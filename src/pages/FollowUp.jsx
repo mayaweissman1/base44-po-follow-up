@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -66,9 +66,6 @@ function passesFilters(row, filters, role) {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const scrollAreaRef = useRef(null);
-  const [scrolled, setScrolled] = useState(false);
-
   const userRole = user?.role || 'main_office';
   const [activeRole, setActiveRole] = useState(userRole || 'main_office');
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -104,16 +101,6 @@ export default function FollowUp() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-    function onScroll() {
-      setScrolled(el.scrollTop > 60);
-    }
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
 
   useEffect(() => {
     setFilters(DEFAULT_FILTERS(activeRole));
@@ -199,17 +186,14 @@ export default function FollowUp() {
           </div>
         </div>
 
-        {/* KPI Cards — only shrink when advanced filters are open */}
         <KpiCards
           role={activeRole}
           kpis={kpis}
           activeFilter={activeKpiFilter}
           onFilterClick={handleKpiFilterClick}
-          scrolled={advancedOpen && scrolled}
         />
 
-        {/* Stats Row — hidden when shrunk */}
-        {!(advancedOpen && scrolled) && activeRole === 'main_office' && rows.length > 0 && (
+        {activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
         )}
 
@@ -227,7 +211,7 @@ export default function FollowUp() {
       </div>
 
       {/* Scrollable area — table only */}
-      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-7 pb-6">
+      <div className="flex-1 overflow-y-auto px-7 pb-6">
         <FollowUpTable
           rows={filteredRows}
           role={activeRole}
