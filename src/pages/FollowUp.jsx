@@ -67,13 +67,9 @@ function passesFilters(row, filters, role) {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const scrolled = useScrollShrink(80);
+  const scrolled = useScrollShrink(100, 40);
 
-  // Role handling - user.role from Base44 profile
   const userRole = user?.role || 'main_office';
-  const availableRoles = userRole ? [userRole] : ['main_office'];
-
-  // If user has a role field, allow switching (for testing multi-role)
   const [activeRole, setActiveRole] = useState(userRole || 'main_office');
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
@@ -86,7 +82,7 @@ export default function FollowUp() {
   // Modals
   const [logDelayPo, setLogDelayPo] = useState(null);
   const [generalUpdatePo, setGeneralUpdatePo] = useState(null);
-  const [decisionState, setDecisionState] = useState(null); // { po, decision }
+  const [decisionState, setDecisionState] = useState(null);
   const [internalNotePo, setInternalNotePo] = useState(null);
   const [logsDrawerPo, setLogsDrawerPo] = useState(null);
 
@@ -108,7 +104,6 @@ export default function FollowUp() {
     loadData();
   }, [loadData]);
 
-  // When role changes, reset filters
   useEffect(() => {
     setFilters(DEFAULT_FILTERS(activeRole));
     setActiveKpiFilter(null);
@@ -133,7 +128,6 @@ export default function FollowUp() {
   }
 
   const filteredRows = rows.filter(r => passesFilters(r, filters, activeRole));
-
   const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))].sort();
   const ddManagers = [...new Set(rows.map(r => r.dd_manager_name).filter(Boolean))].sort();
 
@@ -145,91 +139,68 @@ export default function FollowUp() {
     loadData();
   }
 
-  // All roles list for testing (show all 3 in dropdown)
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8]">
+    <div className="min-h-screen bg-[#F8F8F8]" style={{ overflowAnchor: 'none' }}>
+      <div className="px-7 pt-6 pb-6">
 
-      {/* Sticky header: shrinks on scroll */}
-      <div className={`sticky top-0 z-40 bg-[rgba(248,248,248,0.95)] backdrop-blur-sm px-7 pt-6 pb-0 transition-all duration-200 ${scrolled ? 'border-b border-[#E5E5E5] shadow-sm pt-2 pb-2' : ''}`}>
-
-        {/* Row 1: when NOT scrolled → title+subtitle stacked left, buttons right */}
-        {!scrolled && (
-          <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-            <div>
-              <h1 className="text-[28px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
-              <div className="text-[13px] text-[#525252] mt-0.5">
-                Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative z-50">
-                <button onClick={() => setShowRoleDropdown(o => !o)} className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">
-                  <span>{ROLE_DISPLAY[activeRole]}</span>
-                  <ChevronDown size={12} />
-                </button>
-                {showRoleDropdown && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
-                    {allRoles.map(r => (
-                      <button key={r} onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }} className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}>
-                        {ROLE_DISPLAY[r]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button onClick={loadData} disabled={loading} className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] disabled:opacity-50 transition-colors">
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
-              </button>
+        {/* Page Header — scrolls away naturally (mirrors mockup page-header) */}
+        <div className={`flex items-end justify-between gap-4 flex-wrap ${scrolled ? 'mb-3' : 'mb-5'}`}>
+          <div>
+            <h1 className="text-[28px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
+            <div className="text-[13px] text-[#525252] mt-0.5">
+              Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong>
             </div>
           </div>
-        )}
-
-        {/* Row 1 (scrolled): title + shrunk KPIs + buttons all in one line */}
-        {scrolled && (
-          <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
-            <div className="flex items-center gap-5 min-w-0">
-              <div>
-                <h1 className="text-[18px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
-                <div className="text-[11px] text-[#525252]">Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong></div>
-              </div>
-              <KpiCards role={activeRole} kpis={kpis} activeFilter={activeKpiFilter} onFilterClick={handleKpiFilterClick} shrunk={true} />
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="relative z-50">
-                <button onClick={() => setShowRoleDropdown(o => !o)} className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">
-                  <span>{ROLE_DISPLAY[activeRole]}</span>
-                  <ChevronDown size={12} />
-                </button>
-                {showRoleDropdown && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
-                    {allRoles.map(r => (
-                      <button key={r} onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }} className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}>
-                        {ROLE_DISPLAY[r]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button onClick={loadData} disabled={loading} className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] disabled:opacity-50 transition-colors">
-                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+          <div className="flex items-center gap-3">
+            <div className="relative z-50">
+              <button
+                onClick={() => setShowRoleDropdown(o => !o)}
+                className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
+              >
+                <span>{ROLE_DISPLAY[activeRole]}</span>
+                <ChevronDown size={12} />
               </button>
+              {showRoleDropdown && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
+                  {allRoles.map(r => (
+                    <button
+                      key={r}
+                      onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }}
+                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}
+                    >
+                      {ROLE_DISPLAY[r]}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
+            <button
+              onClick={loadData}
+              disabled={loading}
+              className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] disabled:opacity-50 transition-colors"
+            >
+              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+            </button>
           </div>
-        )}
+        </div>
 
-        {/* KPI Cards — full size, only shown when NOT scrolled */}
-        {!scrolled && (
-          <KpiCards role={activeRole} kpis={kpis} activeFilter={activeKpiFilter} onFilterClick={handleKpiFilterClick} shrunk={false} />
-        )}
+        {/* KPI Cards — always in DOM, becomes sticky top-0 on scroll (mirrors mockup kpi-grid) */}
+        <KpiCards
+          role={activeRole}
+          kpis={kpis}
+          activeFilter={activeKpiFilter}
+          onFilterClick={handleKpiFilterClick}
+          scrolled={scrolled}
+        />
 
-        {/* Stats Row — Main Office only, shown when not scrolled */}
-        {!scrolled && activeRole === 'main_office' && rows.length > 0 && (
+        {/* Stats Row — always in DOM, hidden when scrolled (mirrors mockup body.scrolled .stats-row { display: none }) */}
+        <div className={scrolled || activeRole !== 'main_office' || rows.length === 0 ? 'hidden' : ''}>
           <StatsRow rows={rows} />
-        )}
+        </div>
 
-        {/* Filter Toolbar — always visible in header */}
+        {/* Filter Toolbar */}
         <FilterToolbar
           role={activeRole}
           filters={filters}
@@ -238,10 +209,8 @@ export default function FollowUp() {
           suppliers={suppliers}
           ddManagers={ddManagers}
         />
-      </div>
 
-      {/* Table */}
-      <div className="px-7 pb-6">
+        {/* Table */}
         <FollowUpTable
           rows={filteredRows}
           role={activeRole}
@@ -293,7 +262,6 @@ export default function FollowUp() {
         />
       )}
 
-      {/* Click away for role dropdown */}
       {showRoleDropdown && <div className="fixed inset-0 z-20" onClick={() => setShowRoleDropdown(false)} />}
     </div>
   );

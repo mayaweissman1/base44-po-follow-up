@@ -5,23 +5,30 @@ function KpiCard({ label, value, meta, colorClass, onClick, active, scrolled }) 
     <div
       onClick={onClick}
       className={[
-        'relative bg-white border cursor-pointer min-w-0 transition-all duration-[250ms]',
+        'relative bg-white border cursor-pointer min-w-0',
+        // Always flex, just change direction — this avoids an instant display-mode jump
+        'flex gap-2 transition-all duration-[250ms] ease-[cubic-bezier(.16,1,.3,1)]',
         scrolled
-          ? 'flex items-center gap-2 px-3 py-1.5 min-h-[36px] rounded-[8px] shadow-none'
-          : 'p-4 rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)]',
+          ? 'flex-row items-center px-3 py-1.5 rounded-[8px] shadow-none'
+          : 'flex-col px-4 pt-4 pb-4 rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)]',
         active ? 'border-[#E31B7F] bg-[#FFF0F7]' : 'border-[#E5E5E5] hover:border-[#FFE5F2]',
       ].join(' ')}
     >
       <div className={[
-        'font-bold text-[#525252] uppercase tracking-[.06em] truncate',
-        scrolled ? 'text-[9px] mb-0 flex-1' : 'text-[10px] mb-1.5',
+        'font-bold text-[#525252] uppercase tracking-[.06em] truncate transition-all duration-[250ms]',
+        scrolled ? 'text-[9px] flex-1 leading-none' : 'text-[10px] leading-normal',
       ].join(' ')}>{label}</div>
+
       <div className={[
-        'font-mono font-bold leading-none flex-shrink-0',
+        'font-mono font-bold leading-none flex-shrink-0 transition-all duration-[250ms]',
         colorClass || 'text-[#0A0A0A]',
         scrolled ? 'text-sm' : 'text-2xl',
       ].join(' ')}>{value}</div>
-      <div className={scrolled ? 'hidden' : 'mt-2 text-[11px] text-[#A3A3A3]'}>{meta}</div>
+
+      <div className={[
+        'text-[#A3A3A3] transition-all duration-[150ms]',
+        scrolled ? 'hidden' : 'text-[11px]',
+      ].join(' ')}>{meta}</div>
     </div>
   );
 }
@@ -44,13 +51,15 @@ export default function KpiCards({ role, kpis, activeFilter, onFilterClick, scro
 
   return (
     <div
+      // overflow-anchor: none prevents the browser from adjusting scroll position
+      // when this element changes height (which would cause oscillation at the threshold)
+      style={{ overflowAnchor: 'none', gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}
       className={[
-        'grid mb-4 transition-all duration-[250ms]',
+        'grid mb-4 transition-all duration-[250ms] ease-[cubic-bezier(.16,1,.3,1)]',
         scrolled
-          ? 'sticky top-0 z-20 -mx-7 px-7 py-2 gap-1.5 bg-[rgba(248,248,248,0.92)] backdrop-blur border-b border-[#E5E5E5]'
+          ? 'sticky top-0 z-20 -mx-7 px-7 py-2 gap-1.5 bg-[rgba(248,248,248,0.95)] backdrop-blur border-b border-[#E5E5E5]'
           : 'gap-3',
       ].join(' ')}
-      style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}
     >
       {cards.map(c => (
         <KpiCard

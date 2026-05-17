@@ -1,15 +1,20 @@
 import { useState, useEffect } from 'react';
 
-export function useScrollShrink(threshold = 40) {
+export function useScrollShrink(enterThreshold = 100, exitThreshold = 40) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
     function onScroll() {
-      setScrolled(window.scrollY > threshold);
+      const y = window.scrollY;
+      setScrolled(prev => {
+        if (!prev && y > enterThreshold) return true;
+        if (prev && y < exitThreshold) return false;
+        return prev;
+      });
     }
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [threshold]);
+  }, [enterThreshold, exitThreshold]);
 
   return scrolled;
 }
