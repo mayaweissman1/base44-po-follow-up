@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useScrollShrink } from '@/hooks/useScrollShrink';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -67,7 +66,8 @@ function passesFilters(row, filters, role) {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const scrolled = useScrollShrink(100, 40);
+  const scrollAreaRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
 
   const userRole = user?.role || 'main_office';
   const [activeRole, setActiveRole] = useState(userRole || 'main_office');
@@ -103,6 +103,16 @@ export default function FollowUp() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    function onScroll() {
+      setScrolled(el.scrollTop > 60);
+    }
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   useEffect(() => {
     setFilters(DEFAULT_FILTERS(activeRole));
@@ -142,11 +152,13 @@ export default function FollowUp() {
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8]" style={{ overflowAnchor: 'none' }}>
-      <div className="px-7 pt-6 pb-6">
+    <div className="h-screen flex flex-col bg-[#F8F8F8] overflow-hidden">
 
-        {/* Page Header — scrolls away naturally (mirrors mockup page-header) */}
-        <div className={`flex items-end justify-between gap-4 flex-wrap ${scrolled ? 'mb-3' : 'mb-5'}`}>
+      {/* Fixed header — never scrolls */}
+      <div className="flex-shrink-0 bg-[#F8F8F8] px-7 pt-6 pb-0 z-40">
+
+        {/* Title + buttons */}
+        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <div>
             <h1 className="text-[28px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
             <div className="text-[13px] text-[#525252] mt-0.5">
@@ -186,7 +198,7 @@ export default function FollowUp() {
           </div>
         </div>
 
-        {/* KPI Cards — always in DOM, becomes sticky top-0 on scroll (mirrors mockup kpi-grid) */}
+        {/* KPI Cards */}
         <KpiCards
           role={activeRole}
           kpis={kpis}
@@ -195,12 +207,12 @@ export default function FollowUp() {
           scrolled={scrolled}
         />
 
-        {/* Stats Row — always in DOM, hidden when scrolled (mirrors mockup body.scrolled .stats-row { display: none }) */}
-        <div className={scrolled || activeRole !== 'main_office' || rows.length === 0 ? 'hidden' : ''}>
+        {/* Stats Row — hidden when scrolled */}
+        {!scrolled && activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
-        </div>
+        )}
 
-        {/* Filter Toolbar */}
+        {/* Filter Toolbar — always in fixed header */}
         <FilterToolbar
           role={activeRole}
           filters={filters}
@@ -209,8 +221,10 @@ export default function FollowUp() {
           suppliers={suppliers}
           ddManagers={ddManagers}
         />
+      </div>
 
-        {/* Table */}
+      {/* Scrollable area — table only */}
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-7 pb-6">
         <FollowUpTable
           rows={filteredRows}
           role={activeRole}
