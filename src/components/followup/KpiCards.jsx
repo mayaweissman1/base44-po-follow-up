@@ -1,24 +1,32 @@
 import React from 'react';
 
-function KpiCard({ label, value, meta, colorClass, onClick, active }) {
+function KpiCard({ label, value, meta, colorClass, onClick, active, scrolled }) {
   return (
     <div
       onClick={onClick}
-      className={`
-        relative bg-white border rounded-[10px] p-4 cursor-pointer min-w-0
-        transition-all duration-150 shadow-[0_1px_3px_rgba(0,0,0,.04)]
-        hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)]
-        ${active ? 'border-[#E31B7F] bg-[#FFF0F7]' : 'border-[#E5E5E5] hover:border-[#FFE5F2]'}
-      `}
+      className={[
+        'relative bg-white border cursor-pointer min-w-0 transition-all duration-[250ms]',
+        scrolled
+          ? 'flex items-center gap-2 px-3 py-1.5 min-h-[36px] rounded-[8px] shadow-none'
+          : 'p-4 rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)]',
+        active ? 'border-[#E31B7F] bg-[#FFF0F7]' : 'border-[#E5E5E5] hover:border-[#FFE5F2]',
+      ].join(' ')}
     >
-      <div className="text-[10px] font-bold text-[#525252] uppercase tracking-[.06em] mb-1.5 truncate">{label}</div>
-      <div className={`font-mono text-2xl font-bold leading-none ${colorClass || 'text-[#0A0A0A]'}`}>{value}</div>
-      <div className="mt-2 text-[11px] text-[#A3A3A3]">{meta}</div>
+      <div className={[
+        'font-bold text-[#525252] uppercase tracking-[.06em] truncate',
+        scrolled ? 'text-[9px] mb-0 flex-1' : 'text-[10px] mb-1.5',
+      ].join(' ')}>{label}</div>
+      <div className={[
+        'font-mono font-bold leading-none flex-shrink-0',
+        colorClass || 'text-[#0A0A0A]',
+        scrolled ? 'text-sm' : 'text-2xl',
+      ].join(' ')}>{value}</div>
+      <div className={scrolled ? 'hidden' : 'mt-2 text-[11px] text-[#A3A3A3]'}>{meta}</div>
     </div>
   );
 }
 
-export default function KpiCards({ role, kpis, activeFilter, onFilterClick, shrunk }) {
+export default function KpiCards({ role, kpis, activeFilter, onFilterClick, scrolled }) {
   if (role === 'dd_team_employee') return null;
 
   const cards = role === 'main_office' ? [
@@ -34,29 +42,16 @@ export default function KpiCards({ role, kpis, activeFilter, onFilterClick, shru
     { key: 'rejected_today',     label: 'Rejected today',       value: kpis.rejected_today ?? 0,     meta: 'Team delays · rejected today',             colorClass: 'text-red-500',   filterKey: 'rejected_today' },
   ];
 
-  // Shrunk: compact single-row of label + number
-  if (shrunk) {
-    return (
-      <div className="flex items-center gap-6 overflow-x-auto py-2">
-        {cards.map(c => (
-          <button
-            key={c.key}
-            onClick={() => onFilterClick(c.filterKey)}
-            className={`flex items-center gap-2 whitespace-nowrap transition-colors ${activeFilter === c.filterKey ? 'text-[#E31B7F]' : 'text-[#525252] hover:text-[#0A0A0A]'}`}
-          >
-            <span className="text-[10px] font-bold uppercase tracking-[.06em]">{c.label}</span>
-            <span className={`text-sm font-bold tabular-nums font-mono ${activeFilter === c.filterKey ? 'text-[#E31B7F]' : c.colorClass || 'text-[#0A0A0A]'}`}>
-              {c.value}
-            </span>
-          </button>
-        ))}
-      </div>
-    );
-  }
-
-  // Full cards
   return (
-    <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}>
+    <div
+      className={[
+        'grid mb-4 transition-all duration-[250ms]',
+        scrolled
+          ? 'sticky top-0 z-20 -mx-7 px-7 py-2 gap-1.5 bg-[rgba(248,248,248,0.92)] backdrop-blur border-b border-[#E5E5E5]'
+          : 'gap-3',
+      ].join(' ')}
+      style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}
+    >
       {cards.map(c => (
         <KpiCard
           key={c.key}
@@ -66,6 +61,7 @@ export default function KpiCards({ role, kpis, activeFilter, onFilterClick, shru
           colorClass={c.colorClass}
           active={activeFilter === c.filterKey}
           onClick={() => onFilterClick(c.filterKey)}
+          scrolled={scrolled}
         />
       ))}
     </div>
