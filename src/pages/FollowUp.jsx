@@ -161,7 +161,7 @@ export default function FollowUp() {
           </div>
           <div className="flex items-center gap-3">
             {/* Role Dropdown */}
-            <div className="relative">
+            <div className="relative z-50">
               <button
                 onClick={() => setShowRoleDropdown(o => !o)}
                 className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
@@ -170,7 +170,7 @@ export default function FollowUp() {
                 <ChevronDown size={12} />
               </button>
               {showRoleDropdown && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-30 min-w-[180px] overflow-hidden">
+                <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
                   {allRoles.map(r => (
                     <button
                       key={r}
@@ -194,16 +194,14 @@ export default function FollowUp() {
           </div>
         </div>
 
-        {/* KPI Cards — sticky, shrinks on scroll */}
-        <div className={`sticky top-0 z-30 transition-all duration-200 -mx-7 px-7 ${scrolled ? 'bg-white border-b border-[#E5E5E5] shadow-[0_1px_4px_rgba(0,0,0,.06)]' : ''}`}>
-          <KpiCards
-            role={activeRole}
-            kpis={kpis}
-            activeFilter={activeKpiFilter}
-            onFilterClick={handleKpiFilterClick}
-            shrunk={scrolled}
-          />
-        </div>
+        {/* KPI Cards — shrinks on scroll */}
+        <KpiCards
+          role={activeRole}
+          kpis={kpis}
+          activeFilter={activeKpiFilter}
+          onFilterClick={handleKpiFilterClick}
+          shrunk={scrolled}
+        />
 
         {/* Stats Row — Main Office only */}
         {activeRole === 'main_office' && rows.length > 0 && (
