@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, ChevronDown } from 'lucide-react';
+import { useScrollShrink } from '@/hooks/useScrollShrink';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
@@ -66,6 +67,7 @@ function passesFilters(row, filters, role) {
 
 export default function FollowUp() {
   const { user } = useAuth();
+  const scrolled = useScrollShrink(40);
 
   // Role handling - user.role from Base44 profile
   const userRole = user?.role || 'main_office';
@@ -148,7 +150,34 @@ export default function FollowUp() {
 
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
-      <div className="px-7 py-6">
+      {/* Sticky shrunk KPI bar — visible only when scrolled */}
+      {scrolled && (
+        <div className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-[#E5E5E5] shadow-[0_1px_4px_rgba(0,0,0,.06)]">
+          <div className="px-7 flex items-center h-9 gap-6 overflow-x-auto">
+            {[
+              { key: 'new_pending', label: 'NEW PENDING (TODAY)' },
+              { key: 'total_pending', label: 'TOTAL PENDING' },
+              { key: 'urgent_pending', label: 'URGENT PENDING' },
+              { key: 'approved_today', label: 'APPROVED TODAY' },
+              { key: 'rejected_today', label: 'REJECTED TODAY' },
+              { key: 'acknowledged_today', label: 'ACKNOWLEDGED TODAY' },
+            ].map(({ key, label }) => (
+              <button
+                key={key}
+                onClick={() => handleKpiFilterClick(key)}
+                className={`flex items-center gap-2 whitespace-nowrap h-full transition-colors ${activeKpiFilter === key ? 'text-[#E31B7F]' : 'text-[#525252] hover:text-[#0A0A0A]'}`}
+              >
+                <span className="text-[10px] font-bold uppercase tracking-[.06em]">{label}</span>
+                <span className={`text-sm font-bold tabular-nums ${activeKpiFilter === key ? 'text-[#E31B7F]' : 'text-[#0A0A0A]'}`}>
+                  {kpis[key] ?? 0}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div className={`px-7 py-6 transition-all ${scrolled ? 'pt-14' : ''}`}>
         {/* Page Header */}
         <div className="flex items-end justify-between mb-5 gap-4 flex-wrap">
           <div>
