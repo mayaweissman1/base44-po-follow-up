@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useScrollShrink } from '@/hooks/useScrollShrink';
 import { RefreshCw, ChevronDown } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -66,16 +67,7 @@ function passesFilters(row, filters, role) {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const scrollAreaRef = useRef(null);
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const el = scrollAreaRef.current;
-    if (!el) return;
-    const onScroll = () => setScrolled(el.scrollTop > 40);
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
+  const scrolled = useScrollShrink(80);
 
   // Role handling - user.role from Base44 profile
   const userRole = user?.role || 'main_office';
@@ -157,10 +149,10 @@ export default function FollowUp() {
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (
-    <div className="h-screen flex flex-col bg-[#F8F8F8] overflow-hidden">
+    <div className="min-h-screen bg-[#F8F8F8]">
 
-      {/* Fixed header: title + KPIs (shrinks on scroll) + filters — never scrolls */}
-      <div className="flex-shrink-0 bg-[#F8F8F8] px-7 pt-6 pb-0 z-40">
+      {/* Sticky header: shrinks on scroll */}
+      <div className={`sticky top-0 z-40 bg-[rgba(248,248,248,0.95)] backdrop-blur-sm px-7 pt-6 pb-0 transition-all duration-200 ${scrolled ? 'border-b border-[#E5E5E5] shadow-sm pt-2 pb-2' : ''}`}>
 
         {/* Row 1: when NOT scrolled → title+subtitle stacked left, buttons right */}
         {!scrolled && (
@@ -248,9 +240,8 @@ export default function FollowUp() {
         />
       </div>
 
-      {/* Scrollable content area — table only */}
-      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-7 pb-6">
-        {/* Data Table */}
+      {/* Table */}
+      <div className="px-7 pb-6">
         <FollowUpTable
           rows={filteredRows}
           role={activeRole}
