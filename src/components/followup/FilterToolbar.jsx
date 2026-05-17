@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronDown, RotateCcw } from 'lucide-react';
+import { RotateCcw, X } from 'lucide-react';
 import { DD_STATUS_OPTIONS, DD_REASONS_BY_GROUP } from '@/lib/followUpConstants';
 
 function FilterField({ label, children }) {
@@ -14,8 +14,65 @@ function FilterField({ label, children }) {
 const inputCls = "h-8 px-2.5 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors";
 const selectCls = "h-8 pl-2.5 pr-7 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white appearance-none cursor-pointer focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors";
 
-export default function FilterToolbar({ role, filters, onChange, onReset, suppliers, ddManagers, advancedOpen, onAdvancedToggle }) {
+const CHIP_FORMATTERS = {
+  po:             v => `PO: ${v}`,
+  style:          v => `Style: ${v}`,
+  priority:       v => ({ URGENT: 'URGENT', Deadline: 'Deadline at risk', Normal: 'Normal', MISSING_SIZES: 'Missing sizes', Drop: 'Drop' }[v] || v),
+  supplier:       v => `Supplier: ${v}`,
+  ddManager:      v => `Mgr: ${v}`,
+  ddStatus:       v => `DD Status: ${v}`,
+  reason:         v => v,
+  responsibility: v => ({ OTHER: 'Resp: Other', EDIKTED: 'Resp: Edikted', SUPPLIER: 'Resp: Supplier' }[v] || v),
+  urgent:         _ => 'Urgent only',
+  collection:     v => `Collection: ${v}`,
+  orderType:      v => `Type: ${v}`,
+  flag:           v => ({ URGENT: 'Flag: URGENT', REVIEW: 'Flag: REVIEW', NONE: 'No flag' }[v] || v),
+  nextUpdate:     v => `Next Upd: ${v}`,
+  lateFuture:     v => ({ LATE: 'Late DD', FUTURE: 'Future DD' }[v] || v),
+  poRank:         v => `Rank: ${v}`,
+  destination:    v => `Dest: ${v}`,
+  delayResponse:  v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
+};
+
+function ActiveChips({ filters, defaultFilters, onChange }) {
+  const chips = [];
+  for (const [key, fmt] of Object.entries(CHIP_FORMATTERS)) {
+    const val = filters[key];
+    if (val === undefined || val === null) continue;
+    if (val === defaultFilters[key]) continue;
+    if (val === '' || val === false) continue;
+    chips.push({ key, label: fmt(val) });
+  }
+  if (chips.length === 0) return null;
+  return (
+    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-[#E5E5E5] mt-2">
+      {chips.map(chip => (
+        <button
+          key={chip.key}
+          onClick={() => onChange({ ...filters, [chip.key]: defaultFilters[chip.key] })}
+          className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#FFF0F7] text-[#E31B7F] border border-[#FFE5F2] hover:bg-[#FFE0EF] transition-colors"
+        >
+          {chip.label}
+          <X size={9} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
+export default function FilterToolbar({
+  role, filters, onChange, onReset,
+  suppliers, ddManagers, collections = [], destinations = [],
+  advancedOpen, onAdvancedToggle,
+}) {
   const setAdvancedOpen = onAdvancedToggle || (() => {});
+  const defaultFilters = {
+    po: '', style: '',
+    status: role === 'main_office' ? 'HOLD' : 'ALL',
+    priority: '', supplier: '', ddManager: '', ddStatus: '', reason: '',
+    responsibility: '', urgent: false, collection: '', orderType: '', flag: '',
+    nextUpdate: '', lateFuture: '', poRank: '', destination: '', delayResponse: '',
+  };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
 
@@ -35,7 +92,10 @@ export default function FilterToolbar({ role, filters, onChange, onReset, suppli
           <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
         </FilterField>
         <FilterField label="Collection">
-          <input className={inputCls} placeholder="Search…" value={filters.collection} onChange={e => set('collection', e.target.value)} />
+          <select className={selectCls} value={filters.collection} onChange={e => set('collection', e.target.value)}>
+            <option value="">All</option>
+            {collections.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </FilterField>
         <FilterField label="DD Manager">
           <select className={selectCls} value={filters.ddManager} onChange={e => set('ddManager', e.target.value)}>
@@ -56,6 +116,7 @@ export default function FilterToolbar({ role, filters, onChange, onReset, suppli
             <option value="">All</option>
             <option value="URGENT">URGENT</option>
             <option value="REVIEW">REVIEW</option>
+            <option value="NONE">No flag</option>
           </select>
         </FilterField>
         <FilterField label="DD Status">
@@ -101,6 +162,8 @@ export default function FilterToolbar({ role, filters, onChange, onReset, suppli
               <option value="URGENT">URGENT</option>
               <option value="Deadline">Deadline at risk</option>
               <option value="Normal">Normal</option>
+              <option value="MISSING_SIZES">Missing sizes</option>
+              <option value="Drop">Drop</option>
             </select>
           </FilterField>
           <button
@@ -154,6 +217,40 @@ export default function FilterToolbar({ role, filters, onChange, onReset, suppli
                 <option value="SUPPLIER">Supplier</option>
               </select>
             </FilterField>
+            <FilterField label="Flag">
+              <select className={selectCls} value={filters.flag} onChange={e => set('flag', e.target.value)}>
+                <option value="">All</option>
+                <option value="URGENT">URGENT</option>
+                <option value="REVIEW">REVIEW</option>
+                <option value="NONE">No flag</option>
+              </select>
+            </FilterField>
+            <FilterField label="Late / Future DD">
+              <select className={selectCls} value={filters.lateFuture} onChange={e => set('lateFuture', e.target.value)}>
+                <option value="">All</option>
+                <option value="LATE">Late</option>
+                <option value="FUTURE">Future</option>
+              </select>
+            </FilterField>
+            <FilterField label="PO Rank">
+              <select className={selectCls} value={filters.poRank} onChange={e => set('poRank', e.target.value)}>
+                <option value="">All</option>
+                {['1', '2', '3', '4', '5'].map(r => <option key={r} value={r}>{r}</option>)}
+              </select>
+            </FilterField>
+            <FilterField label="Destination">
+              <select className={selectCls} value={filters.destination} onChange={e => set('destination', e.target.value)}>
+                <option value="">All</option>
+                <option value="UK">UK</option>
+                <option value="US">US</option>
+                {destinations.filter(d => d !== 'UK' && d !== 'US').map(d => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </select>
+            </FilterField>
+            <FilterField label="Delay Response">
+              <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />
+            </FilterField>
             <FilterField label="Urgent">
               <button
                 onClick={() => set('urgent', !filters.urgent)}
@@ -163,6 +260,7 @@ export default function FilterToolbar({ role, filters, onChange, onReset, suppli
               </button>
             </FilterField>
           </div>
+          <ActiveChips filters={filters} defaultFilters={defaultFilters} onChange={onChange} />
         </div>
       )}
     </>

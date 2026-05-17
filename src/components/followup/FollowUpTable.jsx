@@ -4,7 +4,7 @@ import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
 import PriorityBadge from './PriorityBadge';
-import { fmtDate, ddmm, getResponsibility } from '@/lib/followUpConstants';
+import { fmtDate, ddmm } from '@/lib/followUpConstants';
 
 function DaysCell({ value }) {
   if (value === null || value === undefined) return <span className="font-mono text-[#A3A3A3]">0</span>;
@@ -63,8 +63,14 @@ function Checkbox({ checked, onChange }) {
   );
 }
 
+function deliveryDateStatusText(po) {
+  const raw = po.delivery_date_status ?? po.ddd_comment;
+  if (!raw) return '—';
+  return raw.length > 60 ? raw.slice(0, 60) + '…' : raw;
+}
+
 export default function FollowUpTable({
-  rows, role, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, loading,
+  rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, loading,
   selectedRows = new Set(), onSelectRow, onSelectAll, onPoDetails,
 }) {
   const [expanded, setExpanded] = useState(new Set());
@@ -91,11 +97,21 @@ export default function FollowUpTable({
   }
 
   if (rows.length === 0) {
+    const isPending = filterStatus === 'HOLD' || filterStatus === undefined;
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
         <div className="text-center py-16">
-          <div className="text-lg font-semibold text-[#0A0A0A] mb-2">All caught up ✦</div>
-          <div className="text-sm text-[#525252]">No delay requests need your attention right now.</div>
+          {isPending ? (
+            <>
+              <div className="text-lg font-semibold text-[#0A0A0A] mb-2">All caught up ✦</div>
+              <div className="text-sm text-[#525252]">No delay requests need your attention right now.</div>
+            </>
+          ) : (
+            <>
+              <div className="text-lg font-semibold text-[#0A0A0A] mb-2">Nothing matches your filters</div>
+              <div className="text-sm text-[#525252]">Try adjusting or clearing the current filters.</div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -120,6 +136,7 @@ export default function FollowUpTable({
                 <th className={thCls}>Supplier</th>
                 <th className={thCls}>DD Manager</th>
                 <th className={thCls}>Style Color</th>
+                <th className={thCls} title="Set with / linked styles">Set With</th>
                 <th className={thCls}>Order Qty</th>
                 <th className={thCls}>Qty Received</th>
                 <th className={thCls}>Manual RW</th>
@@ -141,6 +158,7 @@ export default function FollowUpTable({
                 <th className={thCls}>Drop</th>
                 <th className={thCls}>Collection</th>
                 <th className={thCls}>PM Tags</th>
+                <th className={thCls}>Type</th>
                 <th className={`${thCls} sticky right-0 z-20 shadow-[-4px_0_8px_rgba(0,0,0,.04)]`}>Actions</th>
               </tr>
             </thead>
@@ -163,6 +181,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.supplier}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{po.dd_manager_name}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[12px]">{po.style_color}</span></td>
+                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#A3A3A3]">{po.set_with || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ordered_qty ?? '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono font-semibold">{po.qty_received ?? 0}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_manual ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
@@ -188,6 +207,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3] text-xs">{fmtDate(po.drop)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.collection}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.pm_tags ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">{po.pm_tags}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#525252]">{po.type || '—'}</span></td>
                     <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg} group-hover:bg-[#FFF0F7]`}>
                       <div className="flex items-center gap-1">
                         <button onClick={() => onLogDelay(po)} className={`h-7 px-3 text-[11px] font-semibold rounded-[6px] transition-colors ${po.effective_delayed_due_date ? 'bg-white text-[#E31B7F] border border-[#E5E5E5] hover:bg-[#FFF0F7] hover:border-[#E31B7F]' : 'bg-[#E31B7F] text-white hover:bg-[#C21571]'}`}>
@@ -208,6 +228,11 @@ export default function FollowUpTable({
   }
 
   // Main Office + DD Team Manager view
+  // Column counts:
+  //   main_office:     checkbox + chevron + 19 always + HOLD Age + Last Comment = 24
+  //   dd_team_manager: chevron + 19 always = 21 (no checkbox, no HOLD Age, no Last Comment)
+  const expandColSpan = role === 'dd_team_manager' ? 21 : 24;
+
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
       <div className="overflow-x-auto overflow-y-auto" style={{ height: 'calc(100vh - 240px)' }}>
@@ -231,6 +256,7 @@ export default function FollowUpTable({
               <th className={thCls}>DD Manager</th>
               <th className={thCls}>Supplier</th>
               <th className={thCls}>DD Status</th>
+              <th className={thCls} title="Truncated DDD comment — production delivery stage">Delivery Date Status</th>
               <th className={thCls}>Due Date</th>
               <th className={thCls}>Delayed DD</th>
               <th className={thCls}>Final DD</th>
@@ -252,8 +278,6 @@ export default function FollowUpTable({
               const isRejected = po.current_status === 'REJECTED';
               const tdBase = `${tdCls} ${role === 'dd_team_manager' && isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'group-hover:bg-[#FFF0F7]'}`;
               const actionCellBase = role === 'dd_team_manager' && isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
-              // colSpan: main_office = 23 cols (checkbox + chevron + 20 data + actions), dd_team_manager = 22 (no checkbox, no HOLD Age, no internal note)
-              const expandColSpan = role === 'dd_team_manager' ? 22 : 23;
 
               return (
                 <React.Fragment key={po.po_number}>
@@ -276,6 +300,7 @@ export default function FollowUpTable({
                     <td className={tdBase}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{po.dd_manager_name || '—'}</span></td>
                     <td className={tdBase}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.supplier}</span></td>
                     <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>
+                    <td className={tdBase}><span className="text-[#525252] text-xs max-w-[160px] truncate inline-block" title={po.delivery_date_status ?? po.ddd_comment}>{deliveryDateStatusText(po)}</span></td>
                     <td className={tdBase}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.due_date)}</span></td>
                     <td className={tdBase}>{po.effective_delayed_due_date ? <span className="font-mono font-semibold">{fmtDate(po.effective_delayed_due_date)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={tdBase}><span className="font-mono font-semibold">{fmtDate(po.final_dd)}</span></td>

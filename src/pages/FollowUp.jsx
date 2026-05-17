@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useScrollShrink } from '@/hooks/useScrollShrink';
 import { RefreshCw, ChevronDown, Download } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -31,16 +30,24 @@ const DEFAULT_FILTERS = (role) => ({
   orderType: '',
   flag: '',
   nextUpdate: '',
+  lateFuture: '',
+  poRank: '',
+  destination: '',
+  delayResponse: '',
 });
 
 function passesFilters(row, filters, role) {
-  const { po, style, status, priority, supplier, ddManager, ddStatus, reason, responsibility, urgent, collection, orderType, flag, nextUpdate } = filters;
+  const {
+    po, style, status, priority, supplier, ddManager, ddStatus, reason,
+    responsibility, urgent, collection, orderType, flag, nextUpdate,
+    lateFuture, poRank, destination, delayResponse,
+  } = filters;
 
   if (po && !row.po_number.toLowerCase().includes(po.toLowerCase())) return false;
   if (style && !row.style_color.toLowerCase().includes(style.toLowerCase())) return false;
   if (supplier && row.supplier !== supplier) return false;
   if (ddManager && row.dd_manager_name !== ddManager) return false;
-  if (collection && !row.collection.toLowerCase().includes(collection.toLowerCase())) return false;
+  if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
   if (orderType) {
     const t = row.po_number.endsWith('-CL') ? 'CL' : row.po_number.endsWith('-AC') ? 'ACC' : 'Regular';
     if (t !== orderType) return false;
@@ -48,17 +55,24 @@ function passesFilters(row, filters, role) {
   if (flag) {
     if (flag === 'URGENT' && row.flags !== 'URGENT') return false;
     if (flag === 'REVIEW' && row.flags !== 'REVIEW') return false;
+    if (flag === 'NONE' && row.flags) return false;
   }
   if (urgent && !row.urgent) return false;
   if (ddStatus && row.effective_dd_status !== ddStatus) return false;
   if (reason && row.ddd_reason !== reason) return false;
   if (responsibility && REASON_TO_RESPONSIBILITY[row.ddd_reason] !== responsibility) return false;
   if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
+  if (lateFuture && row.late_future !== lateFuture) return false;
+  if (poRank && String(row.po_rank) !== poRank) return false;
+  if (destination && row.destination !== destination) return false;
+  if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
 
   if (priority) {
     if (priority === 'URGENT' && row.priority !== 'URGENT') return false;
     if (priority === 'Deadline' && !(row.priority || '').includes('Deadline')) return false;
     if (priority === 'Normal' && row.priority !== 'Normal') return false;
+    if (priority === 'MISSING_SIZES' && row.priority !== 'MISSING SIZES') return false;
+    if (priority === 'Drop' && row.priority !== 'Drop') return false;
   }
 
   if (status === 'HOLD' && row.current_status !== 'HOLD') return false;
@@ -75,7 +89,8 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
     ['dd_manager_name', 'DD Manager'], ['current_status', 'Status'], ['priority', 'Priority'],
     ['due_date', 'Due Date'], ['effective_delayed_due_date', 'Delayed DD'], ['final_dd', 'Final DD'],
     ['days_late_counting', 'Days Late'], ['ddd_reason', 'DD Reason'], ['ddd_comment', 'DDD Comment'],
-    ['effective_dd_status', 'DD Status'], ['delay_response_comment', 'Response'], ['collection', 'Collection'],
+    ['effective_dd_status', 'DD Status'], ['delivery_date_status', 'Delivery Date Status'],
+    ['delay_response_comment', 'Response'], ['collection', 'Collection'],
     ['effective_next_update', 'Next Update'], ['ddd_count', 'DDD Count'],
   ];
   const header = cols.map(([, l]) => `"${l}"`).join(',');
@@ -88,7 +103,6 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const isAdmin = user?.role === 'admin';
   const userRole = user?.role === 'admin' ? 'main_office' : (user?.role || 'main_office');
   const [activeRole, setActiveRole] = useState(userRole);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
@@ -100,21 +114,14 @@ export default function FollowUp() {
   const [activeKpiFilter, setActiveKpiFilter] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
-  // Selection
   const [selectedRows, setSelectedRows] = useState(new Set());
-
-  // Single-PO modals
   const [logDelayPo, setLogDelayPo] = useState(null);
   const [generalUpdatePo, setGeneralUpdatePo] = useState(null);
   const [decisionState, setDecisionState] = useState(null);
   const [internalNotePo, setInternalNotePo] = useState(null);
   const [logsDrawerPo, setLogsDrawerPo] = useState(null);
-
-  // Bulk modals
   const [bulkLogDelayPOs, setBulkLogDelayPOs] = useState(null);
   const [bulkGeneralUpdatePOs, setBulkGeneralUpdatePOs] = useState(null);
-
-  // PO details drawer
   const [detailsPo, setDetailsPo] = useState(null);
 
   const loadData = useCallback(async () => {
@@ -131,9 +138,7 @@ export default function FollowUp() {
     setLoading(false);
   }, [activeRole, user?.dd_employee_id]);
 
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
+  useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
     setFilters(DEFAULT_FILTERS(activeRole));
@@ -162,8 +167,7 @@ export default function FollowUp() {
   function handleSelectRow(poNumber) {
     setSelectedRows(prev => {
       const next = new Set(prev);
-      if (next.has(poNumber)) next.delete(poNumber);
-      else next.add(poNumber);
+      if (next.has(poNumber)) next.delete(poNumber); else next.add(poNumber);
       return next;
     });
   }
@@ -193,10 +197,6 @@ export default function FollowUp() {
     loadData();
   }
 
-  const filteredRows = rows.filter(r => passesFilters(r, filters, activeRole));
-  const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))].sort();
-  const ddManagers = [...new Set(rows.map(r => r.dd_manager_name).filter(Boolean))].sort();
-
   function onActionSaved() {
     setLogDelayPo(null);
     setGeneralUpdatePo(null);
@@ -208,6 +208,11 @@ export default function FollowUp() {
     loadData();
   }
 
+  const filteredRows = rows.filter(r => passesFilters(r, filters, activeRole));
+  const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))].sort();
+  const ddManagers = [...new Set(rows.map(r => r.dd_manager_name).filter(Boolean))].sort();
+  const collections = [...new Set(rows.map(r => r.collection).filter(Boolean))].sort();
+  const destinations = [...new Set(rows.map(r => r.destination).filter(Boolean))].sort();
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (
@@ -253,30 +258,6 @@ export default function FollowUp() {
             >
               <Download size={13} /> Export
             </button>
-            {isAdmin && (
-              <div className="relative z-50">
-                <button
-                  onClick={() => setShowRoleDropdown(o => !o)}
-                  className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
-                >
-                  <span>{ROLE_DISPLAY[activeRole]}</span>
-                  <ChevronDown size={12} />
-                </button>
-                {showRoleDropdown && (
-                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
-                    {allRoles.map(r => (
-                      <button
-                        key={r}
-                        onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }}
-                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}
-                      >
-                        {ROLE_DISPLAY[r]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
             <button
               onClick={loadData}
               disabled={loading}
@@ -295,13 +276,12 @@ export default function FollowUp() {
           onFilterClick={handleKpiFilterClick}
         />
 
-        {/* Stats Row */}
-        <div className={scrolled || activeRole !== 'main_office' || rows.length === 0 ? 'hidden' : ''}>
+        {/* Stats Row — main_office only */}
         {activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
         )}
 
-        {/* Filter Toolbar — always in fixed header */}
+        {/* Filter Toolbar */}
         <FilterToolbar
           role={activeRole}
           filters={filters}
@@ -309,17 +289,20 @@ export default function FollowUp() {
           onReset={() => { setFilters(DEFAULT_FILTERS(activeRole)); setActiveKpiFilter(null); }}
           suppliers={suppliers}
           ddManagers={ddManagers}
+          collections={collections}
+          destinations={destinations}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}
         />
       </div>
 
-      {/* Scrollable area — table only */}
+      {/* Scrollable table area */}
       <div className="flex-1 overflow-y-auto px-7 pb-6">
         <FollowUpTable
           rows={filteredRows}
           role={activeRole}
           loading={loading}
+          filterStatus={filters.status}
           selectedRows={selectedRows}
           onSelectRow={handleSelectRow}
           onSelectAll={handleSelectAll}
@@ -332,7 +315,6 @@ export default function FollowUp() {
         />
       </div>
 
-      {/* Bulk action bar */}
       <BulkActionBar
         count={selectedRows.size}
         role={activeRole}
@@ -345,7 +327,6 @@ export default function FollowUp() {
         onClear={() => setSelectedRows(new Set())}
       />
 
-      {/* Single-PO modals */}
       {logDelayPo && (
         <LogDelayModal
           po={logDelayPo}
@@ -385,8 +366,6 @@ export default function FollowUp() {
           onClose={() => setLogsDrawerPo(null)}
         />
       )}
-
-      {/* Bulk modals */}
       {bulkLogDelayPOs && (
         <LogDelayModal
           po={null}
@@ -404,8 +383,6 @@ export default function FollowUp() {
           onSaved={onActionSaved}
         />
       )}
-
-      {/* PO details drawer */}
       {detailsPo && (
         <PoDetailsDrawer
           po={detailsPo}
