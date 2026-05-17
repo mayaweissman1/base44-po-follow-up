@@ -149,13 +149,15 @@ export default function FollowUp() {
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (
-    <div className="min-h-screen bg-[#F8F8F8]">
-      <div className="px-7 py-6">
-        {/* Page Header */}
-        <div className="flex items-end justify-between mb-5 gap-4 flex-wrap">
+    <div className="h-screen flex flex-col bg-[#F8F8F8] overflow-hidden">
+
+      {/* Sticky top header — never scrolls */}
+      <div className="flex-shrink-0 bg-[#F8F8F8] px-7 pt-6 pb-0 z-40">
+        {/* Page Header row */}
+        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
           <div>
             <h1 className="text-[28px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
-            <div className="text-[13px] text-[#525252] mt-1">
+            <div className="text-[13px] text-[#525252] mt-0.5">
               Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong>
             </div>
           </div>
@@ -194,15 +196,18 @@ export default function FollowUp() {
           </div>
         </div>
 
-        {/* KPI Cards — shrinks on scroll */}
+        {/* KPI Cards — always visible, no scroll effect */}
         <KpiCards
           role={activeRole}
           kpis={kpis}
           activeFilter={activeKpiFilter}
           onFilterClick={handleKpiFilterClick}
-          shrunk={scrolled}
+          shrunk={false}
         />
+      </div>
 
+      {/* Scrollable content area */}
+      <div className="flex-1 overflow-y-auto px-7 pb-6">
         {/* Stats Row — Main Office only */}
         {activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
