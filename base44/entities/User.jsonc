@@ -1,0 +1,19 @@
+{
+  "name": "User",
+  "type": "object",
+  "properties": {
+    "role": {
+      "type": "string",
+      "enum": [
+        "dd_team_employee",
+        "dd_team_manager",
+        "main_office"
+      ],
+      "description": "User role in the Follow Up system"
+    },
+    "dd_employee_id": {
+      "type": "string",
+      "description": "Only for dd_team_employee - matching edikted_employees.id from the Edikted DB"
+    }
+  }
+}

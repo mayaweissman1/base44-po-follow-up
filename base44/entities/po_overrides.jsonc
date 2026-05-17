@@ -1,0 +1,40 @@
+{
+  "name": "po_overrides",
+  "type": "object",
+  "properties": {
+    "po_number": {
+      "type": "string",
+      "description": "PO number - one row per PO"
+    },
+    "delayed_due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Overrides purchase_orders.delayed_due_date"
+    },
+    "dd_status": {
+      "type": "string",
+      "description": "Overrides purchase_orders.dd_status"
+    },
+    "next_update_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Overrides purchase_orders.next_update"
+    },
+    "dd_status_changed_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "For Days Same Status computation"
+    },
+    "last_ddd_update_id": {
+      "type": "string",
+      "description": "FK to dd_updates.id - latest DDD_UPDATE"
+    },
+    "last_general_update_id": {
+      "type": "string",
+      "description": "FK to dd_updates.id - latest GENERAL_UPDATE"
+    }
+  },
+  "required": [
+    "po_number"
+  ]
+}

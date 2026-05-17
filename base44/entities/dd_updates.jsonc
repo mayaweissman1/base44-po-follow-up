@@ -1,0 +1,134 @@
+{
+  "name": "dd_updates",
+  "type": "object",
+  "properties": {
+    "po_number": {
+      "type": "string",
+      "description": "References purchase_orders.po_number"
+    },
+    "actor_email": {
+      "type": "string",
+      "description": "Email of user who performed the action"
+    },
+    "type": {
+      "type": "string",
+      "enum": [
+        "DDD_UPDATE",
+        "GENERAL_UPDATE"
+      ],
+      "description": "Type of update"
+    },
+    "previous_due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "DDD_UPDATE only - previous due date"
+    },
+    "new_due_date": {
+      "type": "string",
+      "format": "date",
+      "description": "DDD_UPDATE only - new delayed due date"
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "Force Majeure",
+        "DD Temporary",
+        "PPS Approval Late",
+        "Fabric Approval Late",
+        "QC Approval Late",
+        "Wrong Packing Materials",
+        "Labels Arrive Late",
+        "QC Reproduction",
+        "QC ReWork",
+        "PPS Submission Late",
+        "Fabric Issue",
+        "Production Capacity Issue",
+        "Technical problem - washing",
+        "Technical problem - printing",
+        "Technical problem - sewing / handmade",
+        "Packing Issue",
+        "Special details late"
+      ],
+      "description": "DDD_UPDATE only - delay reason"
+    },
+    "responsibility": {
+      "type": "string",
+      "enum": [
+        "OTHER",
+        "EDIKTED",
+        "SUPPLIER"
+      ],
+      "description": "DDD_UPDATE only - derived from reason"
+    },
+    "ddd_comment": {
+      "type": "string",
+      "description": "DDD_UPDATE only - free text explanation"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "HOLD",
+        "AUTOMATICALLY",
+        "APPROVED",
+        "ACKNOWLEDGED",
+        "REJECTED"
+      ],
+      "description": "DDD_UPDATE only - approval status"
+    },
+    "cumulative_delay_days": {
+      "type": "number",
+      "description": "DDD_UPDATE only - total days delayed from original due date"
+    },
+    "decision_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "DDD_UPDATE only - when decision was made"
+    },
+    "decision_by_email": {
+      "type": "string",
+      "description": "DDD_UPDATE only - who made the decision"
+    },
+    "delay_response_comment": {
+      "type": "string",
+      "description": "DDD_UPDATE only - public comment from main office"
+    },
+    "internal_note": {
+      "type": "string",
+      "description": "DDD_UPDATE only - main office private note"
+    },
+    "dd_status": {
+      "type": "string",
+      "description": "GENERAL_UPDATE only - production stage"
+    },
+    "general_comment": {
+      "type": "string",
+      "enum": [
+        "On track",
+        "Awaiting supplier response",
+        "Sample sent",
+        "Sample approved",
+        "Bulk fabric received",
+        "Production started",
+        "Quality check in progress",
+        "Goods ready for shipment",
+        "Risk: possible delay",
+        "Other"
+      ],
+      "description": "GENERAL_UPDATE only - closed list comment"
+    },
+    "general_comment_other_text": {
+      "type": "string",
+      "description": "GENERAL_UPDATE only - free text when comment is Other"
+    },
+    "next_update_date": {
+      "type": "string",
+      "format": "date",
+      "description": "GENERAL_UPDATE only - next scheduled update"
+    }
+  },
+  "required": [
+    "po_number",
+    "actor_email",
+    "type"
+  ]
+}
