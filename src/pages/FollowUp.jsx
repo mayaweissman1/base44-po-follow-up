@@ -159,69 +159,85 @@ export default function FollowUp() {
   return (
     <div className="h-screen flex flex-col bg-[#F8F8F8] overflow-hidden">
 
-      {/* Sticky top header — never scrolls */}
+      {/* Fixed header: title + KPIs (shrinks on scroll) + filters — never scrolls */}
       <div className="flex-shrink-0 bg-[#F8F8F8] px-7 pt-6 pb-0 z-40">
-        {/* Page Header row */}
-        <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-          <div>
-            <h1 className="text-[28px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
-            <div className="text-[13px] text-[#525252] mt-0.5">
-              Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong>
+
+        {/* Row 1: when NOT scrolled → title+subtitle stacked left, buttons right */}
+        {!scrolled && (
+          <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
+            <div>
+              <h1 className="text-[28px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
+              <div className="text-[13px] text-[#525252] mt-0.5">
+                Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong>
+              </div>
             </div>
-          </div>
-          <div className="flex items-center gap-3">
-            {/* Role Dropdown */}
-            <div className="relative z-50">
-              <button
-                onClick={() => setShowRoleDropdown(o => !o)}
-                className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
-              >
-                <span>{ROLE_DISPLAY[activeRole]}</span>
-                <ChevronDown size={12} />
+            <div className="flex items-center gap-3">
+              <div className="relative z-50">
+                <button onClick={() => setShowRoleDropdown(o => !o)} className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">
+                  <span>{ROLE_DISPLAY[activeRole]}</span>
+                  <ChevronDown size={12} />
+                </button>
+                {showRoleDropdown && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
+                    {allRoles.map(r => (
+                      <button key={r} onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }} className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}>
+                        {ROLE_DISPLAY[r]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={loadData} disabled={loading} className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] disabled:opacity-50 transition-colors">
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
               </button>
-              {showRoleDropdown && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
-                  {allRoles.map(r => (
-                    <button
-                      key={r}
-                      onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}
-                    >
-                      {ROLE_DISPLAY[r]}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
-            <button
-              onClick={loadData}
-              disabled={loading}
-              className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] disabled:opacity-50 transition-colors"
-            >
-              <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
-              Refresh
-            </button>
           </div>
-        </div>
+        )}
 
-        {/* KPI Cards — shrinks on scroll */}
-        <KpiCards
-          role={activeRole}
-          kpis={kpis}
-          activeFilter={activeKpiFilter}
-          onFilterClick={handleKpiFilterClick}
-          shrunk={scrolled}
-        />
-      </div>
+        {/* Row 1 (scrolled): title + shrunk KPIs + buttons all in one line */}
+        {scrolled && (
+          <div className="flex items-center justify-between mb-3 gap-4 flex-wrap">
+            <div className="flex items-center gap-5 min-w-0">
+              <div>
+                <h1 className="text-[18px] font-bold text-[#0A0A0A] leading-tight">Follow Up</h1>
+                <div className="text-[11px] text-[#525252]">Working as <strong>{ROLE_DISPLAY[activeRole] || activeRole}</strong></div>
+              </div>
+              <KpiCards role={activeRole} kpis={kpis} activeFilter={activeKpiFilter} onFilterClick={handleKpiFilterClick} shrunk={true} />
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative z-50">
+                <button onClick={() => setShowRoleDropdown(o => !o)} className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">
+                  <span>{ROLE_DISPLAY[activeRole]}</span>
+                  <ChevronDown size={12} />
+                </button>
+                {showRoleDropdown && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
+                    {allRoles.map(r => (
+                      <button key={r} onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }} className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}>
+                        {ROLE_DISPLAY[r]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={loadData} disabled={loading} className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] disabled:opacity-50 transition-colors">
+                <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
+              </button>
+            </div>
+          </div>
+        )}
 
-      {/* Scrollable content area */}
-      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-7 pb-6">
-        {/* Stats Row — Main Office only */}
-        {activeRole === 'main_office' && rows.length > 0 && (
+        {/* KPI Cards — full size, only shown when NOT scrolled */}
+        {!scrolled && (
+          <KpiCards role={activeRole} kpis={kpis} activeFilter={activeKpiFilter} onFilterClick={handleKpiFilterClick} shrunk={false} />
+        )}
+
+        {/* Stats Row — Main Office only, shown when not scrolled */}
+        {!scrolled && activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
         )}
 
-        {/* Filter Toolbar */}
+        {/* Filter Toolbar — always visible in header */}
         <FilterToolbar
           role={activeRole}
           filters={filters}
@@ -230,7 +246,10 @@ export default function FollowUp() {
           suppliers={suppliers}
           ddManagers={ddManagers}
         />
+      </div>
 
+      {/* Scrollable content area — table only */}
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-7 pb-6">
         {/* Data Table */}
         <FollowUpTable
           rows={filteredRows}
