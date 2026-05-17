@@ -64,6 +64,9 @@ export default function FilterToolbar({ role, filters, onChange, onReset, suppli
             {DD_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
         </FilterField>
+        <FilterField label="Next Update">
+          <input type="date" className={inputCls} value={filters.nextUpdate || ''} onChange={e => set('nextUpdate', e.target.value)} />
+        </FilterField>
         <button onClick={onReset} className="h-8 px-3 text-xs font-semibold text-[#525252] hover:text-[#0A0A0A] hover:bg-[#F8F8F8] rounded-[6px] flex items-center gap-1.5 transition-colors ml-auto">
           <RotateCcw size={12} /> Reset
         </button>

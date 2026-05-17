@@ -3,7 +3,9 @@ import { X } from 'lucide-react';
 import { DD_STATUS_OPTIONS, DD_COMMENT_OPTIONS, fmtDate } from '@/lib/followUpConstants';
 import { base44 } from '@/api/base44Client';
 
-export default function GeneralUpdateModal({ po, onClose, onSaved }) {
+export default function GeneralUpdateModal({ po, posBulk, onClose, onSaved }) {
+  const isBulk = !po && !!posBulk?.length;
+
   const [ddStatus, setDdStatus] = useState('');
   const [commentSel, setCommentSel] = useState('');
   const [commentOther, setCommentOther] = useState('');
@@ -11,7 +13,7 @@ export default function GeneralUpdateModal({ po, onClose, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  if (!po) return null;
+  if (!po && !posBulk?.length) return null;
 
   async function handleSave() {
     if (!ddStatus && !commentSel && !nextUpdate) {
@@ -24,20 +26,31 @@ export default function GeneralUpdateModal({ po, onClose, onSaved }) {
     }
     setSaving(true);
     setError('');
-    const res = await base44.functions.invoke('saveFollowUpAction', {
-      action_type: 'GENERAL_UPDATE',
-      po_number: po.po_number,
-      payload: {
-        dd_status: ddStatus || null,
-        general_comment: commentSel || null,
-        general_comment_other_text: commentSel === 'Other' ? commentOther.trim() : null,
-        next_update_date: nextUpdate || null,
-        current_dd_status: po.effective_dd_status,
-      },
-    });
-    setSaving(false);
-    if (res.data?.error) { setError(res.data.error); return; }
-    onSaved(res.data);
+    try {
+      const targets = isBulk ? posBulk : [po];
+      for (const target of targets) {
+        const res = await base44.functions.invoke('saveFollowUpAction', {
+          action_type: 'GENERAL_UPDATE',
+          po_number: target.po_number,
+          payload: {
+            dd_status: ddStatus || null,
+            general_comment: commentSel || null,
+            general_comment_other_text: commentSel === 'Other' ? commentOther.trim() : null,
+            next_update_date: nextUpdate || null,
+            current_dd_status: target.effective_dd_status,
+          },
+        });
+        if (res.data?.error) {
+          setError(`Error on ${target.po_number}: ${res.data.error}`);
+          setSaving(false);
+          return;
+        }
+      }
+      onSaved();
+    } catch {
+      setError('An error occurred.');
+      setSaving(false);
+    }
   }
 
   return (
@@ -45,16 +58,24 @@ export default function GeneralUpdateModal({ po, onClose, onSaved }) {
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
       <div className="relative bg-white rounded-[14px] w-[520px] max-w-[calc(100vw-32px)] max-h-[90vh] flex flex-col shadow-[0_8px_24px_rgba(227,27,127,.10),0_4px_8px_rgba(0,0,0,.04)] animate-scale-in">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E5]">
-          <h2 className="text-base font-semibold text-[#0A0A0A]">Add update</h2>
+          <h2 className="text-base font-semibold text-[#0A0A0A]">
+            {isBulk ? `Add update · ${posBulk.length} POs` : 'Add update'}
+          </h2>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#F8F8F8] hover:text-[#0A0A0A] transition-colors"><X size={16} /></button>
         </div>
         <div className="px-5 py-5 overflow-y-auto flex-1">
-          <dl className="grid text-xs mb-4 bg-[#FAFAFA] border border-[#E5E5E5] rounded-[8px] p-3" style={{ gridTemplateColumns: 'max-content 1fr', gap: '6px 16px' }}>
-            <dt className="text-[#525252] font-semibold">PO</dt><dd className="font-mono font-bold">{po.po_number}</dd>
-            <dt className="text-[#525252] font-semibold">Style</dt><dd className="font-mono">{po.style_color}</dd>
-            <dt className="text-[#525252] font-semibold">Current DD Status</dt><dd>{po.effective_dd_status || '—'}</dd>
-            <dt className="text-[#525252] font-semibold">Current Next Update</dt><dd>{fmtDate(po.effective_next_update) || '—'}</dd>
-          </dl>
+          {isBulk ? (
+            <div className="mb-4 bg-[#FFF0F7] border border-[#FFE5F2] rounded-[8px] px-3 py-2.5 text-xs font-semibold text-[#E31B7F]">
+              {posBulk.length} POs selected · same update settings will apply to all
+            </div>
+          ) : (
+            <dl className="grid text-xs mb-4 bg-[#FAFAFA] border border-[#E5E5E5] rounded-[8px] p-3" style={{ gridTemplateColumns: 'max-content 1fr', gap: '6px 16px' }}>
+              <dt className="text-[#525252] font-semibold">PO</dt><dd className="font-mono font-bold">{po.po_number}</dd>
+              <dt className="text-[#525252] font-semibold">Style</dt><dd className="font-mono">{po.style_color}</dd>
+              <dt className="text-[#525252] font-semibold">Current DD Status</dt><dd>{po.effective_dd_status || '—'}</dd>
+              <dt className="text-[#525252] font-semibold">Current Next Update</dt><dd>{fmtDate(po.effective_next_update) || '—'}</dd>
+            </dl>
+          )}
 
           <div className="mb-4">
             <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">DD Status</label>
@@ -90,7 +111,7 @@ export default function GeneralUpdateModal({ po, onClose, onSaved }) {
         <div className="px-5 py-4 border-t border-[#E5E5E5] flex justify-end gap-3">
           <button onClick={onClose} className="h-8 px-4 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[6px] hover:bg-[#F8F8F8] transition-colors">Cancel</button>
           <button onClick={handleSave} disabled={saving} className="h-8 px-4 text-xs font-semibold text-white bg-[#E31B7F] rounded-[6px] hover:bg-[#C21571] disabled:opacity-50 transition-colors">
-            {saving ? 'Saving…' : 'Save update'}
+            {saving ? 'Saving…' : isBulk ? `Save ${posBulk.length} updates` : 'Save update'}
           </button>
         </div>
       </div>
