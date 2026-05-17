@@ -18,24 +18,45 @@ function KpiCard({ label, value, meta, colorClass, onClick, active }) {
   );
 }
 
-export default function KpiCards({ role, kpis, activeFilter, onFilterClick }) {
+export default function KpiCards({ role, kpis, activeFilter, onFilterClick, shrunk }) {
   if (role === 'dd_team_employee') return null;
 
   const cards = role === 'main_office' ? [
-    { key: 'new_pending',       label: 'New pending (today)', value: kpis.new_pending ?? 0,        meta: 'HOLDs created today',       colorClass: '', filterKey: 'new_pending' },
-    { key: 'total_pending',     label: 'Total pending',        value: kpis.total_pending ?? 0,      meta: 'All HOLDs in the system',   colorClass: '', filterKey: 'total_pending' },
-    { key: 'urgent_pending',    label: 'Urgent pending',       value: kpis.urgent_pending ?? 0,     meta: 'Urgent POs in HOLD',        colorClass: 'text-red-500', filterKey: 'urgent_pending' },
-    { key: 'approved_today',    label: 'Approved today',       value: kpis.approved_today ?? 0,     meta: 'Approved · today',          colorClass: 'text-green-500', filterKey: 'approved_today' },
-    { key: 'rejected_today',    label: 'Rejected today',       value: kpis.rejected_today ?? 0,     meta: 'Rejected · today',          colorClass: 'text-red-500', filterKey: 'rejected_today' },
-    { key: 'acknowledged_today',label: 'Acknowledged today',   value: kpis.acknowledged_today ?? 0, meta: 'Acknowledged · today',      colorClass: 'text-teal-500', filterKey: 'acknowledged_today' },
+    { key: 'new_pending',        label: 'New pending (today)',  value: kpis.new_pending ?? 0,        meta: 'HOLDs created today',      colorClass: '',               filterKey: 'new_pending' },
+    { key: 'total_pending',      label: 'Total pending',        value: kpis.total_pending ?? 0,      meta: 'All HOLDs in the system',  colorClass: '',               filterKey: 'total_pending' },
+    { key: 'urgent_pending',     label: 'Urgent pending',       value: kpis.urgent_pending ?? 0,     meta: 'Urgent POs in HOLD',       colorClass: 'text-red-500',   filterKey: 'urgent_pending' },
+    { key: 'approved_today',     label: 'Approved today',       value: kpis.approved_today ?? 0,     meta: 'Approved · today',         colorClass: 'text-green-500', filterKey: 'approved_today' },
+    { key: 'rejected_today',     label: 'Rejected today',       value: kpis.rejected_today ?? 0,     meta: 'Rejected · today',         colorClass: 'text-red-500',   filterKey: 'rejected_today' },
+    { key: 'acknowledged_today', label: 'Acknowledged today',   value: kpis.acknowledged_today ?? 0, meta: 'Acknowledged · today',     colorClass: 'text-teal-500',  filterKey: 'acknowledged_today' },
   ] : [
-    { key: 'total_pending',     label: 'Team pending',         value: kpis.total_pending ?? 0,      meta: 'Team HOLDs · awaiting decision',       colorClass: '', filterKey: 'total_pending' },
-    { key: 'acknowledged_today',label: 'Acknowledged today',   value: (kpis.approved_today ?? 0) + (kpis.acknowledged_today ?? 0), meta: 'Team delays · acknowledged/approved today', colorClass: 'text-green-500', filterKey: 'acknowledged_today' },
-    { key: 'rejected_today',    label: 'Rejected today',       value: kpis.rejected_today ?? 0,     meta: 'Team delays · rejected today',         colorClass: 'text-red-500', filterKey: 'rejected_today' },
+    { key: 'total_pending',      label: 'Team pending',         value: kpis.total_pending ?? 0,      meta: 'Team HOLDs · awaiting decision',           colorClass: '',               filterKey: 'total_pending' },
+    { key: 'acknowledged_today', label: 'Acknowledged today',   value: (kpis.approved_today ?? 0) + (kpis.acknowledged_today ?? 0), meta: 'Team delays · acknowledged/approved today', colorClass: 'text-green-500', filterKey: 'acknowledged_today' },
+    { key: 'rejected_today',     label: 'Rejected today',       value: kpis.rejected_today ?? 0,     meta: 'Team delays · rejected today',             colorClass: 'text-red-500',   filterKey: 'rejected_today' },
   ];
 
+  // Shrunk: compact single-row of label + number
+  if (shrunk) {
+    return (
+      <div className="flex items-center gap-6 overflow-x-auto py-2">
+        {cards.map(c => (
+          <button
+            key={c.key}
+            onClick={() => onFilterClick(c.filterKey)}
+            className={`flex items-center gap-2 whitespace-nowrap transition-colors ${activeFilter === c.filterKey ? 'text-[#E31B7F]' : 'text-[#525252] hover:text-[#0A0A0A]'}`}
+          >
+            <span className="text-[10px] font-bold uppercase tracking-[.06em]">{c.label}</span>
+            <span className={`text-sm font-bold tabular-nums font-mono ${activeFilter === c.filterKey ? 'text-[#E31B7F]' : c.colorClass || 'text-[#0A0A0A]'}`}>
+              {c.value}
+            </span>
+          </button>
+        ))}
+      </div>
+    );
+  }
+
+  // Full cards
   return (
-    <div className={`grid gap-3 mb-4`} style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}>
+    <div className="grid gap-3 mb-4" style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }}>
       {cards.map(c => (
         <KpiCard
           key={c.key}
