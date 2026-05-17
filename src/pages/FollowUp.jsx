@@ -78,6 +78,7 @@ export default function FollowUp() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(DEFAULT_FILTERS(activeRole));
   const [activeKpiFilter, setActiveKpiFilter] = useState(null);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Modals
   const [logDelayPo, setLogDelayPo] = useState(null);
@@ -198,17 +199,17 @@ export default function FollowUp() {
           </div>
         </div>
 
-        {/* KPI Cards */}
+        {/* KPI Cards — only shrink when advanced filters are open */}
         <KpiCards
           role={activeRole}
           kpis={kpis}
           activeFilter={activeKpiFilter}
           onFilterClick={handleKpiFilterClick}
-          scrolled={scrolled}
+          scrolled={advancedOpen && scrolled}
         />
 
-        {/* Stats Row — hidden when scrolled */}
-        {!scrolled && activeRole === 'main_office' && rows.length > 0 && (
+        {/* Stats Row — hidden when shrunk */}
+        {!(advancedOpen && scrolled) && activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
         )}
 
@@ -220,6 +221,8 @@ export default function FollowUp() {
           onReset={() => { setFilters(DEFAULT_FILTERS(activeRole)); setActiveKpiFilter(null); }}
           suppliers={suppliers}
           ddManagers={ddManagers}
+          advancedOpen={advancedOpen}
+          onAdvancedToggle={setAdvancedOpen}
         />
       </div>
 
