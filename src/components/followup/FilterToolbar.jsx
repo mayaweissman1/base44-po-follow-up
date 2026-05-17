@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ChevronDown, RotateCcw } from 'lucide-react';
 import { DD_STATUS_OPTIONS, DD_REASONS_BY_GROUP } from '@/lib/followUpConstants';
 
@@ -14,8 +14,8 @@ function FilterField({ label, children }) {
 const inputCls = "h-8 px-2.5 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors";
 const selectCls = "h-8 pl-2.5 pr-7 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white appearance-none cursor-pointer focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors";
 
-export default function FilterToolbar({ role, filters, onChange, onReset, suppliers, ddManagers }) {
-  const [advancedOpen, setAdvancedOpen] = useState(false);
+export default function FilterToolbar({ role, filters, onChange, onReset, suppliers, ddManagers, advancedOpen, onAdvancedToggle }) {
+  const setAdvancedOpen = onAdvancedToggle || (() => {});
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
 
