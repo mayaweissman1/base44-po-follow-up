@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, ChevronDown } from 'lucide-react';
-import { useScrollShrink } from '@/hooks/useScrollShrink';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
@@ -67,7 +66,16 @@ function passesFilters(row, filters, role) {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const scrolled = useScrollShrink(40);
+  const scrollAreaRef = useRef(null);
+  const [scrolled, setScrolled] = useState(false);
+
+  useEffect(() => {
+    const el = scrollAreaRef.current;
+    if (!el) return;
+    const onScroll = () => setScrolled(el.scrollTop > 40);
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
 
   // Role handling - user.role from Base44 profile
   const userRole = user?.role || 'main_office';
@@ -196,18 +204,18 @@ export default function FollowUp() {
           </div>
         </div>
 
-        {/* KPI Cards — always visible, no scroll effect */}
+        {/* KPI Cards — shrinks on scroll */}
         <KpiCards
           role={activeRole}
           kpis={kpis}
           activeFilter={activeKpiFilter}
           onFilterClick={handleKpiFilterClick}
-          shrunk={false}
+          shrunk={scrolled}
         />
       </div>
 
       {/* Scrollable content area */}
-      <div className="flex-1 overflow-y-auto px-7 pb-6">
+      <div ref={scrollAreaRef} className="flex-1 overflow-y-auto px-7 pb-6">
         {/* Stats Row — Main Office only */}
         {activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
