@@ -253,6 +253,7 @@ Deno.serve(async (req) => {
         supplier: po.supplier_name || String(po.supplier || ''),
         po_type: po.po_type_name || String(po.po_type || ''),
         collection: po.collection || '',
+        po_rank: po.po_rank ?? null,
         product_image: po.product_image || '',
         urgent: !!po.urgent,
         drop: po.drop,
