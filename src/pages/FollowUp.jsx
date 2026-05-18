@@ -104,10 +104,25 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
 export default function FollowUp() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  // Non-admin users are locked to their assigned role
-  const userRole = isAdmin ? 'main_office' : (user?.role || 'main_office');
-  const [activeRole, setActiveRole] = useState(userRole);
+  const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
+  // Roles available to this user: admin sees all, others see their assigned roles.
+  // Falls back to legacy single `role` value if `roles` array isn't set yet.
+  const availableRoles = useMemo(() => {
+    if (isAdmin) return ALL_ROLES;
+    const assigned = Array.isArray(user?.roles) && user.roles.length > 0
+      ? user.roles
+      : (ALL_ROLES.includes(user?.role) ? [user.role] : []);
+    return assigned.filter(r => ALL_ROLES.includes(r));
+  }, [isAdmin, user?.roles, user?.role]);
+  const [activeRole, setActiveRole] = useState(availableRoles[0] || 'main_office');
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
+
+  // Keep activeRole in sync when availableRoles loads
+  useEffect(() => {
+    if (availableRoles.length > 0 && !availableRoles.includes(activeRole)) {
+      setActiveRole(availableRoles[0]);
+    }
+  }, [availableRoles, activeRole]);
 
   const [rows, setRows] = useState([]);
   const [kpis, setKpis] = useState({});
@@ -235,13 +250,12 @@ export default function FollowUp() {
       destinations: [...dest].sort(),
     };
   }, [rows]);
-  const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
+  const showRoleSwitcher = availableRoles.length > 1;
 
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
 
-      {/* Sticky header */}
-      <div className="sticky top-0 z-40 bg-[#F8F8F8] px-7 pt-6 pb-0">
+      <div className="px-7 pt-6 pb-0">
 
         {/* Title + buttons */}
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
@@ -252,7 +266,7 @@ export default function FollowUp() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {isAdmin && (
+            {showRoleSwitcher && (
               <div className="relative z-50">
                 <button
                   onClick={() => setShowRoleDropdown(o => !o)}
@@ -263,7 +277,7 @@ export default function FollowUp() {
                 </button>
                 {showRoleDropdown && (
                   <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
-                    {allRoles.map(r => (
+                    {availableRoles.map(r => (
                       <button
                         key={r}
                         onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }}

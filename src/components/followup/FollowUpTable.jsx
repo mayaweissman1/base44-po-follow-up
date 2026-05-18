@@ -332,7 +332,7 @@ export default function FollowUpTable({
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-      <div className="overflow-x-auto overflow-y-auto" style={{ height: 'calc(100vh - 240px)' }}>
+      <div className="overflow-x-auto">
         <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
           <thead>
             <tr>

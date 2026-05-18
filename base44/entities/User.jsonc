@@ -5,11 +5,23 @@
     "role": {
       "type": "string",
       "enum": [
-        "dd_team_employee",
-        "dd_team_manager",
-        "main_office"
+        "admin",
+        "user"
       ],
-      "description": "User role in the Follow Up system"
+      "description": "System role (admin or user)"
+    },
+    "roles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "main_office",
+          "dd_team_manager",
+          "dd_team_employee"
+        ]
+      },
+      "default": [],
+      "description": "Follow Up roles assigned to the user (can be multiple)"
     },
     "dd_employee_id": {
       "type": "string",
