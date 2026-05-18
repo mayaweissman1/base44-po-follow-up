@@ -49,8 +49,8 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { dd_employee_id } = body;
 
-    // sub_po_view has most enriched data; join suppliers/po_types/style_colors for name resolution
-    const poSql = `
+    // Fetch ALL sub_po rows (one per destination) for sub-PO expansion
+    const subPoSql = `
       SELECT
         spv.po_number,
         spv.order_date,
@@ -70,6 +70,7 @@ Deno.serve(async (req) => {
         spv.qty_sent_out,
         spv.delivery_date,
         spv.drop,
+        spv.destination,
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
         sc.product_image
@@ -80,17 +81,36 @@ Deno.serve(async (req) => {
       LEFT JOIN style_colors sc ON sc.style_color = spv.style_color
       WHERE spv.due_date >= NOW() - INTERVAL '60 days'
         AND spv.due_date <= NOW() + INTERVAL '180 days'
-      ORDER BY spv.due_date ASC
-      LIMIT 500
+      ORDER BY spv.po_number ASC, spv.destination ASC
+      LIMIT 2000
     `;
 
-    let pos = [];
+    let subPosRaw = [];
     try {
-      pos = await query(poSql);
+      subPosRaw = await query(subPoSql);
     } catch (dbErr) {
       console.error('DB error:', dbErr.message);
       return Response.json({ error: 'Database error: ' + dbErr.message }, { status: 500 });
     }
+
+    // Group sub-POs by po_number to get unique POs + sub_pos list
+    const poMap = new Map();
+    for (const row of subPosRaw) {
+      if (!poMap.has(row.po_number)) {
+        poMap.set(row.po_number, { ...row, sub_pos: [] });
+      }
+      const parent = poMap.get(row.po_number);
+      // Aggregate totals from first row (they share same PO-level data)
+      // Add sub-PO entry
+      parent.sub_pos.push({
+        destination: row.destination || '—',
+        ordered_qty: row.ordered_qty,
+        qty_received: row.qty_received,
+        priority: null, // will be filled in later
+      });
+    }
+
+    const pos = [...poMap.values()];
 
     // Resolve dd_manager integer IDs -> name/email from edikted_employees
     const managerIds = [...new Set(pos.map(p => p.dd_manager).filter(Boolean))];
@@ -189,6 +209,9 @@ Deno.serve(async (req) => {
       const nextUpdatePassed = effectiveNextUpdate && new Date(effectiveNextUpdate) < today;
       const qtyError = po.good_for_sale === 0 && po.qty_sent_out > 0;
 
+      // Sub-POs with priority filled in
+      const subPos = (po.sub_pos || []).map(s => ({ ...s, priority }));
+
       return {
         po_number: po.po_number,
         style_color: po.style_color || '',
@@ -210,6 +233,8 @@ Deno.serve(async (req) => {
         product_image: po.product_image || '',
         urgent: !!po.urgent,
         drop: po.drop,
+        destination: po.destination || '',
+        sub_pos: subPos,
         // Effective/computed
         effective_delayed_due_date: effectiveDelayedDD,
         effective_dd_status: effectiveDdStatus,
@@ -242,16 +267,24 @@ Deno.serve(async (req) => {
       filteredRows = rows.filter(r => r.dd_manager_id === dd_employee_id || r.dd_manager_email === user.email);
     }
 
-    // KPI counts
+    // KPI counts — count by unique PO (latest DDD update status per PO)
     const todayStr = today.toISOString().slice(0, 10);
-    const allDddUpdates = allUpdates.filter(u => u.type === 'DDD_UPDATE');
+    // Build map of po_number -> latest DDD update
+    const latestDddByPo = {};
+    for (const u of allUpdates.filter(u => u.type === 'DDD_UPDATE')) {
+      if (!latestDddByPo[u.po_number] || new Date(u.created_date) > new Date(latestDddByPo[u.po_number].created_date)) {
+        latestDddByPo[u.po_number] = u;
+      }
+    }
+    const latestDddList = Object.values(latestDddByPo);
+
     const kpis = {
-      new_pending: allDddUpdates.filter(u => u.status === 'HOLD' && u.created_date?.slice(0, 10) === todayStr).length,
-      total_pending: allDddUpdates.filter(u => u.status === 'HOLD').length,
-      urgent_pending: allDddUpdates.filter(u => u.status === 'HOLD' && filteredRows.find(r => r.po_number === u.po_number && r.urgent)).length,
-      approved_today: allDddUpdates.filter(u => u.status === 'APPROVED' && u.decision_at?.slice(0, 10) === todayStr).length,
-      rejected_today: allDddUpdates.filter(u => u.status === 'REJECTED' && u.decision_at?.slice(0, 10) === todayStr).length,
-      acknowledged_today: allDddUpdates.filter(u => u.status === 'ACKNOWLEDGED' && u.decision_at?.slice(0, 10) === todayStr).length,
+      new_pending: latestDddList.filter(u => u.status === 'HOLD' && u.created_date?.slice(0, 10) === todayStr).length,
+      total_pending: latestDddList.filter(u => u.status === 'HOLD').length,
+      urgent_pending: latestDddList.filter(u => u.status === 'HOLD' && filteredRows.find(r => r.po_number === u.po_number && r.urgent)).length,
+      approved_today: latestDddList.filter(u => u.status === 'APPROVED' && u.decision_at?.slice(0, 10) === todayStr).length,
+      rejected_today: latestDddList.filter(u => u.status === 'REJECTED' && u.decision_at?.slice(0, 10) === todayStr).length,
+      acknowledged_today: latestDddList.filter(u => u.status === 'ACKNOWLEDGED' && u.decision_at?.slice(0, 10) === todayStr).length,
     };
 
     return Response.json({ rows: filteredRows, kpis });

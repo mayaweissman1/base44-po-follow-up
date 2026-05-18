@@ -144,9 +144,9 @@ export default function FilterToolbar({
           </FilterField>
           <FilterField label="Status">
             <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
+              <option value="ALL">All</option>
               <option value="HOLD">Pending</option>
               <option value="HANDLED">Handled</option>
-              <option value="ALL">All</option>
               <option value="APPROVED">Approved</option>
               <option value="REJECTED">Rejected</option>
               <option value="ACKNOWLEDGED">Acknowledged</option>

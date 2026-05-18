@@ -24,14 +24,15 @@ export default function BulkActionBar({ count, role, onApproveAll, onAcknowledge
           </>
         )}
 
-        {role === 'dd_team_employee' && (
-          <span className="text-xs text-white/60 italic">Export only</span>
-        )}
-
         {role === 'dd_team_manager' && (
-          <button onClick={onBulkGeneralUpdate} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors">
-            Add update
-          </button>
+          <>
+            <button onClick={onBulkLogDelay} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors">
+              Report delay
+            </button>
+            <button onClick={onBulkGeneralUpdate} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors">
+              Add update
+            </button>
+          </>
         )}
 
         <div className="w-px h-4 bg-white/30" />

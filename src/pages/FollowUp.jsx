@@ -103,7 +103,9 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
 
 export default function FollowUp() {
   const { user } = useAuth();
-  const userRole = user?.role === 'admin' ? 'main_office' : (user?.role || 'main_office');
+  const isAdmin = user?.role === 'admin';
+  // Non-admin users are locked to their assigned role
+  const userRole = isAdmin ? 'main_office' : (user?.role || 'main_office');
   const [activeRole, setActiveRole] = useState(userRole);
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
@@ -149,7 +151,7 @@ export default function FollowUp() {
   function handleKpiFilterClick(filterKey) {
     if (activeKpiFilter === filterKey) {
       setActiveKpiFilter(null);
-      setFilters(f => ({ ...f, status: activeRole === 'main_office' ? 'HOLD' : 'ALL', urgent: false }));
+      setFilters(DEFAULT_FILTERS(activeRole));
       return;
     }
     setActiveKpiFilter(filterKey);
@@ -230,28 +232,30 @@ export default function FollowUp() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="relative z-50">
-              <button
-                onClick={() => setShowRoleDropdown(o => !o)}
-                className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
-              >
-                <span>{ROLE_DISPLAY[activeRole]}</span>
-                <ChevronDown size={12} />
-              </button>
-              {showRoleDropdown && (
-                <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
-                  {allRoles.map(r => (
-                    <button
-                      key={r}
-                      onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }}
-                      className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}
-                    >
-                      {ROLE_DISPLAY[r]}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            {isAdmin && (
+              <div className="relative z-50">
+                <button
+                  onClick={() => setShowRoleDropdown(o => !o)}
+                  className="h-8 pl-3 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
+                >
+                  <span>{ROLE_DISPLAY[activeRole]}</span>
+                  <ChevronDown size={12} />
+                </button>
+                {showRoleDropdown && (
+                  <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[180px] overflow-hidden">
+                    {allRoles.map(r => (
+                      <button
+                        key={r}
+                        onClick={() => { setActiveRole(r); setShowRoleDropdown(false); }}
+                        className={`w-full text-left px-4 py-2.5 text-xs font-medium transition-colors ${activeRole === r ? 'bg-[#FFF0F7] text-[#E31B7F] font-semibold' : 'text-[#0A0A0A] hover:bg-[#F8F8F8]'}`}
+                      >
+                        {ROLE_DISPLAY[r]}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <button
               onClick={() => exportRowsToCSV(filteredRows)}
               className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] transition-colors"

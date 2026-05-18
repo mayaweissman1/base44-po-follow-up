@@ -263,7 +263,7 @@ export default function FollowUpTable({
             <tbody>
               {sortedRows.map(po => {
                 const isRejected = po.current_status === 'REJECTED';
-                const rowBg = isRejected ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-[#FFF0F7]';
+                const rowBg = isRejected ? 'bg-red-50 hover:bg-red-100' : 'bg-white hover:bg-[#FFF0F7]';
                 const actionBg = isRejected ? 'bg-red-50' : 'bg-white';
                 const countdown = po.countdown;
 
@@ -329,7 +329,7 @@ export default function FollowUpTable({
   // Column counts (for sub-PO expand colSpan):
   //   main_office:     checkbox + chevron + 19 always-shown + HOLD Age + Last Comment = 24
   //   dd_team_manager: chevron + 19 always-shown = 21
-  const expandColSpan = role === 'dd_team_manager' ? 21 : 24;
+  const expandColSpan = role === 'dd_team_manager' ? 22 : 24;
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
@@ -337,11 +337,9 @@ export default function FollowUpTable({
         <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
           <thead>
             <tr>
-              {role !== 'dd_team_manager' && (
-                <th className={thCls} style={{ width: 36 }}>
-                  <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
-                </th>
-              )}
+              <th className={thCls} style={{ width: 36 }}>
+                <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
+              </th>
               <th className={thCls} style={{ width: 36 }}></th>
               <Th {...thProps} col="po_number"                     width={colWidths['po_number'] || 170}>PO Number</Th>
               <Th {...thProps} col="style_color"                   width={colWidths['style_color'] || 130}>Style Color</Th>
@@ -371,17 +369,15 @@ export default function FollowUpTable({
             {sortedRows.map(po => {
               const isExpanded = expanded.has(po.po_number);
               const isRejected = po.current_status === 'REJECTED';
-              const tdBase = `${tdCls} ${isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'group-hover:bg-[#FFF0F7]'}`;
+              const tdBase = `${tdCls} ${isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]'}`;
               const actionCellBase = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
 
               return (
                 <React.Fragment key={po.po_number}>
                   <tr className="group cursor-default">
-                    {role !== 'dd_team_manager' && (
-                      <td className={`${tdBase} w-9`}>
-                        <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
-                      </td>
-                    )}
+                    <td className={`${tdBase} w-9`}>
+                      <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
+                    </td>
                     <td className={`${tdBase} w-9`}>
                       <button onClick={() => toggleExpand(po.po_number)} className={`w-[18px] h-[18px] flex items-center justify-center text-[#525252] transition-transform ${isExpanded ? 'rotate-90 text-[#E31B7F]' : ''}`}>
                         <ChevronRight size={14} />
