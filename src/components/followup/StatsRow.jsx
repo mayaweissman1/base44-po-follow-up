@@ -2,6 +2,7 @@ import React from 'react';
 import { REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
 
 export default function StatsRow({ rows }) {
+  // HOLD responsibility breakdown — only for actual pending HOLDs
   const holds = rows.filter(r => r.current_status === 'HOLD');
   const respCounts = { OTHER: 0, EDIKTED: 0, SUPPLIER: 0 };
   holds.forEach(r => {
@@ -10,12 +11,12 @@ export default function StatsRow({ rows }) {
   });
   const total = Math.max(1, holds.length);
 
-  // Top reason this week
+  // Top reason + top supplier — count across ALL rows that have a delay reason (not just HOLDs)
   const reasonCounts = {};
   const supplierCounts = {};
-  holds.forEach(r => {
+  rows.forEach(r => {
     if (r.ddd_reason) reasonCounts[r.ddd_reason] = (reasonCounts[r.ddd_reason] || 0) + 1;
-    if (r.supplier) supplierCounts[r.supplier] = (supplierCounts[r.supplier] || 0) + 1;
+    if (r.ddd_reason && r.supplier) supplierCounts[r.supplier] = (supplierCounts[r.supplier] || 0) + 1;
   });
   const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
   const topSupplier = Object.entries(supplierCounts).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
@@ -36,12 +37,12 @@ export default function StatsRow({ rows }) {
         </div>
       </div>
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] mb-3">Top reason this week</div>
+        <div className="text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] mb-3">Top delay reason</div>
         <div className="text-sm font-semibold text-[#0A0A0A] mb-1 leading-snug">{topReason[0]}</div>
         <div className="font-mono text-xs font-semibold text-[#E31B7F]">{topReason[1]} {topReason[1] === 1 ? 'PO' : 'POs'}</div>
       </div>
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] px-5 py-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] mb-3">Most delays supplier this week</div>
+        <div className="text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] mb-3">Most delays supplier</div>
         <div className="text-sm font-semibold font-mono text-[#0A0A0A] mb-1">{topSupplier[0]}</div>
         <div className="font-mono text-xs font-semibold text-[#E31B7F]">{topSupplier[1]} {topSupplier[1] === 1 ? 'delayed PO' : 'delayed POs'}</div>
       </div>

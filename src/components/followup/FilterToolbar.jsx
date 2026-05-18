@@ -68,7 +68,7 @@ export default function FilterToolbar({
   const setAdvancedOpen = onAdvancedToggle || (() => {});
   const defaultFilters = {
     po: '', style: '',
-    status: role === 'main_office' ? 'HOLD' : 'ALL',
+    status: 'ALL',
     priority: '', supplier: '', ddManager: '', ddStatus: '', reason: '',
     responsibility: '', urgent: false, collection: '', orderType: '', flag: '',
     nextUpdate: '', lateFuture: '', poRank: '', destination: '', delayResponse: '',

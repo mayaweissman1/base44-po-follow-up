@@ -18,7 +18,7 @@ import BulkActionBar from '@/components/followup/BulkActionBar';
 const DEFAULT_FILTERS = (role) => ({
   po: '',
   style: '',
-  status: role === 'main_office' ? 'HOLD' : 'ALL',
+  status: 'ALL',
   priority: '',
   supplier: '',
   ddManager: '',
@@ -43,8 +43,8 @@ function passesFilters(row, filters, role) {
     lateFuture, poRank, destination, delayResponse,
   } = filters;
 
-  if (po && !row.po_number.toLowerCase().includes(po.toLowerCase())) return false;
-  if (style && !row.style_color.toLowerCase().includes(style.toLowerCase())) return false;
+  if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
+  if (style && !row.style_color?.toLowerCase().includes(style.toLowerCase())) return false;
   if (supplier && row.supplier !== supplier) return false;
   if (ddManager && row.dd_manager_name !== ddManager) return false;
   if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;

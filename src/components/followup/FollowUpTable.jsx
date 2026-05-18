@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Check, Info, X, Clock, MessageSquare, ChevronRight, FileText } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { Check, Info, X, Clock, MessageSquare, ChevronRight, FileText, ChevronUp, ChevronDown } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
@@ -69,11 +69,97 @@ function deliveryDateStatusText(po) {
   return raw.length > 60 ? raw.slice(0, 60) + '…' : raw;
 }
 
+// ─── Sort helpers ──────────────────────────────────────────────────────────────
+function sortValue(row, col) {
+  const v = row[col];
+  if (v === null || v === undefined) return '';
+  return v;
+}
+
+function compareRows(a, b, col, dir) {
+  const av = sortValue(a, col);
+  const bv = sortValue(b, col);
+  let cmp;
+  if (typeof av === 'number' && typeof bv === 'number') {
+    cmp = av - bv;
+  } else {
+    cmp = String(av).localeCompare(String(bv), undefined, { numeric: true });
+  }
+  return dir === 'asc' ? cmp : -cmp;
+}
+
+// ─── Resize hook ───────────────────────────────────────────────────────────────
+function useColResize(initialWidths) {
+  const [widths, setWidths] = useState(initialWidths);
+  const dragging = useRef(null);
+
+  const startResize = useCallback((col, e) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startW = widths[col] || 120;
+    dragging.current = { col, startX, startW };
+
+    function onMove(ev) {
+      if (!dragging.current) return;
+      const { col, startX, startW } = dragging.current;
+      const newW = Math.max(60, startW + ev.clientX - startX);
+      setWidths(prev => ({ ...prev, [col]: newW }));
+    }
+    function onUp() {
+      dragging.current = null;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    }
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [widths]);
+
+  return [widths, startResize];
+}
+
+// ─── SortableResizableTh ───────────────────────────────────────────────────────
+function Th({ col, sortCol, sortDir, onSort, width, onResizeStart, className, children, style = {} }) {
+  const isActive = sortCol === col;
+  return (
+    <th
+      className={`${className} relative select-none`}
+      style={{ minWidth: width || 80, ...style }}
+      onClick={col ? () => onSort(col) : undefined}
+    >
+      <div className="flex items-center gap-1 pr-3 cursor-pointer">
+        <span className="truncate">{children}</span>
+        {col && (
+          <span className="flex-shrink-0 opacity-50">
+            {isActive && sortDir === 'asc' ? <ChevronUp size={10} /> : isActive && sortDir === 'desc' ? <ChevronDown size={10} /> : <ChevronUp size={10} className="opacity-20" />}
+          </span>
+        )}
+      </div>
+      {col && (
+        <div
+          className="absolute right-0 top-0 bottom-0 w-1.5 cursor-col-resize hover:bg-[#E31B7F]/30 active:bg-[#E31B7F]/50"
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => onResizeStart(col, e)}
+        />
+      )}
+    </th>
+  );
+}
+
 export default function FollowUpTable({
   rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, loading,
   selectedRows = new Set(), onSelectRow, onSelectAll, onPoDetails,
 }) {
   const [expanded, setExpanded] = useState(new Set());
+  const [sortCol, setSortCol] = useState(null);
+  const [sortDir, setSortDir] = useState('asc');
+
+  // Reset sort when role changes
+  useEffect(() => {
+    setSortCol(null);
+    setSortDir('asc');
+  }, [role]);
+
+  const [colWidths, startResize] = useColResize({});
 
   function toggleExpand(poNumber) {
     setExpanded(prev => {
@@ -83,10 +169,26 @@ export default function FollowUpTable({
     });
   }
 
+  function handleSort(col) {
+    if (sortCol === col) {
+      setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortCol(col);
+      setSortDir('asc');
+    }
+  }
+
+  const sortedRows = useMemo(() => {
+    if (!sortCol) return rows;
+    return [...rows].sort((a, b) => compareRows(a, b, sortCol, sortDir));
+  }, [rows, sortCol, sortDir]);
+
   const allVisibleSelected = rows.length > 0 && rows.every(r => selectedRows.has(r.po_number));
 
   const thCls = "px-3.5 py-3 text-left text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5] sticky top-0 z-10";
   const tdCls = "px-3.5 py-3 border-b border-[#E5E5E5] bg-white whitespace-nowrap text-[13px] align-middle";
+
+  const thProps = { sortCol, sortDir, onSort: handleSort, onResizeStart: startResize, className: thCls };
 
   if (loading) {
     return (
@@ -117,7 +219,7 @@ export default function FollowUpTable({
     );
   }
 
-  // DD Team Employee view
+  // ─── DD Team Employee view ─────────────────────────────────────────────────
   if (role === 'dd_team_employee') {
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
@@ -126,44 +228,40 @@ export default function FollowUpTable({
             <thead>
               <tr>
                 <th className={thCls} style={{ width: 36 }}>
-                  <Checkbox
-                    checked={allVisibleSelected}
-                    onChange={() => onSelectAll?.(rows.map(r => r.po_number))}
-                  />
+                  <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
                 </th>
-                <th className={thCls}>PO Number</th>
-                <th className={thCls}>Flags</th>
-                <th className={thCls}>Supplier</th>
-                <th className={thCls}>DD Manager</th>
-                <th className={thCls}>Style Color</th>
-                <th className={thCls} title="Set with / linked styles">Set With</th>
-                <th className={thCls}>Order Qty</th>
-                <th className={thCls}>Qty Received</th>
-                <th className={thCls}>Manual RW</th>
-                <th className={thCls}>Auto RW</th>
-                <th className={thCls}>Goods Received</th>
-                <th className={thCls}>Order Date</th>
-                <th className={thCls} title="Comment from latest Log/Edit Delay">DDD Comment</th>
-                <th className={thCls}>DD Status</th>
-                <th className={thCls} title="Stamped history of general update comments">DD Comment</th>
-                <th className={thCls} title="Days in current status">Days Same Status</th>
-                <th className={thCls}>Next Update</th>
-                <th className={thCls}>DD Date</th>
-                <th className={thCls}>Due Date</th>
-                <th className={thCls}>Delayed DD</th>
-                <th className={thCls}>DDD Status</th>
-                <th className={thCls} title="Times Delayed DD was pushed">DDD Count</th>
-                <th className={thCls} title="Days until Final DD">Countdown</th>
-                <th className={thCls}>DD Reason</th>
-                <th className={thCls}>Drop</th>
-                <th className={thCls}>Collection</th>
-                <th className={thCls}>PM Tags</th>
-                <th className={thCls}>Type</th>
+                <Th {...thProps} col="po_number" width={colWidths['po_number'] || 160}>PO Number</Th>
+                <Th {...thProps} col="flags" width={colWidths['flags'] || 80}>Flags</Th>
+                <Th {...thProps} col="supplier" width={colWidths['supplier'] || 100}>Supplier</Th>
+                <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 100}>DD Manager</Th>
+                <Th {...thProps} col="style_color" width={colWidths['style_color'] || 120}>Style Color</Th>
+                <Th {...thProps} col="current_status" width={colWidths['current_status'] || 100}>DDD Status</Th>
+                <Th {...thProps} col="due_date" width={colWidths['due_date'] || 100}>Original DD</Th>
+                <Th {...thProps} col="effective_delayed_due_date" width={colWidths['effective_delayed_due_date'] || 100}>Delayed DD</Th>
+                <Th {...thProps} col="ddd_count" width={colWidths['ddd_count'] || 80}>DDD Count</Th>
+                <Th {...thProps} col="countdown" width={colWidths['countdown'] || 90}>Countdown</Th>
+                <Th {...thProps} col="ddd_reason" width={colWidths['ddd_reason'] || 140}>DDD Reason</Th>
+                <Th {...thProps} col="ddd_comment" width={colWidths['ddd_comment'] || 180}>DDD Comment</Th>
+                <Th {...thProps} col="set_with" width={colWidths['set_with'] || 100}>Set With</Th>
+                <Th {...thProps} col="ordered_qty" width={colWidths['ordered_qty'] || 90}>Order Qty</Th>
+                <Th {...thProps} col="qty_received" width={colWidths['qty_received'] || 100}>Qty Received</Th>
+                <Th {...thProps} col="qty_rw_manual" width={colWidths['qty_rw_manual'] || 90}>Manual RW</Th>
+                <Th {...thProps} col="qty_rw_auto" width={colWidths['qty_rw_auto'] || 80}>Auto RW</Th>
+                <Th {...thProps} col="goods_received" width={colWidths['goods_received'] || 110}>Goods Received</Th>
+                <Th {...thProps} col="order_date" width={colWidths['order_date'] || 100}>Order Date</Th>
+                <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 120}>DD Status</Th>
+                <Th {...thProps} col={null} width={colWidths['dd_comment_log'] || 180}>DD Comment</Th>
+                <Th {...thProps} col="days_same_status" width={colWidths['days_same_status'] || 110}>Days Same Status</Th>
+                <Th {...thProps} col="effective_next_update" width={colWidths['effective_next_update'] || 110}>Next Update</Th>
+                <Th {...thProps} col="drop" width={colWidths['drop'] || 90}>Drop</Th>
+                <Th {...thProps} col="collection" width={colWidths['collection'] || 100}>Collection</Th>
+                <Th {...thProps} col="pm_tags" width={colWidths['pm_tags'] || 90}>PM Tags</Th>
+                <Th {...thProps} col="type" width={colWidths['type'] || 80}>Type</Th>
                 <th className={`${thCls} sticky right-0 z-20 shadow-[-4px_0_8px_rgba(0,0,0,.04)]`}>Actions</th>
               </tr>
             </thead>
             <tbody>
-              {rows.map(po => {
+              {sortedRows.map(po => {
                 const isRejected = po.current_status === 'REJECTED';
                 const rowBg = isRejected ? 'bg-red-50 hover:bg-red-100' : 'hover:bg-[#FFF0F7]';
                 const actionBg = isRejected ? 'bg-red-50' : 'bg-white';
@@ -174,13 +272,25 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
-                    <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} onDetailsClick={onPoDetails} /></td>
+                    {/* No onDetailsClick for dd_employee — only managers see the drawer */}
+                    <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={`${tdCls} ${rowBg}`}>
                       {po.flags ? <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${po.flags === 'URGENT' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{po.flags}</span> : <span className="text-[#A3A3A3]">—</span>}
                     </td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.supplier}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{po.dd_manager_name}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[12px]">{po.style_color}</span></td>
+                    <td className={`${tdCls} ${rowBg}`}><StatusBadge status={po.current_status} /></td>
+                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.due_date)}</span></td>
+                    <td className={`${tdCls} ${rowBg}`}>{po.effective_delayed_due_date ? <span className="font-mono font-semibold">{fmtDate(po.effective_delayed_due_date)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ddd_count ?? 0}</span></td>
+                    <td className={`${tdCls} ${rowBg}`}>
+                      <span className={`font-mono font-semibold ${countdown < 0 ? 'text-red-500' : countdown <= 3 ? 'text-[#525252]' : 'text-green-500'}`}>
+                        {countdown != null ? (countdown > 0 ? `+${countdown}` : countdown) : '—'}
+                      </span>
+                    </td>
+                    <td className={`${tdCls} ${rowBg}`}><ReasonTag reason={po.ddd_reason} /></td>
+                    <td className={`${tdCls} ${rowBg}`}><span className="text-[#A3A3A3] truncate max-w-[180px] inline-block" title={po.ddd_comment}>{po.ddd_comment || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#A3A3A3]">{po.set_with || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ordered_qty ?? '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono font-semibold">{po.qty_received ?? 0}</span></td>
@@ -188,22 +298,10 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_auto ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.goods_received)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.order_date)}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}><span className="text-[#A3A3A3] truncate max-w-[180px] inline-block" title={po.ddd_comment}>{po.ddd_comment || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><DdStatusBadge status={po.effective_dd_status} /></td>
                     <td className={`${tdCls} ${rowBg}`}><DdCommentLog log={po.dd_comment_log} /></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.days_same_status != null ? `${po.days_same_status}d` : '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.effective_next_update ? <span className="font-mono">{fmtDate(po.effective_next_update)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
-                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono font-semibold">{fmtDate(po.final_dd)}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.due_date)}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}>{po.effective_delayed_due_date ? <span className="font-mono font-semibold">{fmtDate(po.effective_delayed_due_date)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
-                    <td className={`${tdCls} ${rowBg}`}><StatusBadge status={po.current_status} /></td>
-                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ddd_count ?? 0}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}>
-                      <span className={`font-mono font-semibold ${countdown < 0 ? 'text-red-500' : countdown <= 3 ? 'text-[#525252]' : 'text-green-500'}`}>
-                        {countdown > 0 ? `+${countdown}` : countdown}
-                      </span>
-                    </td>
-                    <td className={`${tdCls} ${rowBg}`}><ReasonTag reason={po.ddd_reason} /></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3] text-xs">{fmtDate(po.drop)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.collection}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.pm_tags ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">{po.pm_tags}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
@@ -227,10 +325,10 @@ export default function FollowUpTable({
     );
   }
 
-  // Main Office + DD Team Manager view
-  // Column counts:
-  //   main_office:     checkbox + chevron + 19 always + HOLD Age + Last Comment = 24
-  //   dd_team_manager: chevron + 19 always = 21 (no checkbox, no HOLD Age, no Last Comment)
+  // ─── Main Office + DD Team Manager view ────────────────────────────────────
+  // Column counts (for sub-PO expand colSpan):
+  //   main_office:     checkbox + chevron + 19 always-shown + HOLD Age + Last Comment = 24
+  //   dd_team_manager: chevron + 19 always-shown = 21
   const expandColSpan = role === 'dd_team_manager' ? 21 : 24;
 
   return (
@@ -241,43 +339,40 @@ export default function FollowUpTable({
             <tr>
               {role !== 'dd_team_manager' && (
                 <th className={thCls} style={{ width: 36 }}>
-                  <Checkbox
-                    checked={allVisibleSelected}
-                    onChange={() => onSelectAll?.(rows.map(r => r.po_number))}
-                  />
+                  <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
                 </th>
               )}
               <th className={thCls} style={{ width: 36 }}></th>
-              <th className={thCls}>PO Number</th>
-              <th className={thCls}>Style Color</th>
-              <th className={thCls}>PO Rank</th>
-              <th className={thCls}>Current Status</th>
-              <th className={thCls}>Priority</th>
-              <th className={thCls}>DD Manager</th>
-              <th className={thCls}>Supplier</th>
-              <th className={thCls}>DD Status</th>
-              <th className={thCls} title="Truncated DDD comment — production delivery stage">Delivery Date Status</th>
-              <th className={thCls}>Due Date</th>
-              <th className={thCls}>Delayed DD</th>
-              <th className={thCls}>Final DD</th>
-              <th className={thCls}>Days Late</th>
-              <th className={thCls}>DD Reason</th>
-              <th className={thCls} title="Latest DDD update comment">DDD Comment</th>
-              <th className={thCls} title="General update comments history">DD Comment</th>
-              {role === 'main_office' && <th className={thCls}>HOLD Age</th>}
-              <th className={thCls}>Delay Response</th>
-              {role === 'main_office' && <th className={thCls}>Last Comment (internal)</th>}
-              <th className={thCls}>Next Update</th>
-              <th className={thCls}>DDD Count</th>
+              <Th {...thProps} col="po_number"                     width={colWidths['po_number'] || 170}>PO Number</Th>
+              <Th {...thProps} col="style_color"                   width={colWidths['style_color'] || 130}>Style Color</Th>
+              <Th {...thProps} col="po_rank"                       width={colWidths['po_rank'] || 80}>PO Rank</Th>
+              <Th {...thProps} col="current_status"                width={colWidths['current_status'] || 120}>Current Status</Th>
+              <Th {...thProps} col="priority"                      width={colWidths['priority'] || 100}>Priority</Th>
+              <Th {...thProps} col="dd_manager_name"               width={colWidths['dd_manager_name'] || 110}>DD Manager</Th>
+              <Th {...thProps} col="supplier"                      width={colWidths['supplier'] || 100}>Supplier</Th>
+              <Th {...thProps} col="effective_dd_status"           width={colWidths['effective_dd_status'] || 130}>DD Status</Th>
+              <Th {...thProps} col="delivery_date_status"          width={colWidths['delivery_date_status'] || 170}>Delivery Date Status</Th>
+              <Th {...thProps} col="due_date"                      width={colWidths['due_date'] || 95}>Due Date</Th>
+              <Th {...thProps} col="effective_delayed_due_date"    width={colWidths['effective_delayed_due_date'] || 100}>Delayed DD</Th>
+              <Th {...thProps} col="final_dd"                      width={colWidths['final_dd'] || 90}>Final DD</Th>
+              <Th {...thProps} col="days_late_counting"            width={colWidths['days_late_counting'] || 90}>Days Late</Th>
+              <Th {...thProps} col="ddd_reason"                    width={colWidths['ddd_reason'] || 140}>DD Reason</Th>
+              <Th {...thProps} col="ddd_comment"                   width={colWidths['ddd_comment'] || 180}>DDD Comment</Th>
+              <Th {...thProps} col={null}                          width={colWidths['dd_comment_log'] || 190}>DD Comment</Th>
+              {role === 'main_office' && <Th {...thProps} col="hold_age_days" width={colWidths['hold_age_days'] || 95}>HOLD Age</Th>}
+              <Th {...thProps} col="delay_response_comment"        width={colWidths['delay_response_comment'] || 150}>Delay Response</Th>
+              {role === 'main_office' && <Th {...thProps} col="internal_note" width={colWidths['internal_note'] || 170}>Last Comment (internal)</Th>}
+              <Th {...thProps} col="effective_next_update"         width={colWidths['effective_next_update'] || 110}>Next Update</Th>
+              <Th {...thProps} col="ddd_count"                     width={colWidths['ddd_count'] || 90}>DDD Count</Th>
               <th className={`${thCls} sticky right-0 z-20 shadow-[-4px_0_8px_rgba(0,0,0,.04)]`}>Actions</th>
             </tr>
           </thead>
           <tbody>
-            {rows.map(po => {
+            {sortedRows.map(po => {
               const isExpanded = expanded.has(po.po_number);
               const isRejected = po.current_status === 'REJECTED';
-              const tdBase = `${tdCls} ${role === 'dd_team_manager' && isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'group-hover:bg-[#FFF0F7]'}`;
-              const actionCellBase = role === 'dd_team_manager' && isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
+              const tdBase = `${tdCls} ${isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'group-hover:bg-[#FFF0F7]'}`;
+              const actionCellBase = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
 
               return (
                 <React.Fragment key={po.po_number}>
@@ -310,9 +405,9 @@ export default function FollowUpTable({
                     <td className={tdBase}><DdCommentLog log={po.dd_comment_log} /></td>
                     {role === 'main_office' && (
                       <td className={tdBase}>
-                        {po.current_status === 'HOLD' && po.hold_age_days != null ? (
+                        {po.hold_age_days != null ? (
                           <span className={`font-mono font-semibold ${po.hold_age_days > 0 ? 'text-red-500' : 'text-[#A3A3A3]'}`}>
-                            {po.hold_age_days === 0 ? 'Today' : `${po.hold_age_days}d ago`}
+                            {po.hold_age_days <= 0 ? 'Today' : `${po.hold_age_days}d ago`}
                           </span>
                         ) : <span className="text-[#A3A3A3]">—</span>}
                       </td>
@@ -333,9 +428,12 @@ export default function FollowUpTable({
                             <button onClick={() => onInternalNote(po)}           title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><MessageSquare size={14} /></button>
                           </>
                         ) : (
-                          <button onClick={() => onLogDelay(po)} className={`h-7 px-3 text-[11px] font-semibold rounded-[6px] transition-colors ${po.effective_delayed_due_date ? 'bg-white text-[#E31B7F] border border-[#E5E5E5] hover:bg-[#FFF0F7] hover:border-[#E31B7F]' : 'bg-[#E31B7F] text-white hover:bg-[#C21571]'}`}>
-                            {po.effective_delayed_due_date ? 'Edit delay' : 'Report delay'}
-                          </button>
+                          <>
+                            <button onClick={() => onLogDelay(po)} className={`h-7 px-2.5 text-[11px] font-semibold rounded-[6px] transition-colors ${po.effective_delayed_due_date ? 'bg-white text-[#E31B7F] border border-[#E5E5E5] hover:bg-[#FFF0F7] hover:border-[#E31B7F]' : 'bg-[#E31B7F] text-white hover:bg-[#C21571]'}`}>
+                              {po.effective_delayed_due_date ? 'Edit delay' : 'Report delay'}
+                            </button>
+                            <button onClick={() => onGeneralUpdate(po)} className="h-7 px-2 text-[11px] font-semibold rounded-[6px] bg-[#FFF0F7] text-[#E31B7F] border border-[#FFE5F2] hover:border-[#E31B7F] transition-colors">Update</button>
+                          </>
                         )}
                         <button onClick={() => onViewLogs(po)} title="View logs" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><Clock size={14} /></button>
                       </div>
@@ -369,7 +467,7 @@ export default function FollowUpTable({
                                   ))
                                 ) : (
                                   <tr>
-                                    <td colSpan={4} className="px-3.5 py-4 text-center text-xs text-[#A3A3A3]">No sub-PO data available</td>
+                                    <td colSpan={4} className="px-3.5 py-4 text-center text-xs text-[#A3A3A3]">Sub-PO data not available — will be populated from production API</td>
                                   </tr>
                                 )}
                               </tbody>

@@ -108,8 +108,12 @@ export default function PoDetailsDrawer({ po, onClose }) {
                 </span>
               ) : '—'}
             </Row>
-            {po.current_status === 'HOLD' && po.hold_age_days != null && (
-              <Row label="HOLD Age"><span className="font-mono">{po.hold_age_days === 0 ? 'Today' : `${po.hold_age_days}d ago`}</span></Row>
+            {po.hold_age_days != null && (
+              <Row label="HOLD Age">
+                <span className="font-mono">
+                  {po.hold_age_days <= 0 ? 'Today' : `${po.hold_age_days}d ago`}
+                </span>
+              </Row>
             )}
           </Section>
 
