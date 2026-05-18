@@ -49,7 +49,28 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { dd_employee_id } = body;
 
+    // Fetch Base44 overrides + dd_updates FIRST so we can also pull any POs they reference
+    const overrides = await base44.entities.po_overrides.list();
+    const overrideMap = {};
+    for (const ov of overrides) {
+      overrideMap[ov.po_number] = ov;
+    }
+
+    const allUpdates = await base44.entities.dd_updates.list('-created_date', 2000);
+    const updatesByPo = {};
+    for (const upd of allUpdates) {
+      if (!updatesByPo[upd.po_number]) updatesByPo[upd.po_number] = [];
+      updatesByPo[upd.po_number].push(upd);
+    }
+
+    // Always include POs that have base44 activity (overrides or updates),
+    // even if their due_date is outside the default window
+    const activePoNumbers = [
+      ...new Set([...Object.keys(overrideMap), ...Object.keys(updatesByPo)]),
+    ];
+
     // Fetch ALL sub_po rows (one per destination) for sub-PO expansion
+    // Resolve destination name via shipment_destination table
     const subPoSql = `
       SELECT
         spv.po_number,
@@ -70,7 +91,8 @@ Deno.serve(async (req) => {
         spv.qty_sent_out,
         spv.delivery_date,
         spv.drop,
-        spv.destination,
+        spv.destination AS destination_id,
+        sd.destination AS destination_name,
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
         sc.product_image
@@ -79,15 +101,19 @@ Deno.serve(async (req) => {
       LEFT JOIN suppliers sup ON sup.id = po.supplier
       LEFT JOIN po_types pt ON pt.id = po.po_type
       LEFT JOIN style_colors sc ON sc.style_color = spv.style_color
-      WHERE spv.due_date >= NOW() - INTERVAL '365 days'
-        AND spv.due_date <= NOW() + INTERVAL '180 days'
+      LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+      WHERE (
+              (spv.due_date >= NOW() - INTERVAL '60 days'
+               AND spv.due_date <= NOW() + INTERVAL '180 days')
+              OR spv.po_number = ANY($1::text[])
+            )
       ORDER BY spv.po_number ASC, spv.destination ASC
       LIMIT 2000
     `;
 
     let subPosRaw = [];
     try {
-      subPosRaw = await query(subPoSql);
+      subPosRaw = await query(subPoSql, [activePoNumbers]);
     } catch (dbErr) {
       console.error('DB error:', dbErr.message);
       return Response.json({ error: 'Database error: ' + dbErr.message }, { status: 500 });
@@ -100,10 +126,9 @@ Deno.serve(async (req) => {
         poMap.set(row.po_number, { ...row, sub_pos: [] });
       }
       const parent = poMap.get(row.po_number);
-      // Aggregate totals from first row (they share same PO-level data)
-      // Add sub-PO entry
+      // Add sub-PO entry — use destination name (resolved via shipment_destination) when available
       parent.sub_pos.push({
-        destination: row.destination || '—',
+        destination: row.destination_name || (row.destination_id != null ? `#${row.destination_id}` : '—'),
         ordered_qty: row.ordered_qty,
         qty_received: row.qty_received,
         priority: null, // will be filled in later
@@ -121,23 +146,6 @@ Deno.serve(async (req) => {
         [managerIds]
       );
       for (const m of managers) managerMap[m.id] = m;
-    }
-
-    // Fetch Base44 overrides
-    const overrides = await base44.entities.po_overrides.list();
-    const overrideMap = {};
-    for (const ov of overrides) {
-      overrideMap[ov.po_number] = ov;
-    }
-
-    // Fetch all dd_updates for KPI + row enrichment
-    const allUpdates = await base44.entities.dd_updates.list('-created_date', 2000);
-
-    // Group updates by po_number
-    const updatesByPo = {};
-    for (const upd of allUpdates) {
-      if (!updatesByPo[upd.po_number]) updatesByPo[upd.po_number] = [];
-      updatesByPo[upd.po_number].push(upd);
     }
 
     const today = new Date();
@@ -233,7 +241,7 @@ Deno.serve(async (req) => {
         product_image: po.product_image || '',
         urgent: !!po.urgent,
         drop: po.drop,
-        destination: po.destination || '',
+        destination: po.destination_name || (po.destination_id != null ? String(po.destination_id) : ''),
         sub_pos: subPos,
         // Effective/computed
         effective_delayed_due_date: effectiveDelayedDD,

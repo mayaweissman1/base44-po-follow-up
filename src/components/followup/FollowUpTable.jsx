@@ -438,7 +438,7 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={expandColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="px-6 py-4">
+                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 720 }}>
                           <div className="text-[11px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-2.5">📦 Sub-POs · per destination</div>
                           <div className="bg-white border border-[#E5E5E5] rounded-[8px] overflow-hidden">
                           <table className="border-collapse w-full text-xs">
