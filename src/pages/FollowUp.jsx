@@ -134,7 +134,13 @@ export default function FollowUp() {
     }
     const res = await base44.functions.invoke('getFollowUpData', payload);
     if (res.data?.rows) {
-      setRows(res.data.rows);
+      const seen = new Set();
+      const uniqueRows = res.data.rows.filter(r => {
+        if (seen.has(r.po_number)) return false;
+        seen.add(r.po_number);
+        return true;
+      });
+      setRows(uniqueRows);
       setKpis(res.data.kpis || {});
     }
     setLoading(false);
@@ -232,10 +238,10 @@ export default function FollowUp() {
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (
-    <div className="h-screen flex flex-col bg-[#F8F8F8] overflow-hidden">
+    <div className="min-h-screen bg-[#F8F8F8]">
 
-      {/* Fixed header — never scrolls */}
-      <div className="flex-shrink-0 bg-[#F8F8F8] px-7 pt-6 pb-0 z-40">
+      {/* Sticky header */}
+      <div className="sticky top-0 z-40 bg-[#F8F8F8] px-7 pt-6 pb-0">
 
         {/* Title + buttons */}
         <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
@@ -314,8 +320,8 @@ export default function FollowUp() {
         />
       </div>
 
-      {/* Scrollable table area */}
-      <div className="flex-1 overflow-y-auto px-7 pb-6">
+      {/* Table area */}
+      <div className="px-7 pb-6">
         <FollowUpTable
           rows={filteredRows}
           role={activeRole}
