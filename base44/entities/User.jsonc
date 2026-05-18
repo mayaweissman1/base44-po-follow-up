@@ -6,9 +6,12 @@
       "type": "string",
       "enum": [
         "admin",
-        "user"
+        "user",
+        "main_office",
+        "dd_team_manager",
+        "dd_team_employee"
       ],
-      "description": "System role (admin or user)"
+      "description": "Primary role (admin, user, or a Follow Up role)"
     },
     "roles": {
       "type": "array",
