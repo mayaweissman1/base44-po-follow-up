@@ -185,7 +185,7 @@ export default function FollowUpTable({
 
   const allVisibleSelected = rows.length > 0 && rows.every(r => selectedRows.has(r.po_number));
 
-  const thCls = "px-3.5 py-3 text-left text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5]";
+  const thCls = "px-3.5 py-3 text-left text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5] sticky top-0 z-10";
   const tdCls = "px-3.5 py-3 border-b border-[#E5E5E5] bg-white whitespace-nowrap text-[13px] align-middle";
 
   const thProps = { sortCol, sortDir, onSort: handleSort, onResizeStart: startResize, className: thCls };
@@ -223,7 +223,7 @@ export default function FollowUpTable({
   if (role === 'dd_team_employee') {
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
             <thead>
               <tr>
@@ -332,7 +332,7 @@ export default function FollowUpTable({
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-280px)]">
         <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
           <thead>
             <tr>
