@@ -87,15 +87,6 @@ Deno.serve(async (req) => {
     // Prioritize active POs (those with overrides/updates) so they're never cut off by LIMIT.
     // Order: active POs first, then by due_date so the most relevant window rows come before older ones.
     const subPoSql = `
-      WITH ranked AS (
-        SELECT
-          pov.*,
-          rank() OVER (
-            PARTITION BY pov.destination, pov.style_color
-            ORDER BY COALESCE(pov.delayed_due_date, pov.due_date), pov.order_date, pov.sub_po_number
-          ) AS po_rank
-        FROM sub_po_view pov
-      )
       SELECT
         spv.po_number,
         spv.order_date,
@@ -116,17 +107,14 @@ Deno.serve(async (req) => {
         spv.delivery_date,
         spv.drop,
         spv.destination AS destination_id,
-        spv.po_rank,
         sd.destination AS destination_name,
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
-        sc.product_image,
         (spv.po_number = ANY($1::text[]))::int AS is_active
-      FROM ranked spv
+      FROM sub_po_view spv
       LEFT JOIN purchase_orders po ON po.po_number = spv.po_number
       LEFT JOIN suppliers sup ON sup.id = po.supplier
       LEFT JOIN po_types pt ON pt.id = po.po_type
-      LEFT JOIN style_colors sc ON sc.style_color = spv.style_color
       LEFT JOIN shipment_destination sd ON sd.id = spv.destination
       WHERE (
               (spv.due_date >= NOW() - INTERVAL '60 days'
@@ -149,19 +137,14 @@ Deno.serve(async (req) => {
     const poMap = new Map();
     for (const row of subPosRaw) {
       if (!poMap.has(row.po_number)) {
-        poMap.set(row.po_number, { ...row, sub_pos: [], po_rank_min: row.po_rank ?? null });
+        poMap.set(row.po_number, { ...row, sub_pos: [] });
       }
       const parent = poMap.get(row.po_number);
-      // Track best (lowest) rank across destinations for the PO-level value
-      if (row.po_rank != null && (parent.po_rank_min == null || row.po_rank < parent.po_rank_min)) {
-        parent.po_rank_min = row.po_rank;
-      }
       // Add sub-PO entry — use destination name (resolved via shipment_destination) when available
       parent.sub_pos.push({
         destination: row.destination_name || (row.destination_id != null ? `#${row.destination_id}` : '—'),
         ordered_qty: row.ordered_qty,
         qty_received: row.qty_received,
-        po_rank: row.po_rank ?? null,
         priority: null, // will be filled in later
       });
     }
@@ -268,8 +251,6 @@ Deno.serve(async (req) => {
         supplier: po.supplier_name || String(po.supplier || ''),
         po_type: po.po_type_name || String(po.po_type || ''),
         collection: po.collection || '',
-        po_rank: po.po_rank_min ?? null,
-        product_image: po.product_image || '',
         urgent: !!po.urgent,
         drop: po.drop,
         destination: po.destination_name || (po.destination_id != null ? String(po.destination_id) : ''),
