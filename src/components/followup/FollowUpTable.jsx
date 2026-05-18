@@ -441,33 +441,37 @@ export default function FollowUpTable({
                         <div className="px-6 py-4">
                           <div className="text-[11px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-2.5">📦 Sub-POs · per destination</div>
                           <div className="bg-white border border-[#E5E5E5] rounded-[8px] overflow-hidden">
-                            <table className="border-collapse w-full text-xs">
-                              <thead>
-                                <tr>
-                                  {['Destination', 'Priority', 'Ordered Qty', 'Qty Received'].map(h => (
-                                    <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">{h}</th>
-                                  ))}
-                                </tr>
-                              </thead>
-                              <tbody>
-                                {po.sub_pos?.length > 0 ? (
-                                  po.sub_pos.map((s, i) => (
-                                    <tr key={i} className="hover:bg-[#FFF0F7]">
-                                      <td className="px-3.5 py-2.5 border-b border-[#E5E5E5]">
-                                        <span className="inline-flex items-center px-3 py-1 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[11px] font-bold">{s.destination}</span>
-                                      </td>
-                                      <td className="px-3.5 py-2.5 border-b border-[#E5E5E5]"><PriorityBadge priority={s.priority || po.priority} /></td>
-                                      <td className="px-3.5 py-2.5 border-b border-[#E5E5E5] font-mono">{s.ordered_qty ?? '—'}</td>
-                                      <td className="px-3.5 py-2.5 border-b border-[#E5E5E5] font-mono">{s.qty_received ?? 0}</td>
-                                    </tr>
-                                  ))
-                                ) : (
-                                  <tr>
-                                    <td colSpan={4} className="px-3.5 py-4 text-center text-xs text-[#A3A3A3]">Sub-PO data not available — will be populated from production API</td>
+                          <table className="border-collapse w-full text-xs">
+                          <thead>
+                            <tr>
+                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Destination</th>
+                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Priority</th>
+                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Ordered Qty</th>
+                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Qty Received</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {po.sub_pos?.length > 0 ? (
+                              po.sub_pos.map((s, i) => {
+                                const isLast = i === po.sub_pos.length - 1;
+                                return (
+                                  <tr key={i} className={`hover:bg-[#FFF0F7] ${i % 2 === 1 ? 'bg-[#FAFAFA]' : ''}`}>
+                                    <td className={`px-3.5 py-2.5 ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}>
+                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[11px] font-bold">{s.destination || '—'}</span>
+                                    </td>
+                                    <td className={`px-3.5 py-2.5 ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}><PriorityBadge priority={s.priority || po.priority} /></td>
+                                    <td className={`px-3.5 py-2.5 font-mono font-semibold ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}>{s.ordered_qty != null ? s.ordered_qty : '—'}</td>
+                                    <td className={`px-3.5 py-2.5 font-mono font-semibold ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}>{s.qty_received != null ? s.qty_received : 0}</td>
                                   </tr>
-                                )}
-                              </tbody>
-                            </table>
+                                );
+                              })
+                            ) : (
+                              <tr>
+                                <td colSpan={4} className="px-3.5 py-4 text-center text-xs text-[#A3A3A3]">No sub-PO data available</td>
+                              </tr>
+                            )}
+                          </tbody>
+                          </table>
                           </div>
                         </div>
                       </td>

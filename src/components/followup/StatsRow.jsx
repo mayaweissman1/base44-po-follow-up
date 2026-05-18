@@ -11,12 +11,12 @@ export default function StatsRow({ rows }) {
   });
   const total = Math.max(1, holds.length);
 
-  // Top reason + top supplier — only count POs that actually have a delayed DD
+  // Top reason + top supplier — count POs that have a DDD reason (delayed or not)
   const reasonCounts = {};
   const supplierCounts = {};
   rows.forEach(r => {
-    if (!r.effective_delayed_due_date) return; // only count actual delayed POs
-    if (r.ddd_reason) reasonCounts[r.ddd_reason] = (reasonCounts[r.ddd_reason] || 0) + 1;
+    if (!r.ddd_reason) return; // only count POs with a delay reason recorded
+    reasonCounts[r.ddd_reason] = (reasonCounts[r.ddd_reason] || 0) + 1;
     if (r.supplier) supplierCounts[r.supplier] = (supplierCounts[r.supplier] || 0) + 1;
   });
   const topReason = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0] || ['—', 0];

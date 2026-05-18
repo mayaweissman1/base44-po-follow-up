@@ -79,7 +79,7 @@ Deno.serve(async (req) => {
       LEFT JOIN suppliers sup ON sup.id = po.supplier
       LEFT JOIN po_types pt ON pt.id = po.po_type
       LEFT JOIN style_colors sc ON sc.style_color = spv.style_color
-      WHERE spv.due_date >= NOW() - INTERVAL '60 days'
+      WHERE spv.due_date >= NOW() - INTERVAL '365 days'
         AND spv.due_date <= NOW() + INTERVAL '180 days'
       ORDER BY spv.po_number ASC, spv.destination ASC
       LIMIT 2000
