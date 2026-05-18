@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, ChevronDown, Download } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
@@ -210,11 +210,25 @@ export default function FollowUp() {
     loadData();
   }
 
-  const filteredRows = rows.filter(r => passesFilters(r, filters, activeRole));
-  const suppliers = [...new Set(rows.map(r => r.supplier).filter(Boolean))].sort();
-  const ddManagers = [...new Set(rows.map(r => r.dd_manager_name).filter(Boolean))].sort();
-  const collections = [...new Set(rows.map(r => r.collection).filter(Boolean))].sort();
-  const destinations = [...new Set(rows.map(r => r.destination).filter(Boolean))].sort();
+  const filteredRows = useMemo(
+    () => rows.filter(r => passesFilters(r, filters, activeRole)),
+    [rows, filters, activeRole]
+  );
+  const { suppliers, ddManagers, collections, destinations } = useMemo(() => {
+    const sup = new Set(), mgr = new Set(), col = new Set(), dest = new Set();
+    for (const r of rows) {
+      if (r.supplier) sup.add(r.supplier);
+      if (r.dd_manager_name) mgr.add(r.dd_manager_name);
+      if (r.collection) col.add(r.collection);
+      if (r.destination) dest.add(r.destination);
+    }
+    return {
+      suppliers: [...sup].sort(),
+      ddManagers: [...mgr].sort(),
+      collections: [...col].sort(),
+      destinations: [...dest].sort(),
+    };
+  }, [rows]);
   const allRoles = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
   return (

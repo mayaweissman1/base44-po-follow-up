@@ -263,8 +263,8 @@ export default function FollowUpTable({
             <tbody>
               {sortedRows.map(po => {
                 const isRejected = po.current_status === 'REJECTED';
-                const rowBg = isRejected ? 'bg-red-50 hover:bg-red-100' : 'bg-white hover:bg-[#FFF0F7]';
-                const actionBg = isRejected ? 'bg-red-50' : 'bg-white';
+                const rowBg = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
+                const actionBg = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
                 const countdown = po.countdown;
 
                 return (
@@ -272,8 +272,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
-                    {/* No onDetailsClick for dd_employee — only managers see the drawer */}
-                    <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} /></td>
+                    <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} onDetailsClick={onPoDetails} /></td>
                     <td className={`${tdCls} ${rowBg}`}>
                       {po.flags ? <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${po.flags === 'URGENT' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{po.flags}</span> : <span className="text-[#A3A3A3]">—</span>}
                     </td>
@@ -306,7 +305,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.collection}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.pm_tags ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">{po.pm_tags}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#525252]">{po.type || '—'}</span></td>
-                    <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg} group-hover:bg-[#FFF0F7]`}>
+                    <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg}`}>
                       <div className="flex items-center gap-1">
                         <button onClick={() => onLogDelay(po)} className={`h-7 px-3 text-[11px] font-semibold rounded-[6px] transition-colors ${po.effective_delayed_due_date ? 'bg-white text-[#E31B7F] border border-[#E5E5E5] hover:bg-[#FFF0F7] hover:border-[#E31B7F]' : 'bg-[#E31B7F] text-white hover:bg-[#C21571]'}`}>
                           {po.effective_delayed_due_date ? 'Edit delay' : 'Report delay'}

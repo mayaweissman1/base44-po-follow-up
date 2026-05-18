@@ -49,25 +49,38 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const { dd_employee_id } = body;
 
-    // Fetch Base44 overrides + dd_updates FIRST so we can also pull any POs they reference
-    const overrides = await base44.entities.po_overrides.list();
-    const overrideMap = {};
-    for (const ov of overrides) {
-      overrideMap[ov.po_number] = ov;
-    }
+    // Fetch Base44 overrides + dd_updates IN PARALLEL
+    const [overrides, allUpdates] = await Promise.all([
+      base44.entities.po_overrides.list(),
+      base44.entities.dd_updates.list('-created_date', 2000),
+    ]);
 
-    const allUpdates = await base44.entities.dd_updates.list('-created_date', 2000);
-    const updatesByPo = {};
-    for (const upd of allUpdates) {
-      if (!updatesByPo[upd.po_number]) updatesByPo[upd.po_number] = [];
-      updatesByPo[upd.po_number].push(upd);
+    const overrideMap = {};
+    for (const ov of overrides) overrideMap[ov.po_number] = ov;
+
+    // Bucket updates by PO and by type in a single pass.
+    // Since allUpdates is already sorted desc by created_date, first hit per (po, type) is the latest.
+    const dddByPo = {};       // latest DDD_UPDATE per PO
+    const generalByPo = {};   // ALL GENERAL_UPDATEs per PO (desc order preserved)
+    const dddCountByPo = {};  // total DDD_UPDATE count per PO
+    for (const u of allUpdates) {
+      if (u.type === 'DDD_UPDATE') {
+        if (!dddByPo[u.po_number]) dddByPo[u.po_number] = u;
+        dddCountByPo[u.po_number] = (dddCountByPo[u.po_number] || 0) + 1;
+      } else if (u.type === 'GENERAL_UPDATE') {
+        if (!generalByPo[u.po_number]) generalByPo[u.po_number] = [];
+        generalByPo[u.po_number].push(u);
+      }
     }
 
     // Always include POs that have base44 activity (overrides or updates),
     // even if their due_date is outside the default window
-    const activePoNumbers = [
-      ...new Set([...Object.keys(overrideMap), ...Object.keys(updatesByPo)]),
-    ];
+    const activeSet = new Set([
+      ...Object.keys(overrideMap),
+      ...Object.keys(dddByPo),
+      ...Object.keys(generalByPo),
+    ]);
+    const activePoNumbers = [...activeSet];
 
     // Fetch ALL sub_po rows (one per destination) for sub-PO expansion
     // Resolve destination name via shipment_destination table
@@ -156,7 +169,6 @@ Deno.serve(async (req) => {
 
     const rows = pos.map(po => {
       const ov = overrideMap[po.po_number] || {};
-      const poUpdates = updatesByPo[po.po_number] || [];
       const mgr = managerMap[po.dd_manager] || null;
 
       // Effective fields (Base44 overrides take precedence)
@@ -165,21 +177,22 @@ Deno.serve(async (req) => {
       const effectiveNextUpdate = ov.next_update_date || po.next_update || null;
       const finalDD = effectiveDelayedDD || po.due_date;
 
-      // Latest DDD_UPDATE
-      const dddUpdates = poUpdates.filter(u => u.type === 'DDD_UPDATE').sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-      const latestDDD = dddUpdates[0] || null;
+      // Latest DDD_UPDATE (precomputed)
+      const latestDDD = dddByPo[po.po_number] || null;
+      const dddCount = dddCountByPo[po.po_number] || 0;
 
-      // Latest GENERAL_UPDATE
-      const generalUpdates = poUpdates.filter(u => u.type === 'GENERAL_UPDATE').sort((a, b) => new Date(b.created_date) - new Date(a.created_date));
-
-      // DD Comment log (general comments history)
-      const ddCommentLog = generalUpdates
-        .filter(u => u.general_comment)
-        .map(u => ({
-          date: u.created_date,
-          text: u.general_comment === 'Other' ? (u.general_comment_other_text || '') : u.general_comment,
-          id: u.id,
-        }));
+      // DD Comment log (general comments history, already desc-sorted)
+      const generalUpdates = generalByPo[po.po_number] || [];
+      const ddCommentLog = [];
+      for (const u of generalUpdates) {
+        if (u.general_comment) {
+          ddCommentLog.push({
+            date: u.created_date,
+            text: u.general_comment === 'Other' ? (u.general_comment_other_text || '') : u.general_comment,
+            id: u.id,
+          });
+        }
+      }
 
       // Computed fields
       const dueDate = po.due_date ? new Date(po.due_date) : null;
@@ -191,7 +204,6 @@ Deno.serve(async (req) => {
         : 0;
 
       const countdown = Math.round((finalDate - today) / 86400000);
-      const dddCount = dddUpdates.length;
 
       // HOLD Age
       let holdAgeDays = null;
@@ -278,25 +290,23 @@ Deno.serve(async (req) => {
       filteredRows = rows.filter(r => r.dd_manager_id === dd_employee_id || r.dd_manager_email === user.email);
     }
 
-    // KPI counts — count by unique PO (latest DDD update status per PO)
+    // KPI counts — single pass over latest-DDD-per-PO (precomputed in dddByPo)
     const todayStr = today.toISOString().slice(0, 10);
-    // Build map of po_number -> latest DDD update
-    const latestDddByPo = {};
-    for (const u of allUpdates.filter(u => u.type === 'DDD_UPDATE')) {
-      if (!latestDddByPo[u.po_number] || new Date(u.created_date) > new Date(latestDddByPo[u.po_number].created_date)) {
-        latestDddByPo[u.po_number] = u;
+    const urgentPoSet = new Set(filteredRows.filter(r => r.urgent).map(r => r.po_number));
+    const kpis = { new_pending: 0, total_pending: 0, urgent_pending: 0, approved_today: 0, rejected_today: 0, acknowledged_today: 0 };
+    for (const u of Object.values(dddByPo)) {
+      const decidedToday = u.decision_at?.slice(0, 10) === todayStr;
+      const createdToday = u.created_date?.slice(0, 10) === todayStr;
+      if (u.status === 'HOLD') {
+        kpis.total_pending++;
+        if (createdToday) kpis.new_pending++;
+        if (urgentPoSet.has(u.po_number)) kpis.urgent_pending++;
+      } else if (decidedToday) {
+        if (u.status === 'APPROVED') kpis.approved_today++;
+        else if (u.status === 'REJECTED') kpis.rejected_today++;
+        else if (u.status === 'ACKNOWLEDGED') kpis.acknowledged_today++;
       }
     }
-    const latestDddList = Object.values(latestDddByPo);
-
-    const kpis = {
-      new_pending: latestDddList.filter(u => u.status === 'HOLD' && u.created_date?.slice(0, 10) === todayStr).length,
-      total_pending: latestDddList.filter(u => u.status === 'HOLD').length,
-      urgent_pending: latestDddList.filter(u => u.status === 'HOLD' && filteredRows.find(r => r.po_number === u.po_number && r.urgent)).length,
-      approved_today: latestDddList.filter(u => u.status === 'APPROVED' && u.decision_at?.slice(0, 10) === todayStr).length,
-      rejected_today: latestDddList.filter(u => u.status === 'REJECTED' && u.decision_at?.slice(0, 10) === todayStr).length,
-      acknowledged_today: latestDddList.filter(u => u.status === 'ACKNOWLEDGED' && u.decision_at?.slice(0, 10) === todayStr).length,
-    };
 
     return Response.json({ rows: filteredRows, kpis });
   } catch (error) {
