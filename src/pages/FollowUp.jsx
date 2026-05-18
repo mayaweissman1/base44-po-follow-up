@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Download } from 'lucide-react';
+import { RefreshCw, ChevronDown, Download, LogOut, User as UserIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
@@ -104,8 +104,9 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
 }
 
 export default function FollowUp() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const [showUserMenu, setShowUserMenu] = useState(false);
   // Roles available to this user: admin sees all, others see their assigned roles.
   // Falls back to legacy single `role` value if `roles` array isn't set yet.
   const userRolesKey = Array.isArray(user?.roles) ? user.roles.join(',') : '';
@@ -151,11 +152,7 @@ export default function FollowUp() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const payload = {};
-    if (activeRole === 'dd_team_employee' && user?.dd_employee_id) {
-      payload.dd_employee_id = user.dd_employee_id;
-    }
-    const res = await base44.functions.invoke('getFollowUpData', payload);
+    const res = await base44.functions.invoke('getFollowUpData', {});
     if (res.data?.rows) {
       const seen = new Set();
       const uniqueRows = res.data.rows.filter(r => {
@@ -167,15 +164,20 @@ export default function FollowUp() {
       setKpis(res.data.kpis || {});
     }
     setLoading(false);
-  }, [activeRole, user?.dd_employee_id]);
+  }, []);
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  // When switching to DD employee role, pre-fill the DD Manager filter with the current user's name
   useEffect(() => {
-    setFilters(DEFAULT_FILTERS(activeRole));
+    const base = DEFAULT_FILTERS(activeRole);
+    if (activeRole === 'dd_team_employee' && user?.full_name) {
+      base.ddManager = user.full_name;
+    }
+    setFilters(base);
     setActiveKpiFilter(null);
     setSelectedRows(new Set());
-  }, [activeRole]);
+  }, [activeRole, user?.full_name]);
 
   function handleKpiFilterClick(filterKey) {
     if (activeKpiFilter === filterKey) {
@@ -311,6 +313,37 @@ export default function FollowUp() {
             >
               <RefreshCw size={13} className={loading ? 'animate-spin' : ''} /> Refresh
             </button>
+
+            {/* User menu */}
+            <div className="relative z-50">
+              <button
+                onClick={() => setShowUserMenu(o => !o)}
+                className="h-8 pl-2.5 pr-2.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
+              >
+                <div className="w-5 h-5 rounded-full bg-[#FFE5F2] text-[#E31B7F] flex items-center justify-center text-[10px] font-bold">
+                  {(user?.full_name || user?.email || '?').charAt(0).toUpperCase()}
+                </div>
+                <span className="max-w-[120px] truncate">{user?.full_name || user?.email}</span>
+                <ChevronDown size={12} />
+              </button>
+              {showUserMenu && (
+                <div className="absolute right-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.08)] z-50 min-w-[220px] overflow-hidden">
+                  <div className="px-4 py-3 border-b border-[#E5E5E5]">
+                    <div className="flex items-center gap-2 text-[12px] font-semibold text-[#0A0A0A]">
+                      <UserIcon size={12} /> {user?.full_name || '—'}
+                    </div>
+                    <div className="text-[11px] text-[#525252] mt-0.5 truncate">{user?.email}</div>
+                    <div className="text-[10px] text-[#A3A3A3] mt-1 uppercase tracking-wide">{user?.role}</div>
+                  </div>
+                  <button
+                    onClick={() => { setShowUserMenu(false); logout(); }}
+                    className="w-full text-left px-4 py-2.5 text-xs font-medium text-[#0A0A0A] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors flex items-center gap-2"
+                  >
+                    <LogOut size={12} /> Log out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -437,6 +470,7 @@ export default function FollowUp() {
       )}
 
       {showRoleDropdown && <div className="fixed inset-0 z-20" onClick={() => setShowRoleDropdown(false)} />}
+      {showUserMenu && <div className="fixed inset-0 z-20" onClick={() => setShowUserMenu(false)} />}
     </div>
   );
 }
