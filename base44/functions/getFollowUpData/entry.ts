@@ -71,6 +71,8 @@ Deno.serve(async (req) => {
 
     // Fetch ALL sub_po rows (one per destination) for sub-PO expansion
     // Resolve destination name via shipment_destination table
+    // Prioritize active POs (those with overrides/updates) so they're never cut off by LIMIT.
+    // Order: active POs first, then by due_date so the most relevant window rows come before older ones.
     const subPoSql = `
       SELECT
         spv.po_number,
@@ -95,7 +97,8 @@ Deno.serve(async (req) => {
         sd.destination AS destination_name,
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
-        sc.product_image
+        sc.product_image,
+        (spv.po_number = ANY($1::text[]))::int AS is_active
       FROM sub_po_view spv
       LEFT JOIN purchase_orders po ON po.po_number = spv.po_number
       LEFT JOIN suppliers sup ON sup.id = po.supplier
@@ -107,8 +110,8 @@ Deno.serve(async (req) => {
                AND spv.due_date <= NOW() + INTERVAL '180 days')
               OR spv.po_number = ANY($1::text[])
             )
-      ORDER BY spv.po_number ASC, spv.destination ASC
-      LIMIT 2000
+      ORDER BY is_active DESC, spv.due_date ASC, spv.po_number ASC, spv.destination ASC
+      LIMIT 5000
     `;
 
     let subPosRaw = [];
