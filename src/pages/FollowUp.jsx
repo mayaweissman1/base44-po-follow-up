@@ -15,6 +15,8 @@ import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
 import BulkActionBar from '@/components/followup/BulkActionBar';
 
+const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
+
 const DEFAULT_FILTERS = (role) => ({
   po: '',
   style: '',
@@ -104,20 +106,26 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
 export default function FollowUp() {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
-  const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
   // Roles available to this user: admin sees all, others see their assigned roles.
   // Falls back to legacy single `role` value if `roles` array isn't set yet.
+  const userRolesKey = Array.isArray(user?.roles) ? user.roles.join(',') : '';
   const availableRoles = useMemo(() => {
     if (isAdmin) return ALL_ROLES;
     const assigned = Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
       : (ALL_ROLES.includes(user?.role) ? [user.role] : []);
     return assigned.filter(r => ALL_ROLES.includes(r));
-  }, [isAdmin, user?.roles, user?.role]);
-  const [activeRole, setActiveRole] = useState(availableRoles[0] || 'main_office');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin, userRolesKey, user?.role]);
+  const [activeRole, setActiveRole] = useState(() => {
+    if (isAdmin) return 'main_office';
+    if (Array.isArray(user?.roles) && user.roles.length > 0) return user.roles[0];
+    if (ALL_ROLES.includes(user?.role)) return user.role;
+    return 'main_office';
+  });
   const [showRoleDropdown, setShowRoleDropdown] = useState(false);
 
-  // Keep activeRole in sync when availableRoles loads
+  // Keep activeRole in sync when availableRoles changes (only when truly invalid)
   useEffect(() => {
     if (availableRoles.length > 0 && !availableRoles.includes(activeRole)) {
       setActiveRole(availableRoles[0]);
