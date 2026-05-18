@@ -5,6 +5,7 @@ import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
 import DdStatusBadge from './DdStatusBadge';
 import ReasonTag from './ReasonTag';
+import PoSizeBreakdown from './PoSizeBreakdown';
 
 function Section({ title, children }) {
   return (
@@ -155,6 +156,9 @@ export default function PoDetailsDrawer({ po, onClose }) {
               </div>
             </>
           )}
+
+          <div className="border-t border-[#E5E5E5] mb-5" />
+          <PoSizeBreakdown poNumber={po.po_number} />
 
           {po.sub_pos?.length > 0 && (
             <>
