@@ -6,6 +6,7 @@ import DdStatusBadge from './DdStatusBadge';
 import PriorityBadge from './PriorityBadge';
 import { fmtDate, ddmm } from '@/lib/followUpConstants';
 import PoSizeBreakdown from './PoSizeBreakdown';
+import StyleThumbnail from './StyleThumbnail';
 
 function DaysCell({ value }) {
   if (value === null || value === undefined) return <span className="font-mono text-[#A3A3A3]">0</span>;
@@ -31,24 +32,33 @@ function PoCell({ po, onLogsClick, onDetailsClick }) {
   const isFuture = po.late_future === 'FUTURE';
   const isReceived = po.late_future === 'RECEIVED';
   return (
-    <div>
-      <div className="flex items-center gap-1.5">
-        <button onClick={() => onLogsClick(po)} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
-        {onDetailsClick && (
-          <button
-            onClick={(e) => { e.stopPropagation(); onDetailsClick(po); }}
-            title="PO details"
-            className="w-5 h-5 flex items-center justify-center rounded text-[#A3A3A3] hover:text-[#E31B7F] hover:bg-[#FFF0F7] transition-colors flex-shrink-0"
-          >
-            <FileText size={11} />
-          </button>
-        )}
-      </div>
-      <div className="flex gap-1 mt-1 flex-wrap">
-        {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
-        {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
-        {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
-        {isFuture && !po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
+    <div className="flex items-start gap-2">
+      <button
+        onClick={(e) => { e.stopPropagation(); onDetailsClick?.(po); }}
+        title="PO details"
+        className="flex-shrink-0 hover:opacity-80 transition-opacity"
+      >
+        <StyleThumbnail styleColor={po.style_color} size={36} />
+      </button>
+      <div className="min-w-0">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => onLogsClick(po)} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
+          {onDetailsClick && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDetailsClick(po); }}
+              title="PO details"
+              className="w-5 h-5 flex items-center justify-center rounded text-[#A3A3A3] hover:text-[#E31B7F] hover:bg-[#FFF0F7] transition-colors flex-shrink-0"
+            >
+              <FileText size={11} />
+            </button>
+          )}
+        </div>
+        <div className="flex gap-1 mt-1 flex-wrap">
+          {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
+          {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
+          {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
+          {isFuture && !po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
+        </div>
       </div>
     </div>
   );

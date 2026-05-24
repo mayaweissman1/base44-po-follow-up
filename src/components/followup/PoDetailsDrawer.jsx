@@ -6,6 +6,7 @@ import ProgressBlock from './po-details/ProgressBlock';
 import DelayBlock from './po-details/DelayBlock';
 import MetaBlock from './po-details/MetaBlock';
 import TimelineBlock from './po-details/TimelineBlock';
+import StyleThumbnail from './StyleThumbnail';
 
 export default function PoDetailsDrawer({ po, onClose }) {
   const [details, setDetails] = useState(null);
@@ -45,7 +46,8 @@ export default function PoDetailsDrawer({ po, onClose }) {
       <div className="relative ml-auto h-full w-[460px] max-w-[calc(100vw-32px)] bg-white shadow-[-4px_0_24px_rgba(0,0,0,.12)] flex flex-col overflow-hidden">
 
         {/* Sticky Header */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-[#E5E5E5] flex-shrink-0 bg-white">
+        <div className="flex items-start gap-3 px-5 py-4 border-b border-[#E5E5E5] flex-shrink-0 bg-white">
+          <StyleThumbnail styleColor={po.style_color} size={64} />
           <div className="min-w-0 flex-1">
             <div className="font-mono font-bold text-[#0A0A0A] text-base">{po.po_number}</div>
             <div className="text-[12px] text-[#525252] mt-0.5 font-medium truncate">{po.style_color}</div>
