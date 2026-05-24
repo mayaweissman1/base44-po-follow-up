@@ -90,12 +90,12 @@ export default function PoSizeBreakdown({ poNumber, combined = false }) {
   return (
     <div className="mb-4">
       <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-3">Size Breakdown · per destination</div>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-wrap gap-4 items-start">
         {destinations.map(d => {
           const totalOrdered  = d.sizes.reduce((acc, s) => acc + (Number(s.ordered_qty)  || 0), 0);
           const totalReceived = d.sizes.reduce((acc, s) => acc + (Number(s.qty_received) || 0), 0);
           return (
-            <div key={d.destination} className="border border-[#E5E5E5] rounded-[8px] overflow-hidden">
+            <div key={d.destination} className="border border-[#E5E5E5] rounded-[8px] overflow-hidden flex-shrink-0">
               <div className="px-4 py-2.5 bg-[#FAFAFA] border-b border-[#E5E5E5] flex items-center gap-2">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[10px] font-bold">{d.destination}</span>
                 <span className="text-[11px] text-[#A3A3A3] ml-auto font-mono">{totalReceived}/{totalOrdered}</span>
