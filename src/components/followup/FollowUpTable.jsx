@@ -487,7 +487,35 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={expandColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 900 }}>
+                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 960 }}>
+                          {po.sub_pos?.length > 0 && (
+                            <div className="mb-4">
+                              <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-2">Sub-POs · per destination</div>
+                              <div className="bg-white border border-[#E5E5E5] rounded-[8px] overflow-hidden">
+                                <table className="border-collapse w-full text-xs">
+                                  <thead>
+                                    <tr>
+                                      {['Destination', 'Priority', 'Ordered Qty', 'Received'].map(h => (
+                                        <th key={h} className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-[#F8F8F8] border-b border-[#E5E5E5]">{h}</th>
+                                      ))}
+                                    </tr>
+                                  </thead>
+                                  <tbody>
+                                    {po.sub_pos.map((s, i) => (
+                                      <tr key={i} className="hover:bg-[#FFF0F7]">
+                                        <td className="px-3.5 py-2 border-b border-[#E5E5E5]">
+                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[11px] font-bold">{s.destination || '—'}</span>
+                                        </td>
+                                        <td className="px-3.5 py-2 border-b border-[#E5E5E5]"><PriorityBadge priority={s.priority || po.priority} /></td>
+                                        <td className="px-3.5 py-2 border-b border-[#E5E5E5] font-mono font-semibold">{s.ordered_qty ?? '—'}</td>
+                                        <td className="px-3.5 py-2 border-b border-[#E5E5E5] font-mono font-semibold">{s.qty_received ?? 0}</td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          )}
                           <PoSizeBreakdown poNumber={po.po_number} />
                         </div>
                       </td>
