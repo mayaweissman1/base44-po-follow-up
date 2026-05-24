@@ -31,7 +31,7 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
             <div className={`text-[20px] font-bold font-mono leading-none ${shippedPct >= 100 ? 'text-green-600' : shippedPct >= 50 ? 'text-[#E31B7F]' : 'text-[#525252]'}`}>
               {shippedPct}%
             </div>
-            <div className="text-[11px] text-[#525252] mt-1">shipped</div>
+            <div className="text-[11px] text-[#525252] mt-1">sent of ordered</div>
           </div>
         )}
       </div>
