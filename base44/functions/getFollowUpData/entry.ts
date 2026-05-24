@@ -87,8 +87,16 @@ Deno.serve(async (req) => {
     // Prioritize active POs (those with overrides/updates) so they're never cut off by LIMIT.
     // Order: active POs first, then by due_date so the most relevant window rows come before older ones.
     const subPoSql = `
+      WITH manual_rw_per_sub AS (
+        SELECT bd.sub_po_number, SUM(COALESCE(bl.rw, 0)) AS manual_rw
+        FROM batch_lines bl
+        JOIN batch_details bd ON bd.id = bl.batch_id
+        WHERE bl.rw IS NOT NULL AND bl.rw > 0
+        GROUP BY bd.sub_po_number
+      )
       SELECT
         spv.po_number,
+        spv.sub_po_number,
         spv.order_date,
         spv.due_date,
         spv.dd_status,
@@ -112,19 +120,15 @@ Deno.serve(async (req) => {
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
         uv.po_rank AS po_rank,
-        GREATEST(COALESCE(spv.ordered_qty, 0) - COALESCE(spv.qty_received, 0), 0)::numeric AS open_qty,
-        CASE
-          WHEN COALESCE(spv.ordered_qty, 0) > 0
-          THEN ROUND(COALESCE(spv.qty_received, 0) * 100.0 / spv.ordered_qty, 1)
-          ELSE NULL
-        END AS shipped_percent,
+        mrw.manual_rw AS manual_rw,
         (spv.po_number = ANY($1::text[]))::int AS is_active
       FROM sub_po_view spv
       LEFT JOIN purchase_orders po ON po.po_number = spv.po_number
       LEFT JOIN suppliers sup ON sup.id = po.supplier
       LEFT JOIN po_types pt ON pt.id = po.po_type
       LEFT JOIN shipment_destination sd ON sd.id = spv.destination
-      LEFT JOIN urgents_view uv ON uv.po_number = spv.po_number
+      LEFT JOIN urgents_view uv ON uv.sub_po_number = spv.sub_po_number
+      LEFT JOIN manual_rw_per_sub mrw ON mrw.sub_po_number = spv.sub_po_number
       WHERE (
               (spv.due_date >= NOW() - INTERVAL '60 days'
                AND spv.due_date <= NOW() + INTERVAL '180 days')
@@ -143,23 +147,25 @@ Deno.serve(async (req) => {
     }
 
     // Group sub-POs by po_number to get unique POs + sub_pos list.
-    // Aggregate open_qty, open_orders, air_otw across the PO's sub-rows.
+    // Aggregate air_otw + manual_rw across the PO's sub-rows; take MIN(po_rank).
     const poMap = new Map();
     for (const row of subPosRaw) {
       if (!poMap.has(row.po_number)) {
         poMap.set(row.po_number, {
           ...row,
           sub_pos: [],
-          _open_qty_total: 0,
-          _open_orders: 0,
           _air_otw_total: 0,
+          _manual_rw_total: 0,
+          _po_rank_min: null,
         });
       }
       const parent = poMap.get(row.po_number);
-      const openQty = Number(row.open_qty) || 0;
-      parent._open_qty_total += openQty;
-      if (openQty > 0) parent._open_orders += 1;
       parent._air_otw_total += Number(row.qty_otw_air) || 0;
+      parent._manual_rw_total += Number(row.manual_rw) || 0;
+      const rank = row.po_rank != null ? Number(row.po_rank) : null;
+      if (rank != null && (parent._po_rank_min == null || rank < parent._po_rank_min)) {
+        parent._po_rank_min = rank;
+      }
       // Add sub-PO entry — use destination name (resolved via shipment_destination) when available
       parent.sub_pos.push({
         destination: row.destination_name || (row.destination_id != null ? `#${row.destination_id}` : '—'),
@@ -299,11 +305,9 @@ Deno.serve(async (req) => {
         dd_comment_log: ddCommentLog,
         has_override: !!ov.po_number,
         // New fields from SQL
-        po_rank: po.po_rank != null ? Number(po.po_rank) : null,
+        po_rank: po._po_rank_min,
         air_otw: po._air_otw_total,
-        open_qty: po._open_qty_total,
-        open_orders: po._open_orders,
-        shipped_percent: po.shipped_percent != null ? Number(po.shipped_percent) : null,
+        manual_rw: po._manual_rw_total,
       };
     });
 

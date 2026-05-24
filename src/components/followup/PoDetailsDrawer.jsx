@@ -63,10 +63,8 @@ export default function PoDetailsDrawer({ po, onClose }) {
     : null;
 
   // These fields may exist on the PO row or inside getPoDetails at the destination level
-  const airOtw       = po.air_otw       ?? po.otw          ?? details?.air_otw       ?? null;
-  const openQty      = po.open_qty      ?? details?.open_qty      ?? null;
-  const openOrders   = po.open_orders   ?? details?.open_orders   ?? null;
-  const shippedPct   = po.shipped_percent ?? po.shipped_pct ?? details?.shipped_percent ?? null;
+  const airOtw   = po.air_otw   ?? po.otw ?? details?.air_otw   ?? null;
+  const manualRw = po.manual_rw ?? details?.manual_rw ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -132,9 +130,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
             <Field label="Qty Received" mono>{totalReceived}</Field>
             <Field label="Good For Sale" mono>{totalGfs}</Field>
             <Field label="Air OTW" mono>{airOtw}</Field>
-            <Field label="Open Qty" mono>{openQty}</Field>
-            <Field label="Open Orders" mono>{openOrders}</Field>
-            <Field label="Shipped %" mono>{shippedPct}</Field>
+            <Field label="Manual RW" mono>{manualRw}</Field>
           </Section>
 
           {/* Delivery Dates */}
