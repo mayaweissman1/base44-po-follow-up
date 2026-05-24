@@ -39,6 +39,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
 
   const airOtw = po.air_otw ?? po.otw ?? details?.air_otw ?? null;
   const autoRw = po.auto_rw ?? po.qty_rw_auto ?? details?.auto_rw ?? null;
+  const manualRw = po.manual_rw ?? po.qty_rw_manual ?? details?.manual_rw ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -68,6 +69,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
             gfs={totalGfs}
             airOtw={airOtw}
             autoRw={autoRw}
+            manualRw={manualRw}
           />
           <DelayBlock po={po} />
           <MetaBlock po={po} destStr={destStr} orderType={orderType} />

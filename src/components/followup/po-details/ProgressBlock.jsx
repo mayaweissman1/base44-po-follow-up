@@ -8,13 +8,14 @@ import React from 'react';
  *   - Progress bar: visual fill with capped 100% + excess overlay
  *   - Metrics grid: Sent Out, Good For Sale, Remaining, Air OTW, Auto RW
  */
-export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw, autoRw }) {
+export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw, autoRw, manualRw }) {
   const orderedN = Number(ordered) || 0;
   const receivedN = Number(received) || 0;
   const sentN = Number(sentOut) || 0;
   const gfsN = Number(gfs) || 0;
   const airN = Number(airOtw) || 0;
   const autoRwN = Number(autoRw) || 0;
+  const manualRwN = Number(manualRw) || 0;
 
   const excess = Math.max(0, receivedN - orderedN);
   const remaining = Math.max(0, orderedN - receivedN);
@@ -78,6 +79,7 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
         <Metric label="Remaining" value={remaining} muted={remaining === 0} />
         <Metric label="Air OTW" value={airN} accent={airN > 0 ? 'text-blue-600' : undefined} muted={airN === 0} />
         <Metric label="Auto RW" value={autoRwN} accent={autoRwN > 0 ? 'text-red-500' : undefined} muted={autoRwN === 0} />
+        <Metric label="Manual RW" value={manualRwN} accent={manualRwN > 0 ? 'text-red-500' : undefined} muted={manualRwN === 0} />
       </div>
     </div>
   );
