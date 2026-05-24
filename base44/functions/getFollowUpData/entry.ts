@@ -18,10 +18,8 @@ async function query(sql, params = []) {
   return res.rows;
 }
 
-// po_status IDs to include — matches current project default (Open + Closed,
-// excludes Cancelled, Pending-Purchase, On Hold, New-Repeat, Pending-Supplier, Draft).
-// 3=Open, 5=Closed. We also exclude done=true at row level.
-const PO_STATUS_INCLUDE = [3, 5];
+// Match legacy cutting: po_status = 3 (Open) AND done = false.
+const PO_STATUS_INCLUDE = [3];
 
 Deno.serve(async (req) => {
   try {
@@ -137,19 +135,14 @@ Deno.serve(async (req) => {
       LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
-      WHERE pov.po_status = ANY($2::int[])
+      WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
-        AND (
-              (pov.due_date >= NOW() - INTERVAL '60 days'
-               AND pov.due_date <= NOW() + INTERVAL '180 days')
-              OR pov.po_number = ANY($1::text[])
-            )
-      ORDER BY pov.due_date ASC, pov.po_number ASC
+      ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
     `;
 
     let pos = [];
     try {
-      pos = await query(poSql, [activePoNumbers, PO_STATUS_INCLUDE]);
+      pos = await query(poSql, [PO_STATUS_INCLUDE]);
     } catch (dbErr) {
       console.error('DB error:', dbErr.message);
       return Response.json({ error: 'Database error: ' + dbErr.message }, { status: 500 });
