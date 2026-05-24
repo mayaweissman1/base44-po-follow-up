@@ -130,11 +130,7 @@ Deno.serve(async (req) => {
         sds.bulk_fabric_approval,
         pps.receipt_date AS pps_receipt_date,
         pmt.tag AS pm_tag_label,
-        CASE
-          WHEN scv.product_image IS NULL
-            THEN 'https://res.cloudinary.com/edikted/image/upload/v1610271170/samples/' || scv.style_color || '.jpg'
-          ELSE scv.product_image
-        END AS product_image
+        scv.product_image AS product_image
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type

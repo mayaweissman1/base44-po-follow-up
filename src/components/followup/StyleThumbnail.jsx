@@ -24,9 +24,9 @@ export default function StyleThumbnail({ styleColor, imageUrl, size = 32, classN
       <div
         style={dim}
         title={styleColor ? `No image for ${styleColor}` : 'No style color'}
-        className={`flex items-center justify-center bg-white border border-dashed border-[#D4D4D4] rounded-[6px] text-[#A3A3A3] flex-shrink-0 ${className}`}
+        className={`flex items-center justify-center bg-[#FAFAFA] border border-[#E5E5E5] rounded-[6px] text-[#D4D4D4] flex-shrink-0 ${className}`}
       >
-        <ImageIcon size={Math.max(10, size * 0.4)} />
+        <ImageIcon size={Math.max(12, size * 0.5)} />
       </div>
     );
   }
