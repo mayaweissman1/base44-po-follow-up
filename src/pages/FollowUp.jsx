@@ -116,19 +116,7 @@ export default function FollowUp() {
   const [showUserMenu, setShowUserMenu] = useState(false);
   // Roles available to this user: admin sees all, others see their assigned roles.
   // Falls back to legacy single `role` value if `roles` array isn't set yet.
-  const userRolesKey = Array.isArray(user?.roles) ? user.roles.join(',') : '';
-  const availableRoles = useMemo(() => {
-    if (isAdmin) return ALL_ROLES;
-    // Main office users can switch between all role views (per product decision)
-    const assignedHasMainOffice = (Array.isArray(user?.roles) && user.roles.includes('main_office'))
-      || user?.role === 'main_office';
-    if (assignedHasMainOffice) return ALL_ROLES;
-    const assigned = Array.isArray(user?.roles) && user.roles.length > 0
-      ? user.roles
-      : (ALL_ROLES.includes(user?.role) ? [user.role] : []);
-    return assigned.filter(r => ALL_ROLES.includes(r));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAdmin, userRolesKey, user?.role]);
+  const availableRoles = ALL_ROLES;
   const [activeRole, setActiveRole] = useState(() => {
     if (isAdmin) return 'main_office';
     if (Array.isArray(user?.roles) && user.roles.length > 0) return user.roles[0];
@@ -271,7 +259,7 @@ export default function FollowUp() {
       destinations: [...dest].sort(),
     };
   }, [rows]);
-  const showRoleSwitcher = availableRoles.length > 1;
+  const showRoleSwitcher = true;
 
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
