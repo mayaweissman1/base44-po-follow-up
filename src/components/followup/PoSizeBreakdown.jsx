@@ -86,45 +86,49 @@ export default function PoSizeBreakdown({ poNumber, combined = false }) {
     );
   }
 
-  // ─── Per-destination view (expanded rows) — side by side, no GFS ───────────
+  // ─── Per-destination view (expanded rows) — transposed: sizes as columns ────
   return (
     <div className="mb-4">
       <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-3">Size Breakdown · per destination</div>
-      <div className="flex flex-wrap gap-5 items-start">
+      <div className="flex flex-col gap-4">
         {destinations.map(d => {
-          const totals = d.sizes.reduce(
-            (acc, s) => ({ ordered: acc.ordered + (Number(s.ordered_qty) || 0), received: acc.received + (Number(s.qty_received) || 0) }),
-            { ordered: 0, received: 0 }
-          );
+          const totalOrdered  = d.sizes.reduce((acc, s) => acc + (Number(s.ordered_qty)  || 0), 0);
+          const totalReceived = d.sizes.reduce((acc, s) => acc + (Number(s.qty_received) || 0), 0);
           return (
-            <div key={d.destination} className="border border-[#E5E5E5] rounded-[8px] overflow-hidden flex-shrink-0 min-w-[190px]">
+            <div key={d.destination} className="border border-[#E5E5E5] rounded-[8px] overflow-hidden">
               <div className="px-4 py-2.5 bg-[#FAFAFA] border-b border-[#E5E5E5] flex items-center gap-2">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[10px] font-bold">{d.destination}</span>
-                <span className="text-[11px] text-[#A3A3A3] ml-auto font-mono">{totals.received}/{totals.ordered}</span>
+                <span className="text-[11px] text-[#A3A3A3] ml-auto font-mono">{totalReceived}/{totalOrdered}</span>
               </div>
-              <table className="text-xs border-collapse w-full">
-                <thead>
-                  <tr>
-                    {['Size', 'Ordered', 'Received'].map(h => (
-                      <th key={h} className="text-left px-4 py-2 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-white border-b border-[#E5E5E5]">{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {d.sizes.map((s, i) => (
-                    <tr key={s.sku || i} className="hover:bg-[#FFF0F7]">
-                      <td className="px-4 py-2 border-b border-[#E5E5E5] font-mono font-semibold">{s.size}</td>
-                      <td className="px-4 py-2 border-b border-[#E5E5E5] font-mono">{s.ordered_qty}</td>
-                      <td className="px-4 py-2 border-b border-[#E5E5E5] font-mono">{s.qty_received}</td>
+              <div className="overflow-x-auto">
+                <table className="text-xs border-collapse">
+                  <thead>
+                    <tr>
+                      <th className="px-4 py-2 text-left text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-white border-b border-r border-[#E5E5E5] whitespace-nowrap w-[90px]"></th>
+                      {d.sizes.map(s => (
+                        <th key={s.size} className="px-4 py-2 text-center text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-white border-b border-r border-[#E5E5E5] whitespace-nowrap">{s.size}</th>
+                      ))}
+                      <th className="px-4 py-2 text-center text-[10px] font-bold text-[#525252] uppercase tracking-[.06em] bg-[#FAFAFA] border-b border-[#E5E5E5] whitespace-nowrap">Total</th>
                     </tr>
-                  ))}
-                  <tr className="bg-[#FAFAFA] font-semibold">
-                    <td className="px-4 py-2 text-[11px] text-[#525252]">Total</td>
-                    <td className="px-4 py-2 font-mono">{totals.ordered}</td>
-                    <td className="px-4 py-2 font-mono">{totals.received}</td>
-                  </tr>
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    <tr className="hover:bg-[#FFF0F7]">
+                      <td className="px-4 py-2 border-b border-r border-[#E5E5E5] text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] whitespace-nowrap">Ordered</td>
+                      {d.sizes.map(s => (
+                        <td key={s.size} className="px-4 py-2 border-b border-r border-[#E5E5E5] font-mono text-center">{Number(s.ordered_qty) || 0}</td>
+                      ))}
+                      <td className="px-4 py-2 border-b border-[#E5E5E5] font-mono font-semibold text-center bg-[#FAFAFA]">{totalOrdered}</td>
+                    </tr>
+                    <tr className="hover:bg-[#FFF0F7]">
+                      <td className="px-4 py-2 border-r border-[#E5E5E5] text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] whitespace-nowrap">Received</td>
+                      {d.sizes.map(s => (
+                        <td key={s.size} className="px-4 py-2 border-r border-[#E5E5E5] font-mono text-center">{Number(s.qty_received) || 0}</td>
+                      ))}
+                      <td className="px-4 py-2 font-mono font-semibold text-center bg-[#FAFAFA]">{totalReceived}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
           );
         })}
