@@ -1,9 +1,11 @@
 import React from 'react';
 import { fmtDate } from '@/lib/followUpConstants';
 import DdStatusBadge from '../DdStatusBadge';
+import PmTagsPills from '../PmTagsPills';
 
 /**
  * Compact metadata: who, what, where. Single-column "definition list" feel.
+ * PM Tags are rendered as a full-width row at the bottom so all pills can wrap.
  */
 export default function MetaBlock({ po, destStr, orderType }) {
   const rows = [
@@ -17,7 +19,9 @@ export default function MetaBlock({ po, destStr, orderType }) {
     { label: 'Next Update', value: po.effective_next_update ? fmtDate(po.effective_next_update) : null, mono: true },
   ].filter(r => r.value);
 
-  if (rows.length === 0) return null;
+  const hasPmTags = !!po.pm_tags_label;
+
+  if (rows.length === 0 && !hasPmTags) return null;
 
   return (
     <div className="px-5 py-4 border-b border-[#E5E5E5]">
@@ -41,6 +45,15 @@ export default function MetaBlock({ po, destStr, orderType }) {
             </span>
           </div>
         ))}
+
+        {hasPmTags && (
+          <div className="pt-1">
+            <div className="text-[12px] text-[#A3A3A3] font-medium mb-1.5">PM Tags</div>
+            <div className="flex flex-wrap gap-1">
+              <PmTagsPills label={po.pm_tags_label} max={20} />
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

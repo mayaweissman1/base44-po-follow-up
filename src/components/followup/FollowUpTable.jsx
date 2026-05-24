@@ -7,6 +7,7 @@ import PriorityBadge from './PriorityBadge';
 import { fmtDate, ddmm } from '@/lib/followUpConstants';
 import PoSizeBreakdown from './PoSizeBreakdown';
 import StyleThumbnail from './StyleThumbnail';
+import PmTagsPills from './PmTagsPills';
 
 function DaysCell({ value }) {
   if (value === null || value === undefined) return <span className="font-mono text-[#A3A3A3]">0</span>;
@@ -366,7 +367,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}>{po.effective_next_update ? <span className="font-mono">{fmtDate(po.effective_next_update)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3] text-xs">{fmtDate(po.drop)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.collection}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}>{po.pm_tags_label ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200" title={po.pm_tags_label}>{po.pm_tags_label}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}><PmTagsPills label={po.pm_tags_label} /></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#525252]">{po.type || '—'}</span></td>
                     <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
