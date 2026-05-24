@@ -396,9 +396,9 @@ export default function FollowUpTable({
 
   // ─── Main Office + DD Team Manager view ────────────────────────────────────
   // Column counts (for sub-PO expand colSpan):
-  //   main_office:     checkbox + chevron + thumb + 19 always-shown + HOLD Age + Last Comment = 25
-  //   dd_team_manager: checkbox + chevron + thumb + 19 always-shown = 23
-  const expandColSpan = role === 'dd_team_manager' ? 23 : 25;
+  //   main_office:     checkbox + chevron + thumb + 20 always-shown + HOLD Age + Last Comment = 26
+  //   dd_team_manager: checkbox + chevron + thumb + 20 always-shown = 24
+  const expandColSpan = role === 'dd_team_manager' ? 24 : 26;
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
@@ -432,6 +432,7 @@ export default function FollowUpTable({
               {role === 'main_office' && <Th {...thProps} col="internal_note" width={colWidths['internal_note'] || 150}>Last Comment (internal)</Th>}
               <Th {...thProps} col="effective_next_update"         width={colWidths['effective_next_update'] || 95}>Next Update</Th>
               <Th {...thProps} col="ddd_count"                     width={colWidths['ddd_count'] || 70}  tooltip={TIPS.ddd_count}>DDD Count</Th>
+              <Th {...thProps} col="pm_tags"                       width={colWidths['pm_tags'] || 110} tooltip={TIPS.pm_tags}>PM Tags</Th>
               <th className={`${thCls} sticky right-0 z-20 shadow-[-4px_0_8px_rgba(0,0,0,.04)]`}>Actions</th>
             </tr>
           </thead>
@@ -485,6 +486,7 @@ export default function FollowUpTable({
                     )}
                     <td className={tdBase}>{po.effective_next_update ? <span className="font-mono text-xs">{fmtDate(po.effective_next_update)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={tdBase}><span className="font-mono">{po.ddd_count ?? 0}</span></td>
+                    <td className={tdBase}><PmTagsPills label={po.pm_tags_label} /></td>
                     <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionCellBase}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
                         {role === 'main_office' ? (

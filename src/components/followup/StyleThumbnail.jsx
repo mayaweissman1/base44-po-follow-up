@@ -6,7 +6,12 @@ import { ImageIcon } from 'lucide-react';
  * Falls back to a placeholder when the image fails to load or styleColor is missing.
  */
 export default function StyleThumbnail({ styleColor, size = 32, className = '' }) {
+  // Reset error state when styleColor changes (component instance can be reused
+  // across rows when the filtered list shrinks, causing a stale `errored=true`
+  // to hide a valid image for a different style_color).
   const [errored, setErrored] = useState(false);
+  React.useEffect(() => { setErrored(false); }, [styleColor]);
+
   const url = styleColor
     ? `https://res.cloudinary.com/edikted/image/upload/v1610271170/samples/${styleColor}.jpg`
     : null;
