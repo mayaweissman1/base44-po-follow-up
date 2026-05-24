@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Check, Info, X, Clock, MessageSquare, ChevronRight, FileText, ChevronUp, ChevronDown } from 'lucide-react';
+import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
@@ -27,31 +27,16 @@ function DdCommentLog({ log }) {
   );
 }
 
-function PoCell({ po, onLogsClick, onDetailsClick }) {
+function PoCell({ po, onLogsClick }) {
   const isLate = po.late_future === 'LATE';
   const isFuture = po.late_future === 'FUTURE';
   const isReceived = po.late_future === 'RECEIVED';
   return (
     <div className="flex items-start gap-2">
-      <button
-        onClick={(e) => { e.stopPropagation(); onDetailsClick?.(po); }}
-        title="PO details"
-        className="flex-shrink-0 hover:opacity-80 transition-opacity"
-      >
-        <StyleThumbnail styleColor={po.style_color} size={36} />
-      </button>
+      <StyleThumbnail styleColor={po.style_color} size={36} />
       <div className="min-w-0">
         <div className="flex items-center gap-1.5">
-          <button onClick={() => onLogsClick(po)} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
-          {onDetailsClick && (
-            <button
-              onClick={(e) => { e.stopPropagation(); onDetailsClick(po); }}
-              title="PO details"
-              className="w-5 h-5 flex items-center justify-center rounded text-[#A3A3A3] hover:text-[#E31B7F] hover:bg-[#FFF0F7] transition-colors flex-shrink-0"
-            >
-              <FileText size={11} />
-            </button>
-          )}
+          <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
         </div>
         <div className="flex gap-1 mt-1 flex-wrap">
           {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
@@ -303,6 +288,7 @@ export default function FollowUpTable({
                 <Th {...thProps} col="qty_received" width={colWidths['qty_received'] || 100}>Qty Received</Th>
                 <Th {...thProps} col="qty_rw_manual" width={colWidths['qty_rw_manual'] || 90}>Manual RW</Th>
                 <Th {...thProps} col="qty_rw_auto" width={colWidths['qty_rw_auto'] || 80}>Auto RW</Th>
+                <Th {...thProps} col="bulk_fabric_approval" width={colWidths['bulk_fabric_approval'] || 130}>Bulk Fabric Approval</Th>
                 <Th {...thProps} col="goods_received" width={colWidths['goods_received'] || 110}>Goods Received</Th>
                 <Th {...thProps} col="order_date" width={colWidths['order_date'] || 100}>Order Date</Th>
                 <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 120}>DD Status</Th>
@@ -324,11 +310,11 @@ export default function FollowUpTable({
                 const countdown = po.countdown;
 
                 return (
-                  <tr key={po.po_number} className="group">
-                    <td className={`${tdCls} ${rowBg}`}>
+                  <tr key={po.po_number} className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
+                    <td className={`${tdCls} ${rowBg}`} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
-                    <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} onDetailsClick={onPoDetails} /></td>
+                    <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={`${tdCls} ${rowBg}`}>
                       {po.flags ? <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${po.flags === 'URGENT' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{po.flags}</span> : <span className="text-[#A3A3A3]">—</span>}
                     </td>
@@ -351,6 +337,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono font-semibold">{po.qty_received ?? 0}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_manual ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_auto ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}>{po.bulk_fabric_approval === true ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">Approved</span> : po.bulk_fabric_approval === false ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">Pending</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.goods_received)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.order_date)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><DdStatusBadge status={po.effective_dd_status} /></td>
@@ -361,7 +348,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.collection}</span></td>
                     <td className={`${tdCls} ${rowBg}`}>{po.pm_tags ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">{po.pm_tags}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#525252]">{po.type || '—'}</span></td>
-                    <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg}`}>
+                    <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         <button onClick={() => onLogDelay(po)} className={`h-7 px-3 text-[11px] font-semibold rounded-[6px] transition-colors ${po.effective_delayed_due_date ? 'bg-white text-[#E31B7F] border border-[#E5E5E5] hover:bg-[#FFF0F7] hover:border-[#E31B7F]' : 'bg-[#E31B7F] text-white hover:bg-[#C21571]'}`}>
                           {po.effective_delayed_due_date ? 'Edit delay' : 'Report delay'}
@@ -435,16 +422,16 @@ export default function FollowUpTable({
 
               return (
                 <React.Fragment key={po.po_number}>
-                  <tr className="group cursor-default">
-                    <td className={`${tdBase} w-9`}>
+                  <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
+                    <td className={`${tdBase} w-9`} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
-                    <td className={`${tdBase} w-9`}>
+                    <td className={`${tdBase} w-9`} onClick={e => e.stopPropagation()}>
                       <button onClick={() => toggleExpand(po.po_number)} className={`w-[18px] h-[18px] flex items-center justify-center text-[#525252] transition-transform ${isExpanded ? 'rotate-90 text-[#E31B7F]' : ''}`}>
                         <ChevronRight size={14} />
                       </button>
                     </td>
-                    <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} onDetailsClick={onPoDetails} /></td>
+                    <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>
                     <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>
                     <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>
@@ -475,7 +462,7 @@ export default function FollowUpTable({
                     )}
                     <td className={tdBase}>{po.effective_next_update ? <span className="font-mono text-xs">{fmtDate(po.effective_next_update)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={tdBase}><span className="font-mono">{po.ddd_count ?? 0}</span></td>
-                    <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionCellBase}`}>
+                    <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionCellBase}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">
                         {role === 'main_office' ? (
                           <>

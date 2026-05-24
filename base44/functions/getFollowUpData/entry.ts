@@ -126,12 +126,15 @@ Deno.serve(async (req) => {
         c.collection AS collection_name,
         mrw.manual_rw AS manual_rw_calc,
         dpo.destinations,
-        prk.po_rank
+        prk.po_rank,
+        sds.bulk_fabric_approval
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
       LEFT JOIN style_colors_view scv ON scv.style_color = pov.style_color
       LEFT JOIN collections c ON c.id = scv.collection
+      LEFT JOIN style_colors sc ON sc.id = scv.id
+      LEFT JOIN style_dev_suppliers sds ON sds.id = sc.style_dev_supplier
       LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
@@ -280,6 +283,7 @@ Deno.serve(async (req) => {
         air_otw: Number(po.qty_otw_air) || 0,
         manual_rw: Number(po.qty_rw_manual ?? po.manual_rw_calc) || 0,
         auto_rw: Number(po.qty_rw_auto) || 0,
+        bulk_fabric_approval: po.bulk_fabric_approval ?? null,
         shipped_percent: (Number(po.ordered_qty) > 0)
           ? Math.round((Number(po.qty_sent_out) || 0) / Number(po.ordered_qty) * 100)
           : null,
