@@ -138,7 +138,11 @@ Deno.serve(async (req) => {
       LEFT JOIN style_colors sc ON sc.id = scv.id
       LEFT JOIN style_dev_suppliers sds ON sds.id = sc.style_dev_supplier
       LEFT JOIN style_color_pps pps ON pps.style_color = scv.id
-      LEFT JOIN pm_tags pmt ON pmt.id = pov.pm_tags
+      LEFT JOIN LATERAL (
+        SELECT string_agg(pmt.pm_tag, ', ' ORDER BY pmt.pm_tag) AS tag
+        FROM pm_tags pmt
+        WHERE pmt.id = ANY(pov.pm_tags)
+      ) pmt ON true
       LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
