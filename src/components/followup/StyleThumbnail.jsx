@@ -5,16 +5,17 @@ import { ImageIcon } from 'lucide-react';
  * Small/medium thumbnail of a style_color from Cloudinary.
  * Falls back to a placeholder when the image fails to load or styleColor is missing.
  */
-export default function StyleThumbnail({ styleColor, size = 32, className = '' }) {
-  // Reset error state when styleColor changes (component instance can be reused
+export default function StyleThumbnail({ styleColor, imageUrl, size = 32, className = '' }) {
+  // Reset error state when source changes (component instance can be reused
   // across rows when the filtered list shrinks, causing a stale `errored=true`
   // to hide a valid image for a different style_color).
   const [errored, setErrored] = useState(false);
-  React.useEffect(() => { setErrored(false); }, [styleColor]);
+  React.useEffect(() => { setErrored(false); }, [styleColor, imageUrl]);
 
-  const url = styleColor
-    ? `https://res.cloudinary.com/edikted/image/upload/v1610271170/samples/${styleColor}.jpg`
-    : null;
+  const url = imageUrl
+    || (styleColor
+      ? `https://res.cloudinary.com/edikted/image/upload/v1610271170/samples/${styleColor}.jpg`
+      : null);
 
   const dim = { width: size, height: size };
 

@@ -48,7 +48,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
 
         {/* Sticky Header */}
         <div className="flex items-start gap-3 px-5 py-4 border-b border-[#E5E5E5] flex-shrink-0 bg-white">
-          <StyleThumbnail styleColor={po.style_color} size={64} />
+          <StyleThumbnail styleColor={po.style_color} imageUrl={po.product_image} size={64} />
           <div className="min-w-0 flex-1">
             <div className="font-mono font-bold text-[#0A0A0A] text-base">{po.po_number}</div>
             <div className="text-[12px] text-[#525252] mt-0.5 font-medium truncate">{po.style_color}</div>

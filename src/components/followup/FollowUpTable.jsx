@@ -333,7 +333,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
-                    <td className={`${tdCls} ${rowBg}`}><StyleThumbnail styleColor={po.style_color} size={40} /></td>
+                    <td className={`${tdCls} ${rowBg}`}><StyleThumbnail styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>
                     <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={`${tdCls} ${rowBg}`}>
                       {po.flags ? <span className={`inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase ${po.flags === 'URGENT' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{po.flags}</span> : <span className="text-[#A3A3A3]">—</span>}
@@ -355,8 +355,8 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#A3A3A3]">{po.set_with || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ordered_qty ?? '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono font-semibold">{po.qty_received ?? 0}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_manual ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
-                    <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_auto ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_manual ? <span className="font-mono font-semibold text-red-500">{Number(po.qty_rw_manual).toLocaleString()}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_auto ? <span className="font-mono font-semibold text-red-500">{Number(po.qty_rw_auto).toLocaleString()}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}>{po.bulk_fabric_approval === true ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">Approved</span> : po.bulk_fabric_approval === false ? <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">Pending</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.pps_receipt_date)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.goods_received)}</span></td>
@@ -454,7 +454,7 @@ export default function FollowUpTable({
                         <ChevronRight size={14} />
                       </button>
                     </td>
-                    <td className={tdBase}><StyleThumbnail styleColor={po.style_color} size={40} /></td>
+                    <td className={tdBase}><StyleThumbnail styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>
                     <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>
                     <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>

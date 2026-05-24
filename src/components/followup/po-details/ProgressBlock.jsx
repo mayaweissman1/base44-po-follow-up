@@ -4,9 +4,10 @@ import React from 'react';
  * Production Progress block — Edikted design system.
  *
  * Shows how the PO is progressing through production:
- *   - Headline: received vs ordered (with % and excess/remaining indicator)
- *   - Progress bar: visual fill with capped 100% + excess overlay
- *   - Metrics grid: Sent Out, Good For Sale, Remaining, Air OTW, Auto RW
+ *   - Headline: GOOD FOR SALE vs ordered (with % and excess/remaining indicator)
+ *   - Sub-line: received of ordered (secondary metric)
+ *   - Progress bar: visual fill (based on GFS) with capped 100% + excess overlay
+ *   - Metrics grid: Sent Out, Received, Remaining, Air OTW, Auto RW, Manual RW
  */
 export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw, autoRw, manualRw }) {
   const orderedN = Number(ordered) || 0;
@@ -17,12 +18,13 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
   const autoRwN = Number(autoRw) || 0;
   const manualRwN = Number(manualRw) || 0;
 
-  const excess = Math.max(0, receivedN - orderedN);
-  const remaining = Math.max(0, orderedN - receivedN);
-  const pct = orderedN > 0 ? Math.round((receivedN / orderedN) * 100) : 0;
+  // PRIMARY metric is now GFS (good for sale) vs ordered
+  const excess = Math.max(0, gfsN - orderedN);
+  const remaining = Math.max(0, orderedN - gfsN);
+  const pct = orderedN > 0 ? Math.round((gfsN / orderedN) * 100) : 0;
   const displayPct = Math.min(pct, 100);
   const hasExcess = excess > 0;
-  const isComplete = receivedN >= orderedN && orderedN > 0;
+  const isComplete = gfsN >= orderedN && orderedN > 0;
 
   // pct color: green at/over 100, pink mid, gray low
   const pctColor = isComplete ? 'text-green-600' : pct >= 50 ? 'text-[#E31B7F]' : 'text-[#525252]';
@@ -42,14 +44,17 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
         Production Progress
       </div>
 
-      {/* Headline */}
+      {/* Headline — GFS / ordered is the primary metric */}
       <div className="flex items-baseline justify-between mb-2.5">
         <div>
           <div className="text-[20px] font-bold text-[#0A0A0A] font-mono leading-none">
-            {receivedN.toLocaleString()}
+            {gfsN.toLocaleString()}
             <span className="text-[#A3A3A3] font-medium text-[14px]"> / {orderedN.toLocaleString()}</span>
           </div>
-          <div className="text-[11px] text-[#525252] mt-1">received of ordered</div>
+          <div className="text-[11px] text-[#525252] mt-1">good for sale of ordered</div>
+          <div className="text-[11px] text-[#A3A3A3] mt-0.5 font-mono">
+            received: {receivedN.toLocaleString()}
+          </div>
         </div>
         <div className="text-right">
           <div className={`text-[20px] font-bold font-mono leading-none ${pctColor}`}>
@@ -61,7 +66,7 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
         </div>
       </div>
 
-      {/* Progress bar — capped fill, amber excess strip on top */}
+      {/* Progress bar — capped fill, amber excess strip on top (based on GFS) */}
       <div className="relative h-2 bg-[#F0F0F0] rounded-full overflow-hidden mb-4">
         <div
           className={`absolute top-0 left-0 h-full ${isComplete ? 'bg-green-500' : 'bg-[#E31B7F]'} transition-all`}
@@ -75,7 +80,7 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
       {/* Metrics grid — uniform layout, label left, value right */}
       <div className="grid grid-cols-2 gap-x-6 gap-y-2.5">
         <Metric label="Sent Out" value={sentN} dot="bg-[#E31B7F]" />
-        <Metric label="Good For Sale" value={gfsN} accent={gfsN > 0 ? 'text-green-600' : undefined} />
+        <Metric label="Received" value={receivedN} accent={receivedN > 0 ? 'text-[#0A0A0A]' : undefined} muted={receivedN === 0} />
         <Metric label="Remaining" value={remaining} muted={remaining === 0} />
         <Metric label="Air OTW" value={airN} accent={airN > 0 ? 'text-blue-600' : undefined} muted={airN === 0} />
         <Metric label="Auto RW" value={autoRwN} accent={autoRwN > 0 ? 'text-red-500' : undefined} muted={autoRwN === 0} />

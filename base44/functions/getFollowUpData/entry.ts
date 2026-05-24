@@ -129,7 +129,12 @@ Deno.serve(async (req) => {
         prk.po_rank,
         sds.bulk_fabric_approval,
         pps.receipt_date AS pps_receipt_date,
-        pmt.tag AS pm_tag_label
+        pmt.tag AS pm_tag_label,
+        CASE
+          WHEN scv.product_image IS NULL
+            THEN 'https://res.cloudinary.com/edikted/image/upload/v1610271170/samples/' || scv.style_color || '.jpg'
+          ELSE scv.product_image
+        END AS product_image
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -265,6 +270,7 @@ Deno.serve(async (req) => {
         sub_pos: subPos,
         pm_tags: po.pm_tags,
         pm_tags_label: po.pm_tag_label || null,
+        product_image: po.product_image || null,
         pps_receipt_date: po.pps_receipt_date,
         // Effective/computed
         effective_delayed_due_date: effectiveDelayedDD,
