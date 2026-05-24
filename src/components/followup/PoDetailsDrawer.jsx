@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { fmtDate, ddmm, getResponsibility } from '@/lib/followUpConstants';
+import { base44 } from '@/api/base44Client';
 import StatusBadge from './StatusBadge';
 import PriorityBadge from './PriorityBadge';
 import DdStatusBadge from './DdStatusBadge';
@@ -17,11 +18,11 @@ function Section({ title, children }) {
   );
 }
 
-function Field({ label, mono = false, full = false, muted = false, children }) {
+function Field({ label, mono = false, full = false, children }) {
   return (
     <div className={full ? 'col-span-2' : ''}>
       <div className="text-[9px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-0.5">{label}</div>
-      <div className={`text-[13px] ${mono ? 'font-mono font-semibold' : 'font-medium'} ${muted ? 'text-[#A3A3A3]' : 'text-[#0A0A0A]'}`}>
+      <div className={`text-[13px] ${mono ? 'font-mono font-semibold' : 'font-medium'} text-[#0A0A0A]`}>
         {children ?? <span className="text-[#A3A3A3]">—</span>}
       </div>
     </div>
@@ -29,11 +30,43 @@ function Field({ label, mono = false, full = false, muted = false, children }) {
 }
 
 export default function PoDetailsDrawer({ po, onClose }) {
+  const [details, setDetails] = useState(null);
+
+  useEffect(() => {
+    if (!po?.po_number) return;
+    let cancelled = false;
+    setDetails(null);
+    base44.functions.invoke('getPoDetails', { po_number: po.po_number }).then(res => {
+      if (cancelled) return;
+      setDetails(res?.data || null);
+    });
+    return () => { cancelled = true; };
+  }, [po?.po_number]);
+
   if (!po) return null;
 
   const orderType = po.po_number.endsWith('-CL') ? 'CL' : po.po_number.endsWith('-AC') ? 'ACC' : 'Regular';
   const responsibility = getResponsibility(po.ddd_reason);
-  const destinations = po.sub_pos?.map(s => s.destination).filter(Boolean).join(' · ') || po.destination || null;
+  const destStr = po.sub_pos?.map(s => s.destination).filter(Boolean).join(' · ') || po.destination || null;
+
+  // Aggregate quantities across all sub-POs (most accurate totals)
+  const totalOrdered = po.sub_pos?.length
+    ? po.sub_pos.reduce((sum, s) => sum + (s.ordered_qty || 0), 0)
+    : (po.ordered_qty ?? null);
+  const totalReceived = po.sub_pos?.length
+    ? po.sub_pos.reduce((sum, s) => sum + (s.qty_received || 0), 0)
+    : (po.qty_received ?? null);
+
+  // GFS aggregated from getPoDetails size breakdown
+  const totalGfs = details?.destinations?.length
+    ? details.destinations.reduce((t, d) => t + d.sizes.reduce((s, sz) => s + (sz.good_for_sale || 0), 0), 0)
+    : null;
+
+  // These fields may exist on the PO row or inside getPoDetails at the destination level
+  const airOtw       = po.air_otw       ?? po.otw          ?? details?.air_otw       ?? null;
+  const openQty      = po.open_qty      ?? details?.open_qty      ?? null;
+  const openOrders   = po.open_orders   ?? details?.open_orders   ?? null;
+  const shippedPct   = po.shipped_percent ?? po.shipped_pct ?? details?.shipped_percent ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -44,7 +77,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E5] flex-shrink-0">
           <div>
             <div className="font-mono font-bold text-[#0A0A0A] text-base">{po.po_number}</div>
-            {destinations && <div className="text-[12px] text-[#E31B7F] font-medium mt-0.5">{po.po_number} › {destinations}</div>}
+            {destStr && <div className="text-[12px] text-[#E31B7F] font-medium mt-0.5">{po.po_number} › {destStr}</div>}
             <div className="text-[12px] text-[#525252] mt-0.5">{po.style_color}</div>
           </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#F8F8F8] hover:text-[#0A0A0A] transition-colors">
@@ -58,12 +91,11 @@ export default function PoDetailsDrawer({ po, onClose }) {
           {/* Order Info */}
           <Section title="Order info">
             <Field label="Style Color" mono>{po.style_color || null}</Field>
-            <Field label="Destinations">{destinations}</Field>
+            <Field label="Destinations">{destStr}</Field>
             <Field label="Collection">{po.collection || null}</Field>
             <Field label="Order Type">
               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-50 text-gray-600 border border-gray-200">{orderType}</span>
             </Field>
-            <Field label="Ordered Qty" mono>{po.ordered_qty ?? null}</Field>
             <Field label="Order Date" mono>{fmtDate(po.order_date)}</Field>
             <Field label="Supplier">
               {po.supplier
@@ -96,12 +128,13 @@ export default function PoDetailsDrawer({ po, onClose }) {
 
           {/* Quantities */}
           <Section title="Quantities">
-            <Field label="Qty Received" mono>{po.qty_received ?? 0}</Field>
-            <Field label="Good For Sale" mono>{po.good_for_sale ?? po.gfs ?? null}</Field>
-            <Field label="Air OTW" mono>{po.air_otw ?? po.otw ?? null}</Field>
-            <Field label="Open Qty" mono>{po.open_qty ?? null}</Field>
-            <Field label="Open Orders" mono>{po.open_orders ?? null}</Field>
-            <Field label="Shipped %" mono>{po.shipped_percent ?? po.shipped_pct ?? null}</Field>
+            <Field label="Ordered Qty" mono>{totalOrdered}</Field>
+            <Field label="Qty Received" mono>{totalReceived}</Field>
+            <Field label="Good For Sale" mono>{totalGfs}</Field>
+            <Field label="Air OTW" mono>{airOtw}</Field>
+            <Field label="Open Qty" mono>{openQty}</Field>
+            <Field label="Open Orders" mono>{openOrders}</Field>
+            <Field label="Shipped %" mono>{shippedPct}</Field>
           </Section>
 
           {/* Delivery Dates */}
