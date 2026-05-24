@@ -24,7 +24,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
 
   if (!po) return null;
 
-  const orderType = po.po_number.endsWith('-CL') ? 'CL' : po.po_number.endsWith('-AC') ? 'ACC' : 'Regular';
+  const orderType = po.type || (po.po_number.endsWith('-CL') ? 'CL' : po.po_number.endsWith('-AC') ? 'ACC' : 'Regular');
   const destStr = po.sub_pos?.map(s => s.destination).filter(Boolean).join(' · ') || po.destination || null;
 
   // Quantities come from po_view (PO totals). sub_pos in this payload only
