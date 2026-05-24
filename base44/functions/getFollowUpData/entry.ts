@@ -18,25 +18,10 @@ async function query(sql, params = []) {
   return res.rows;
 }
 
-const REASON_TO_RESPONSIBILITY = {
-  'Force Majeure': 'OTHER',
-  'DD Temporary': 'OTHER',
-  'PPS Approval Late': 'EDIKTED',
-  'Fabric Approval Late': 'EDIKTED',
-  'QC Approval Late': 'EDIKTED',
-  'Wrong Packing Materials': 'EDIKTED',
-  'Labels Arrive Late': 'EDIKTED',
-  'QC Reproduction': 'SUPPLIER',
-  'QC ReWork': 'SUPPLIER',
-  'PPS Submission Late': 'SUPPLIER',
-  'Fabric Issue': 'SUPPLIER',
-  'Production Capacity Issue': 'SUPPLIER',
-  'Technical problem - washing': 'SUPPLIER',
-  'Technical problem - printing': 'SUPPLIER',
-  'Technical problem - sewing / handmade': 'SUPPLIER',
-  'Packing Issue': 'SUPPLIER',
-  'Special details late': 'SUPPLIER',
-};
+// po_status IDs to include — matches current project default (Open + Closed,
+// excludes Cancelled, Pending-Purchase, On Hold, New-Repeat, Pending-Supplier, Draft).
+// 3=Open, 5=Closed. We also exclude done=true at row level.
+const PO_STATUS_INCLUDE = [3, 5];
 
 Deno.serve(async (req) => {
   try {
@@ -59,10 +44,9 @@ Deno.serve(async (req) => {
     for (const ov of overrides) overrideMap[ov.po_number] = ov;
 
     // Bucket updates by PO and by type in a single pass.
-    // Since allUpdates is already sorted desc by created_date, first hit per (po, type) is the latest.
-    const dddByPo = {};       // latest DDD_UPDATE per PO
-    const generalByPo = {};   // ALL GENERAL_UPDATEs per PO (desc order preserved)
-    const dddCountByPo = {};  // total DDD_UPDATE count per PO
+    const dddByPo = {};
+    const generalByPo = {};
+    const dddCountByPo = {};
     for (const u of allUpdates) {
       if (u.type === 'DDD_UPDATE') {
         if (!dddByPo[u.po_number]) dddByPo[u.po_number] = u;
@@ -73,8 +57,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Always include POs that have base44 activity (overrides or updates),
-    // even if their due_date is outside the default window
+    // Always include POs that have base44 activity even if outside the default window
     const activeSet = new Set([
       ...Object.keys(overrideMap),
       ...Object.keys(dddByPo),
@@ -82,102 +65,87 @@ Deno.serve(async (req) => {
     ]);
     const activePoNumbers = [...activeSet];
 
-    // Fetch ALL sub_po rows (one per destination) for sub-PO expansion
-    // Resolve destination name via shipment_destination table
-    // Prioritize active POs (those with overrides/updates) so they're never cut off by LIMIT.
-    // Order: active POs first, then by due_date so the most relevant window rows come before older ones.
-    const subPoSql = `
-      WITH manual_rw_per_sub AS (
-        SELECT bd.sub_po_number, SUM(COALESCE(bl.rw, 0)) AS manual_rw
+    // PRIMARY QUERY — po_view, one row per PO.
+    // Matches current project semantics: po_status IN (3,5), done=false.
+    // Date window: ±60d / +180d, OR PO has base44 activity.
+    const poSql = `
+      WITH manual_rw_per_po AS (
+        SELECT spv.po_number, SUM(COALESCE(bl.rw, 0)) AS manual_rw
         FROM batch_lines bl
         JOIN batch_details bd ON bd.id = bl.batch_id
+        JOIN sub_po_view spv ON spv.sub_po_number = bd.sub_po_number
         WHERE bl.rw IS NOT NULL AND bl.rw > 0
-        GROUP BY bd.sub_po_number
+        GROUP BY spv.po_number
+      ),
+      destinations_per_po AS (
+        SELECT spv.po_number, ARRAY_AGG(DISTINCT sd.destination) FILTER (WHERE sd.destination IS NOT NULL) AS destinations
+        FROM sub_po_view spv
+        LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+        GROUP BY spv.po_number
+      ),
+      po_rank_per_po AS (
+        SELECT po_number, MIN(po_rank) AS po_rank
+        FROM urgents_view
+        GROUP BY po_number
       )
       SELECT
-        spv.po_number,
-        spv.sub_po_number,
-        spv.order_date,
-        spv.due_date,
-        spv.dd_status,
-        spv.delayed_due_date,
-        spv.next_update,
-        spv.urgent,
-        spv.delivery_date_status,
-        spv.style_color,
-        spv.dd_manager,
-        spv.collection,
-        spv.ordered_qty,
-        spv.qty_received,
-        spv.balance,
-        spv.good_for_sale,
-        spv.qty_sent_out,
-        spv.qty_otw_air,
-        spv.delivery_date,
-        spv.drop,
-        spv.destination AS destination_id,
-        sd.destination AS destination_name,
+        pov.po_number,
+        pov.po_status,
+        pov.done,
+        pov.style_color,
+        pov.order_date,
+        pov.due_date,
+        pov.delayed_due_date,
+        pov.dd_status,
+        pov.delivery_date_status,
+        pov.next_update,
+        pov.urgent,
+        pov.drop,
+        pov.dd_manager,
+        pov.ordered_qty,
+        pov.qty_received,
+        pov.balance,
+        pov.good_for_sale,
+        pov.qty_sent_out,
+        pov.qty_otw_air,
+        pov.qty_rw_manual,
+        pov.qty_rw_auto,
+        pov.goods_received,
+        pov.delivery_date,
+        pov.pm_tags,
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
-        uv.po_rank AS po_rank,
-        mrw.manual_rw AS manual_rw,
-        (spv.po_number = ANY($1::text[]))::int AS is_active
-      FROM sub_po_view spv
-      LEFT JOIN purchase_orders po ON po.po_number = spv.po_number
-      LEFT JOIN suppliers sup ON sup.id = po.supplier
-      LEFT JOIN po_types pt ON pt.id = po.po_type
-      LEFT JOIN shipment_destination sd ON sd.id = spv.destination
-      LEFT JOIN urgents_view uv ON uv.sub_po_number = spv.sub_po_number
-      LEFT JOIN manual_rw_per_sub mrw ON mrw.sub_po_number = spv.sub_po_number
-      WHERE (
-              (spv.due_date >= NOW() - INTERVAL '60 days'
-               AND spv.due_date <= NOW() + INTERVAL '180 days')
-              OR spv.po_number = ANY($1::text[])
+        c.collection AS collection_name,
+        mrw.manual_rw AS manual_rw_calc,
+        dpo.destinations,
+        prk.po_rank
+      FROM po_view pov
+      LEFT JOIN suppliers sup ON sup.id = pov.supplier
+      LEFT JOIN po_types pt ON pt.id = pov.po_type
+      LEFT JOIN style_colors_view scv ON scv.style_color = pov.style_color
+      LEFT JOIN collections c ON c.id = scv.collection
+      LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
+      LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
+      LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
+      WHERE pov.po_status = ANY($2::int[])
+        AND pov.done = false
+        AND (
+              (pov.due_date >= NOW() - INTERVAL '60 days'
+               AND pov.due_date <= NOW() + INTERVAL '180 days')
+              OR pov.po_number = ANY($1::text[])
             )
-      ORDER BY is_active DESC, spv.due_date ASC, spv.po_number ASC, spv.destination ASC
-      LIMIT 5000
+      ORDER BY pov.due_date ASC, pov.po_number ASC
     `;
 
-    let subPosRaw = [];
+    let pos = [];
     try {
-      subPosRaw = await query(subPoSql, [activePoNumbers]);
+      pos = await query(poSql, [activePoNumbers, PO_STATUS_INCLUDE]);
     } catch (dbErr) {
       console.error('DB error:', dbErr.message);
       return Response.json({ error: 'Database error: ' + dbErr.message }, { status: 500 });
     }
 
-    // Group sub-POs by po_number to get unique POs + sub_pos list.
-    // Aggregate air_otw + manual_rw across the PO's sub-rows; take MIN(po_rank).
-    const poMap = new Map();
-    for (const row of subPosRaw) {
-      if (!poMap.has(row.po_number)) {
-        poMap.set(row.po_number, {
-          ...row,
-          sub_pos: [],
-          _air_otw_total: 0,
-          _manual_rw_total: 0,
-          _po_rank_min: null,
-        });
-      }
-      const parent = poMap.get(row.po_number);
-      parent._air_otw_total += Number(row.qty_otw_air) || 0;
-      parent._manual_rw_total += Number(row.manual_rw) || 0;
-      const rank = row.po_rank != null ? Number(row.po_rank) : null;
-      if (rank != null && (parent._po_rank_min == null || rank < parent._po_rank_min)) {
-        parent._po_rank_min = rank;
-      }
-      // Add sub-PO entry — use destination name (resolved via shipment_destination) when available
-      parent.sub_pos.push({
-        destination: row.destination_name || (row.destination_id != null ? `#${row.destination_id}` : '—'),
-        ordered_qty: row.ordered_qty,
-        qty_received: row.qty_received,
-        priority: null, // will be filled in later
-      });
-    }
-
-    const pos = [...poMap.values()];
-
-    // Resolve dd_manager integer IDs -> name/email from edikted_employees
+    // Resolve dd_manager IDs -> name/email
     const managerIds = [...new Set(pos.map(p => p.dd_manager).filter(Boolean))];
     let managerMap = {};
     if (managerIds.length > 0) {
@@ -195,17 +163,14 @@ Deno.serve(async (req) => {
       const ov = overrideMap[po.po_number] || {};
       const mgr = managerMap[po.dd_manager] || null;
 
-      // Effective fields (Base44 overrides take precedence)
       const effectiveDelayedDD = ov.delayed_due_date || po.delayed_due_date || null;
       const effectiveDdStatus = ov.dd_status || po.dd_status || null;
       const effectiveNextUpdate = ov.next_update_date || po.next_update || null;
       const finalDD = effectiveDelayedDD || po.due_date;
 
-      // Latest DDD_UPDATE (precomputed)
       const latestDDD = dddByPo[po.po_number] || null;
       const dddCount = dddCountByPo[po.po_number] || 0;
 
-      // DD Comment log (general comments history, already desc-sorted)
       const generalUpdates = generalByPo[po.po_number] || [];
       const ddCommentLog = [];
       for (const u of generalUpdates) {
@@ -218,7 +183,6 @@ Deno.serve(async (req) => {
         }
       }
 
-      // Computed fields
       const dueDate = po.due_date ? new Date(po.due_date) : null;
       const delayedDate = effectiveDelayedDD ? new Date(effectiveDelayedDD) : null;
       const finalDate = new Date(finalDD);
@@ -229,35 +193,37 @@ Deno.serve(async (req) => {
 
       const countdown = Math.round((finalDate - today) / 86400000);
 
-      // HOLD Age
       let holdAgeDays = null;
       if (latestDDD && latestDDD.status === 'HOLD') {
         holdAgeDays = Math.floor((today - new Date(latestDDD.created_date)) / 86400000);
       }
 
-      // Days same status
       let daysSameStatus = null;
       if (ov.dd_status_changed_at) {
         daysSameStatus = Math.floor((today - new Date(ov.dd_status_changed_at)) / 86400000);
       }
 
-      // Priority
+      // Fully-received check: qty_received >= ordered_qty means the goods arrived,
+      // so we should not flag the PO as LATE even if past its due date.
+      // (done=true POs are already excluded by the SQL WHERE clause.)
+      const ordered = Number(po.ordered_qty) || 0;
+      const received = Number(po.qty_received) || 0;
+      const fullyReceived = ordered > 0 && received >= ordered;
+
       let priority = 'Normal';
-      if (po.urgent) {
-        priority = 'URGENT';
-      } else if (daysLateCounting > 3) {
-        priority = 'Deadline';
-      }
+      if (po.urgent) priority = 'URGENT';
+      else if (daysLateCounting > 3) priority = 'Deadline';
 
-      // Late/Future
-      const lateFuture = finalDate < today ? 'LATE' : 'FUTURE';
+      const lateFuture = fullyReceived
+        ? 'RECEIVED'
+        : (finalDate < today ? 'LATE' : 'FUTURE');
 
-      // Flags
       const nextUpdatePassed = effectiveNextUpdate && new Date(effectiveNextUpdate) < today;
       const qtyError = po.good_for_sale === 0 && po.qty_sent_out > 0;
 
-      // Sub-POs with priority filled in
-      const subPos = (po.sub_pos || []).map(s => ({ ...s, priority }));
+      // Build a thin sub_pos list with destinations only (no qty — used for chips/labels)
+      const destinations = Array.isArray(po.destinations) ? po.destinations : [];
+      const subPos = destinations.map(d => ({ destination: d, priority }));
 
       return {
         po_number: po.po_number,
@@ -271,16 +237,19 @@ Deno.serve(async (req) => {
         qty_sent_out: po.qty_sent_out,
         delivery_date: po.delivery_date,
         delivery_date_status: po.delivery_date_status || '',
+        goods_received: po.goods_received,
+        done: !!po.done,
         dd_manager_id: po.dd_manager,
         dd_manager_name: mgr?.name || String(po.dd_manager || ''),
         dd_manager_email: mgr?.email || '',
         supplier: po.supplier_name || String(po.supplier || ''),
-        po_type: po.po_type_name || String(po.po_type || ''),
-        collection: po.collection || '',
+        po_type: po.po_type_name || '',
+        collection: po.collection_name || '',
         urgent: !!po.urgent,
         drop: po.drop,
-        destination: po.destination_name || (po.destination_id != null ? String(po.destination_id) : ''),
+        destination: destinations.join(' · '),
         sub_pos: subPos,
+        pm_tags: po.pm_tags,
         // Effective/computed
         effective_delayed_due_date: effectiveDelayedDD,
         effective_dd_status: effectiveDdStatus,
@@ -301,13 +270,13 @@ Deno.serve(async (req) => {
         delay_response_comment: latestDDD ? latestDDD.delay_response_comment : null,
         internal_note: latestDDD ? latestDDD.internal_note : null,
         last_ddd_update_id: latestDDD ? latestDDD.id : null,
-        // General comment history
         dd_comment_log: ddCommentLog,
         has_override: !!ov.po_number,
-        // New fields from SQL
-        po_rank: po._po_rank_min,
-        air_otw: po._air_otw_total,
-        manual_rw: po._manual_rw_total,
+        // Numerics from po_view (no aggregation needed)
+        po_rank: po.po_rank != null ? Number(po.po_rank) : null,
+        air_otw: Number(po.qty_otw_air) || 0,
+        manual_rw: Number(po.qty_rw_manual ?? po.manual_rw_calc) || 0,
+        auto_rw: Number(po.qty_rw_auto) || 0,
         shipped_percent: (Number(po.ordered_qty) > 0)
           ? Math.round((Number(po.qty_sent_out) || 0) / Number(po.ordered_qty) * 100)
           : null,
@@ -320,7 +289,7 @@ Deno.serve(async (req) => {
       filteredRows = rows.filter(r => r.dd_manager_id === dd_employee_id || r.dd_manager_email === user.email);
     }
 
-    // KPI counts — single pass over latest-DDD-per-PO (precomputed in dddByPo)
+    // KPI counts
     const todayStr = today.toISOString().slice(0, 10);
     const urgentPoSet = new Set(filteredRows.filter(r => r.urgent).map(r => r.po_number));
     const kpis = { new_pending: 0, total_pending: 0, urgent_pending: 0, approved_today: 0, rejected_today: 0, acknowledged_today: 0 };

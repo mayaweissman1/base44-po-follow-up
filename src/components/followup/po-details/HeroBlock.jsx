@@ -7,10 +7,13 @@ import PriorityBadge from '../PriorityBadge';
 export default function HeroBlock({ po }) {
   const countdown = po.countdown;
   const isLate = po.late_future === 'LATE';
+  const isReceived = po.late_future === 'RECEIVED';
   const daysLate = po.days_late_counting;
 
   // Color the hero based on urgency
-  const heroState = po.urgent
+  const heroState = isReceived
+    ? { bg: 'bg-green-50', border: 'border-green-200', accent: 'text-green-600' }
+    : po.urgent
     ? { bg: 'bg-amber-50', border: 'border-amber-200', accent: 'text-amber-600' }
     : isLate
     ? { bg: 'bg-red-50', border: 'border-red-200', accent: 'text-red-500' }
@@ -18,8 +21,9 @@ export default function HeroBlock({ po }) {
     ? { bg: 'bg-orange-50', border: 'border-orange-200', accent: 'text-orange-500' }
     : { bg: 'bg-green-50', border: 'border-green-200', accent: 'text-green-600' };
 
-  const countdownLabel =
-    countdown == null ? '—'
+  const countdownLabel = isReceived
+    ? 'Goods received'
+    : countdown == null ? '—'
     : countdown < 0 ? `${Math.abs(countdown)}d late`
     : countdown === 0 ? 'Due today'
     : `${countdown}d left`;
@@ -36,7 +40,12 @@ export default function HeroBlock({ po }) {
             {po.flags}
           </span>
         )}
-        {isLate && (
+        {isReceived && (
+          <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-green-100 text-green-700 border border-green-300">
+            RECEIVED
+          </span>
+        )}
+        {isLate && !isReceived && (
           <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-red-100 text-red-600 border border-red-300">
             LATE
           </span>

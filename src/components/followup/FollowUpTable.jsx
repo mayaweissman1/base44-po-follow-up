@@ -29,6 +29,7 @@ function DdCommentLog({ log }) {
 function PoCell({ po, onLogsClick, onDetailsClick }) {
   const isLate = po.late_future === 'LATE';
   const isFuture = po.late_future === 'FUTURE';
+  const isReceived = po.late_future === 'RECEIVED';
   return (
     <div>
       <div className="flex items-center gap-1.5">
@@ -45,6 +46,7 @@ function PoCell({ po, onLogsClick, onDetailsClick }) {
       </div>
       <div className="flex gap-1 mt-1 flex-wrap">
         {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
+        {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
         {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
         {isFuture && !po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
       </div>
