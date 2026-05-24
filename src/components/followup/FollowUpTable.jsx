@@ -32,18 +32,15 @@ function PoCell({ po, onLogsClick }) {
   const isFuture = po.late_future === 'FUTURE';
   const isReceived = po.late_future === 'RECEIVED';
   return (
-    <div className="flex items-start gap-2">
-      <StyleThumbnail styleColor={po.style_color} size={36} />
-      <div className="min-w-0">
-        <div className="flex items-center gap-1.5">
-          <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
-        </div>
-        <div className="flex gap-1 mt-1 flex-wrap">
-          {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
-          {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
-          {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
-          {isFuture && !po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
-        </div>
+    <div className="min-w-0">
+      <div className="flex items-center gap-1.5">
+        <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
+      </div>
+      <div className="flex gap-1 mt-1 flex-wrap">
+        {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
+        {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
+        {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
+        {isFuture && !po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
       </div>
     </div>
   );
@@ -271,6 +268,7 @@ export default function FollowUpTable({
                 <th className={thCls} style={{ width: 36 }}>
                   <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
                 </th>
+                <th className={thCls} style={{ width: 56 }}></th>
                 <Th {...thProps} col="po_number" width={colWidths['po_number'] || 160}>PO Number</Th>
                 <Th {...thProps} col="flags" width={colWidths['flags'] || 80}>Flags</Th>
                 <Th {...thProps} col="supplier" width={colWidths['supplier'] || 100}>Supplier</Th>
@@ -314,6 +312,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
+                    <td className={`${tdCls} ${rowBg}`}><StyleThumbnail styleColor={po.style_color} size={40} /></td>
                     <td className={`${tdCls} ${rowBg}`}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={`${tdCls} ${rowBg}`}>
                       {po.flags ? <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase ${po.flags === 'URGENT' ? 'bg-amber-50 text-amber-600 border border-amber-200' : 'bg-red-50 text-red-500 border border-red-200'}`}>{po.flags}</span> : <span className="text-[#A3A3A3]">—</span>}
@@ -375,9 +374,9 @@ export default function FollowUpTable({
 
   // ─── Main Office + DD Team Manager view ────────────────────────────────────
   // Column counts (for sub-PO expand colSpan):
-  //   main_office:     checkbox + chevron + 19 always-shown + HOLD Age + Last Comment = 24
-  //   dd_team_manager: chevron + 19 always-shown = 21
-  const expandColSpan = role === 'dd_team_manager' ? 22 : 24;
+  //   main_office:     checkbox + chevron + thumb + 19 always-shown + HOLD Age + Last Comment = 25
+  //   dd_team_manager: checkbox + chevron + thumb + 19 always-shown = 23
+  const expandColSpan = role === 'dd_team_manager' ? 23 : 25;
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
@@ -389,6 +388,7 @@ export default function FollowUpTable({
                 <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
               </th>
               <th className={thCls} style={{ width: 36 }}></th>
+              <th className={thCls} style={{ width: 56 }}></th>
               <Th {...thProps} col="po_number"                     width={colWidths['po_number'] || 170}>PO Number</Th>
               <Th {...thProps} col="style_color"                   width={colWidths['style_color'] || 130}>Style Color</Th>
               <Th {...thProps} col="po_rank"                       width={colWidths['po_rank'] || 80}>PO Rank</Th>
@@ -431,6 +431,7 @@ export default function FollowUpTable({
                         <ChevronRight size={14} />
                       </button>
                     </td>
+                    <td className={tdBase}><StyleThumbnail styleColor={po.style_color} size={40} /></td>
                     <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>
                     <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>
