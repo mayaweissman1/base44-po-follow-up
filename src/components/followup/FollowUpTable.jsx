@@ -5,6 +5,7 @@ import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
 import PriorityBadge from './PriorityBadge';
 import { fmtDate, ddmm } from '@/lib/followUpConstants';
+import PoSizeBreakdown from './PoSizeBreakdown';
 
 function DaysCell({ value }) {
   if (value === null || value === undefined) return <span className="font-mono text-[#A3A3A3]">0</span>;
@@ -332,7 +333,7 @@ export default function FollowUpTable({
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-      <div className="overflow-x-auto overflow-y-auto" style={{ height: 'calc(100vh - 240px)' }}>
+      <div className="overflow-x-auto">
         <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
           <thead>
             <tr>
@@ -437,41 +438,8 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={expandColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 720 }}>
-                          <div className="text-[11px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-2.5">📦 Sub-POs · per destination</div>
-                          <div className="bg-white border border-[#E5E5E5] rounded-[8px] overflow-hidden">
-                          <table className="border-collapse w-full text-xs">
-                          <thead>
-                            <tr>
-                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Destination</th>
-                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Priority</th>
-                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Ordered Qty</th>
-                              <th className="text-left px-3.5 py-2.5 text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] bg-[#F8F8F8] border-b border-[#E5E5E5]">Qty Received</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {po.sub_pos?.length > 0 ? (
-                              po.sub_pos.map((s, i) => {
-                                const isLast = i === po.sub_pos.length - 1;
-                                return (
-                                  <tr key={i} className={`hover:bg-[#FFF0F7] ${i % 2 === 1 ? 'bg-[#FAFAFA]' : ''}`}>
-                                    <td className={`px-3.5 py-2.5 ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}>
-                                      <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[11px] font-bold">{s.destination || '—'}</span>
-                                    </td>
-                                    <td className={`px-3.5 py-2.5 ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}><PriorityBadge priority={s.priority || po.priority} /></td>
-                                    <td className={`px-3.5 py-2.5 font-mono font-semibold ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}>{s.ordered_qty != null ? s.ordered_qty : '—'}</td>
-                                    <td className={`px-3.5 py-2.5 font-mono font-semibold ${!isLast ? 'border-b border-[#E5E5E5]' : ''}`}>{s.qty_received != null ? s.qty_received : 0}</td>
-                                  </tr>
-                                );
-                              })
-                            ) : (
-                              <tr>
-                                <td colSpan={4} className="px-3.5 py-4 text-center text-xs text-[#A3A3A3]">No sub-PO data available</td>
-                              </tr>
-                            )}
-                          </tbody>
-                          </table>
-                          </div>
+                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 900 }}>
+                          <PoSizeBreakdown poNumber={po.po_number} />
                         </div>
                       </td>
                     </tr>

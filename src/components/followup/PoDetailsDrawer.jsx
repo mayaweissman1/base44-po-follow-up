@@ -158,7 +158,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
           )}
 
           <div className="border-t border-[#E5E5E5] mb-5" />
-          <PoSizeBreakdown poNumber={po.po_number} />
+          <PoSizeBreakdown poNumber={po.po_number} combined />
 
           {po.sub_pos?.length > 0 && (
             <>

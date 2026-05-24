@@ -128,11 +128,7 @@ export default function FollowUp() {
 
   const loadData = useCallback(async () => {
     setLoading(true);
-    const payload = {};
-    if (activeRole === 'dd_team_employee' && user?.dd_employee_id) {
-      payload.dd_employee_id = user.dd_employee_id;
-    }
-    const res = await base44.functions.invoke('getFollowUpData', payload);
+    const res = await base44.functions.invoke('getFollowUpData', {});
     if (res.data?.rows) {
       const seen = new Set();
       const uniqueRows = res.data.rows.filter(r => {
@@ -144,7 +140,7 @@ export default function FollowUp() {
       setKpis(res.data.kpis || {});
     }
     setLoading(false);
-  }, [activeRole, user?.dd_employee_id]);
+  }, [activeRole]);
 
   useEffect(() => { loadData(); }, [loadData]);
 

@@ -1,6 +1,57 @@
-import React from 'react';
-import { RotateCcw, X } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { RotateCcw, X, ChevronDown } from 'lucide-react';
 import { DD_STATUS_OPTIONS, DD_REASONS_BY_GROUP } from '@/lib/followUpConstants';
+
+const ssTriggerCls = "h-8 px-2.5 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors w-full flex items-center justify-between gap-1 cursor-pointer";
+
+function SearchableSelect({ value, onChange, options, allLabel = 'All' }) {
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function handler(e) {
+      if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setQuery(''); }
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const filtered = options.filter(o => !query || o.toLowerCase().includes(query.toLowerCase()));
+
+  return (
+    <div ref={ref} className="relative min-w-0">
+      <button type="button" onClick={() => setOpen(o => !o)} className={ssTriggerCls}>
+        <span className={`truncate flex-1 text-left ${!value ? 'text-[#737373]' : ''}`}>{value || allLabel}</span>
+        <ChevronDown size={11} className="flex-shrink-0 opacity-50" />
+      </button>
+      {open && (
+        <div className="absolute z-[999] top-full left-0 mt-1 bg-white border border-[#D4D4D4] rounded-[6px] shadow-[0_4px_16px_rgba(0,0,0,.12)] min-w-full w-max max-w-[240px] overflow-hidden">
+          <div className="p-1.5 border-b border-[#E5E5E5]">
+            <input
+              autoFocus
+              className="w-full h-7 px-2 text-xs border border-[#D4D4D4] rounded-[4px] focus:outline-none focus:border-[#E31B7F]"
+              placeholder="Search…"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              onClick={e => e.stopPropagation()}
+            />
+          </div>
+          <div className="max-h-52 overflow-y-auto">
+            <button type="button" className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-[#FFF0F7] hover:text-[#E31B7F] ${!value ? 'text-[#E31B7F] font-semibold bg-[#FFF0F7]' : ''}`}
+              onClick={() => { onChange(''); setOpen(false); setQuery(''); }}>{allLabel}</button>
+            {filtered.map(o => (
+              <button key={o} type="button"
+                className={`w-full text-left px-3 py-1.5 text-xs transition-colors hover:bg-[#FFF0F7] hover:text-[#E31B7F] ${value === o ? 'text-[#E31B7F] font-semibold bg-[#FFF0F7]' : ''}`}
+                onClick={() => { onChange(o); setOpen(false); setQuery(''); }}>{o}</button>
+            ))}
+            {filtered.length === 0 && <div className="px-3 py-2 text-xs text-[#A3A3A3]">No matches</div>}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 function FilterField({ label, children }) {
   return (
@@ -83,25 +134,16 @@ export default function FilterToolbar({
           <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
         </FilterField>
         <FilterField label="Supplier">
-          <select className={selectCls} value={filters.supplier} onChange={e => set('supplier', e.target.value)}>
-            <option value="">All</option>
-            {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <SearchableSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} />
         </FilterField>
         <FilterField label="Style Color">
           <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
         </FilterField>
         <FilterField label="Collection">
-          <select className={selectCls} value={filters.collection} onChange={e => set('collection', e.target.value)}>
-            <option value="">All</option>
-            {collections.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <SearchableSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} />
         </FilterField>
         <FilterField label="DD Manager">
-          <select className={selectCls} value={filters.ddManager} onChange={e => set('ddManager', e.target.value)}>
-            <option value="">All</option>
-            {ddManagers.map(s => <option key={s} value={s}>{s}</option>)}
-          </select>
+          <SearchableSelect value={filters.ddManager} onChange={v => set('ddManager', v)} options={ddManagers} />
         </FilterField>
         <FilterField label="Order Type">
           <select className={selectCls} value={filters.orderType} onChange={e => set('orderType', e.target.value)}>
@@ -182,16 +224,10 @@ export default function FilterToolbar({
         <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(140px,1fr))' }}>
             <FilterField label="DD Manager">
-              <select className={selectCls} value={filters.ddManager} onChange={e => set('ddManager', e.target.value)}>
-                <option value="">All</option>
-                {ddManagers.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <SearchableSelect value={filters.ddManager} onChange={v => set('ddManager', v)} options={ddManagers} />
             </FilterField>
             <FilterField label="Supplier">
-              <select className={selectCls} value={filters.supplier} onChange={e => set('supplier', e.target.value)}>
-                <option value="">All</option>
-                {suppliers.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
+              <SearchableSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} />
             </FilterField>
             <FilterField label="DD Status">
               <select className={selectCls} value={filters.ddStatus} onChange={e => set('ddStatus', e.target.value)}>
