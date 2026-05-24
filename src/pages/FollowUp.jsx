@@ -276,6 +276,11 @@ export default function FollowUp() {
   return (
     <div className="min-h-screen bg-[#F8F8F8]">
 
+      {/* Mockup banner */}
+      <div className="bg-[#FFF0F7] border-b border-[#FFCCDE] text-[#E31B7F] text-[12px] font-semibold text-center px-4 py-2 tracking-wide">
+        ⚠️ This is a mockup — data and actions are for preview purposes only.
+      </div>
+
       <div className="px-7 pt-6 pb-0">
 
         {/* Title + buttons */}

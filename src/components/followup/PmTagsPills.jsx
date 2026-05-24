@@ -25,7 +25,7 @@ export default function PmTagsPills({ label, max = 2 }) {
   const overflow = tags.length - visible.length;
 
   const pillBase =
-    'inline-flex items-center px-2 py-[3px] rounded-[6px] text-[10px] font-semibold leading-[1.2] whitespace-nowrap';
+    'inline-flex items-center px-2 py-[3px] rounded-[0.65rem] text-[10px] font-semibold leading-[1.2] whitespace-nowrap';
 
   return (
     <div className="inline-flex flex-wrap gap-1.5 max-w-full" title={tags.join(' · ')}>

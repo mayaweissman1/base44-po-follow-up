@@ -18,7 +18,7 @@ function Pill({ reason }) {
   const cls = STYLES[resp] || STYLES.OTHER;
   return (
     <span
-      className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${cls}`}
+      className={`inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold whitespace-nowrap ${cls}`}
       title={reason}
     >
       {shorten(reason)}
@@ -40,7 +40,7 @@ export default function ReasonTag({ reason, reasons }) {
     <div className="inline-flex flex-wrap gap-1" title={list.join(' · ')}>
       <Pill reason={list[0]} />
       {list.length > 1 && (
-        <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-[#FAFAFA] text-[#525252] border border-[#E5E5E5]">
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-[#FAFAFA] text-[#525252] border border-[#E5E5E5]">
           +{list.length - 1}
         </span>
       )}

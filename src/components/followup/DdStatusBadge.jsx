@@ -13,7 +13,7 @@ export default function DdStatusBadge({ status }) {
   if (!status || status === 'Empty status') return <span className="text-[#A3A3A3] text-xs">—</span>;
   const cls = STATUS_STYLES[status] || 'bg-gray-50 text-gray-500 border-gray-200';
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded border text-[10px] font-medium max-w-[160px] truncate ${cls}`} title={status}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-[0.65rem] border text-[10px] font-medium max-w-[160px] truncate ${cls}`} title={status}>
       {status}
     </span>
   );

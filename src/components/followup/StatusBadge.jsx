@@ -11,14 +11,14 @@ const STYLES = {
 };
 
 export default function StatusBadge({ status }) {
-  if (!status) return <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase bg-gray-50 text-gray-400 border border-gray-200">—</span>;
+  if (!status) return <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold tracking-wide uppercase bg-gray-50 text-gray-400 border border-gray-200">—</span>;
   const def = STATUS_ENUM[status];
   if (!def) return null;
   const styleKey = def.badgeClass.replace('-', '_');
   const cls = STYLES[styleKey] || STYLES.badge_none;
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] font-semibold tracking-wide uppercase whitespace-nowrap ${cls}`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-[0.65rem] text-[10px] font-semibold tracking-wide uppercase whitespace-nowrap ${cls}`}
       title={def.desc}
     >
       {def.name}

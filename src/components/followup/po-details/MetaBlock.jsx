@@ -32,11 +32,11 @@ export default function MetaBlock({ po, destStr, orderType }) {
             <span className="text-[#A3A3A3] font-medium">{r.label}</span>
             <span className="text-right">
               {r.type === 'pink' ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{r.value}</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{r.value}</span>
               ) : r.type === 'teal' ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{r.value}</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-teal-50 text-teal-600">{r.value}</span>
               ) : r.type === 'gray' ? (
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-gray-50 text-gray-600 border border-gray-200">{r.value}</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-gray-50 text-gray-600 border border-gray-200">{r.value}</span>
               ) : r.type === 'dd-status' ? (
                 <DdStatusBadge status={r.value} />
               ) : (
