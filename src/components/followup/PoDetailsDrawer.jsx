@@ -49,13 +49,13 @@ export default function PoDetailsDrawer({ po, onClose }) {
   const responsibility = getResponsibility(po.ddd_reason);
   const destStr = po.sub_pos?.map(s => s.destination).filter(Boolean).join(' · ') || po.destination || null;
 
-  // Aggregate quantities across all sub-POs (most accurate totals)
+  // Aggregate quantities across all sub-POs — coerce to Number because API returns strings
   const totalOrdered = po.sub_pos?.length
-    ? po.sub_pos.reduce((sum, s) => sum + (s.ordered_qty || 0), 0)
-    : (po.ordered_qty ?? null);
+    ? po.sub_pos.reduce((sum, s) => sum + (Number(s.ordered_qty) || 0), 0)
+    : (Number(po.ordered_qty) || null);
   const totalReceived = po.sub_pos?.length
-    ? po.sub_pos.reduce((sum, s) => sum + (s.qty_received || 0), 0)
-    : (po.qty_received ?? null);
+    ? po.sub_pos.reduce((sum, s) => sum + (Number(s.qty_received) || 0), 0)
+    : (Number(po.qty_received) || null);
 
   // GFS aggregated from getPoDetails size breakdown
   const totalGfs = details?.destinations?.length
