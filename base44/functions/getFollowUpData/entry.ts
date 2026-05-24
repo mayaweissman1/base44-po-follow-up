@@ -83,9 +83,19 @@ Deno.serve(async (req) => {
         LEFT JOIN shipment_destination sd ON sd.id = spv.destination
         GROUP BY spv.po_number
       ),
+      sub_po_ranks AS (
+        SELECT
+          spv.po_number,
+          spv.sub_po_number,
+          RANK() OVER (
+            PARTITION BY spv.destination, spv.style_color
+            ORDER BY COALESCE(spv.delayed_due_date, spv.due_date), spv.order_date, spv.sub_po_number
+          ) AS sub_rank
+        FROM sub_po_view spv
+      ),
       po_rank_per_po AS (
-        SELECT po_number, MIN(po_rank) AS po_rank
-        FROM urgents_view
+        SELECT po_number, MIN(sub_rank)::int AS po_rank
+        FROM sub_po_ranks
         GROUP BY po_number
       )
       SELECT

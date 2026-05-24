@@ -395,7 +395,7 @@ export default function FollowUpTable({
               <Th {...thProps} col="po_number"                     width={colWidths['po_number'] || 170}>PO Number</Th>
               <Th {...thProps} col="style_color"                   width={colWidths['style_color'] || 130}>Style Color</Th>
               <Th {...thProps} col="po_rank"                       width={colWidths['po_rank'] || 80}>PO Rank</Th>
-              <Th {...thProps} col="effective_dd_status"           width={colWidths['effective_dd_status'] || 130}>DD Status</Th>
+              <Th {...thProps} col="effective_dd_status"           width={colWidths['effective_dd_status'] || 130}>Current Status</Th>
               <Th {...thProps} col="current_status"                width={colWidths['current_status'] || 120}>DDD Status</Th>
               <Th {...thProps} col="priority"                      width={colWidths['priority'] || 100}>Priority</Th>
               <Th {...thProps} col="dd_manager_name"               width={colWidths['dd_manager_name'] || 110}>DD Manager</Th>
