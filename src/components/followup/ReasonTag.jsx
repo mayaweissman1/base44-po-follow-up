@@ -8,7 +8,8 @@ const STYLES = {
 };
 
 function shorten(reason) {
-  return reason
+  if (reason == null) return '';
+  return String(reason)
     .replace('Technical problem - ', 'Tech · ')
     .replace(' (YKK zip, beads, feathers, fringes)', '');
 }
@@ -33,7 +34,7 @@ function Pill({ reason }) {
 export default function ReasonTag({ reason, reasons }) {
   const list = Array.isArray(reasons) && reasons.length > 0
     ? reasons
-    : (reason ? [reason] : []);
+    : (Array.isArray(reason) ? reason : (reason ? [reason] : []));
   if (list.length === 0) return <span className="text-[#A3A3A3] text-xs">—</span>;
   if (list.length === 1) return <Pill reason={list[0]} />;
   return (
