@@ -110,13 +110,11 @@ Deno.serve(async (req) => {
         sd.destination AS destination_name,
         sup.supplier AS supplier_name,
         pt.type AS po_type_name,
-        sc.product_image,
         (spv.po_number = ANY($1::text[]))::int AS is_active
       FROM sub_po_view spv
       LEFT JOIN purchase_orders po ON po.po_number = spv.po_number
       LEFT JOIN suppliers sup ON sup.id = po.supplier
       LEFT JOIN po_types pt ON pt.id = po.po_type
-      LEFT JOIN style_colors sc ON sc.style_color = spv.style_color
       LEFT JOIN shipment_destination sd ON sd.id = spv.destination
       WHERE (
               (spv.due_date >= NOW() - INTERVAL '60 days'
@@ -253,7 +251,6 @@ Deno.serve(async (req) => {
         supplier: po.supplier_name || String(po.supplier || ''),
         po_type: po.po_type_name || String(po.po_type || ''),
         collection: po.collection || '',
-        product_image: po.product_image || '',
         urgent: !!po.urgent,
         drop: po.drop,
         destination: po.destination_name || (po.destination_id != null ? String(po.destination_id) : ''),

@@ -52,6 +52,37 @@ function PoCell({ po, onLogsClick, onDetailsClick }) {
   );
 }
 
+function LoadMoreFooter({ visible, total, onLoadMore, onShowAll }) {
+  if (visible >= total) {
+    return (
+      <div className="px-4 py-2.5 text-[11px] text-[#A3A3A3] bg-[#FAFAFA] border-t border-[#E5E5E5] text-center">
+        Showing all {total} row{total === 1 ? '' : 's'}
+      </div>
+    );
+  }
+  return (
+    <div className="px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E5E5] flex items-center justify-between text-[11px]">
+      <span className="text-[#525252]">
+        Showing <strong className="text-[#0A0A0A]">{visible}</strong> of <strong className="text-[#0A0A0A]">{total}</strong>
+      </span>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={onLoadMore}
+          className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white text-[#E31B7F] border border-[#E5E5E5] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors"
+        >
+          Load more
+        </button>
+        <button
+          onClick={onShowAll}
+          className="h-7 px-3 text-[11px] font-semibold rounded-[6px] text-[#525252] hover:text-[#0A0A0A] hover:bg-white transition-colors"
+        >
+          Show all ({total})
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function Checkbox({ checked, onChange }) {
   return (
     <input
@@ -146,6 +177,8 @@ function Th({ col, sortCol, sortDir, onSort, width, onResizeStart, className, ch
   );
 }
 
+const PAGE_SIZE = 100;
+
 export default function FollowUpTable({
   rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, loading,
   selectedRows = new Set(), onSelectRow, onSelectAll, onPoDetails,
@@ -153,12 +186,19 @@ export default function FollowUpTable({
   const [expanded, setExpanded] = useState(new Set());
   const [sortCol, setSortCol] = useState(null);
   const [sortDir, setSortDir] = useState('asc');
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
 
-  // Reset sort when role changes
+  // Reset sort and pagination when role changes
   useEffect(() => {
     setSortCol(null);
     setSortDir('asc');
+    setVisibleCount(PAGE_SIZE);
   }, [role]);
+
+  // Reset pagination when filtered rows change (filter applied)
+  useEffect(() => {
+    setVisibleCount(PAGE_SIZE);
+  }, [rows.length]);
 
   const [colWidths, startResize] = useColResize({});
 
@@ -184,9 +224,12 @@ export default function FollowUpTable({
     return [...rows].sort((a, b) => compareRows(a, b, sortCol, sortDir));
   }, [rows, sortCol, sortDir]);
 
+  const visibleRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount]);
+  const hasMore = sortedRows.length > visibleCount;
+
   const allVisibleSelected = rows.length > 0 && rows.every(r => selectedRows.has(r.po_number));
 
-  const thCls = "px-3.5 py-3 text-left text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5]";
+  const thCls = "px-3.5 py-3 text-left text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5] sticky top-0 z-10";
   const tdCls = "px-3.5 py-3 border-b border-[#E5E5E5] bg-white whitespace-nowrap text-[13px] align-middle";
 
   const thProps = { sortCol, sortDir, onSort: handleSort, onResizeStart: startResize, className: thCls };
@@ -224,7 +267,7 @@ export default function FollowUpTable({
   if (role === 'dd_team_employee') {
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
             <thead>
               <tr>
@@ -262,7 +305,7 @@ export default function FollowUpTable({
               </tr>
             </thead>
             <tbody>
-              {sortedRows.map(po => {
+              {visibleRows.map(po => {
                 const isRejected = po.current_status === 'REJECTED';
                 const rowBg = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
                 const actionBg = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
@@ -321,6 +364,12 @@ export default function FollowUpTable({
             </tbody>
           </table>
         </div>
+        <LoadMoreFooter
+          visible={visibleRows.length}
+          total={sortedRows.length}
+          onLoadMore={() => setVisibleCount(c => c + PAGE_SIZE)}
+          onShowAll={() => setVisibleCount(sortedRows.length)}
+        />
       </div>
     );
   }
@@ -333,7 +382,7 @@ export default function FollowUpTable({
 
   return (
     <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-      <div className="overflow-x-auto">
+      <div className="overflow-auto max-h-[calc(100vh-280px)]">
         <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
           <thead>
             <tr>
@@ -366,7 +415,7 @@ export default function FollowUpTable({
             </tr>
           </thead>
           <tbody>
-            {sortedRows.map(po => {
+            {visibleRows.map(po => {
               const isExpanded = expanded.has(po.po_number);
               const isRejected = po.current_status === 'REJECTED';
               const tdBase = `${tdCls} ${isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]'}`;
@@ -450,6 +499,12 @@ export default function FollowUpTable({
           </tbody>
         </table>
       </div>
+      <LoadMoreFooter
+        visible={visibleRows.length}
+        total={sortedRows.length}
+        onLoadMore={() => setVisibleCount(c => c + PAGE_SIZE)}
+        onShowAll={() => setVisibleCount(sortedRows.length)}
+      />
     </div>
   );
 }
