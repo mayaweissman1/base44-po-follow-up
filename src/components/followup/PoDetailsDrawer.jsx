@@ -130,6 +130,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
             <Field label="Ordered Qty" mono>{totalOrdered}</Field>
             <Field label="Qty Received" mono>{totalReceived}</Field>
             <Field label="Good For Sale" mono>{totalGfs}</Field>
+            <Field label="Qty Sent Out" mono>{po.qty_sent_out}</Field>
             <Field label="Air OTW" mono>{airOtw}</Field>
             <Field label="Manual RW" mono>{manualRw}</Field>
             <Field label="Shipped %" mono>{shippedPct != null ? `${shippedPct}%` : null}</Field>
