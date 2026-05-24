@@ -26,13 +26,10 @@ export default function PoDetailsDrawer({ po, onClose }) {
   const orderType = po.po_number.endsWith('-CL') ? 'CL' : po.po_number.endsWith('-AC') ? 'ACC' : 'Regular';
   const destStr = po.sub_pos?.map(s => s.destination).filter(Boolean).join(' · ') || po.destination || null;
 
-  // Aggregate quantities across sub-POs — API returns strings, coerce.
-  const totalOrdered = po.sub_pos?.length
-    ? po.sub_pos.reduce((sum, s) => sum + (Number(s.ordered_qty) || 0), 0)
-    : (Number(po.ordered_qty) || null);
-  const totalReceived = po.sub_pos?.length
-    ? po.sub_pos.reduce((sum, s) => sum + (Number(s.qty_received) || 0), 0)
-    : (Number(po.qty_received) || null);
+  // Quantities come from po_view (PO totals). sub_pos in this payload only
+  // carries destination labels, not quantities.
+  const totalOrdered = Number(po.ordered_qty) || null;
+  const totalReceived = Number(po.qty_received) || null;
 
   // GFS aggregated from getPoDetails size breakdown
   const totalGfs = details?.destinations?.length
