@@ -68,7 +68,6 @@ export default function PoDetailsDrawer({ po, onClose }) {
             gfs={totalGfs}
             airOtw={airOtw}
             autoRw={autoRw}
-            shippedPct={po.shipped_percent}
           />
           <DelayBlock po={po} />
           <MetaBlock po={po} destStr={destStr} orderType={orderType} />
