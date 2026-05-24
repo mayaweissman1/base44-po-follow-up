@@ -308,6 +308,9 @@ Deno.serve(async (req) => {
         po_rank: po._po_rank_min,
         air_otw: po._air_otw_total,
         manual_rw: po._manual_rw_total,
+        shipped_percent: (Number(po.ordered_qty) > 0)
+          ? Math.round((Number(po.qty_sent_out) || 0) / Number(po.ordered_qty) * 100)
+          : null,
       };
     });
 
