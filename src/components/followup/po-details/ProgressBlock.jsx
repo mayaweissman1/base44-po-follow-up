@@ -4,7 +4,7 @@ import React from 'react';
  * Visualizes ordered → received → sent out as a stacked progress bar
  * with key derived metrics on top.
  */
-export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw, manualRw, shippedPct }) {
+export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw, autoRw, shippedPct }) {
   const orderedN = Number(ordered) || 0;
   const receivedN = Number(received) || 0;
   const sentN = Number(sentOut) || 0;
@@ -53,7 +53,7 @@ export default function ProgressBlock({ ordered, received, sentOut, gfs, airOtw,
         <Metric label="Sent Out" value={sentOut} dot="bg-[#E31B7F]" />
         <Metric label="Good For Sale" value={gfs} />
         {Number(airOtw) > 0 && <Metric label="Air OTW" value={airOtw} accent="text-blue-600" />}
-        {Number(manualRw) > 0 && <Metric label="Manual RW" value={manualRw} accent="text-red-500" />}
+        {Number(autoRw) > 0 && <Metric label="Auto RW" value={autoRw} accent="text-red-500" />}
       </div>
     </div>
   );

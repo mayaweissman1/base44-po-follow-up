@@ -36,8 +36,8 @@ export default function PoDetailsDrawer({ po, onClose }) {
     ? details.destinations.reduce((t, d) => t + d.sizes.reduce((s, sz) => s + (sz.good_for_sale || 0), 0), 0)
     : null;
 
-  const airOtw   = po.air_otw   ?? po.otw ?? details?.air_otw   ?? null;
-  const manualRw = po.manual_rw ?? details?.manual_rw ?? null;
+  const airOtw = po.air_otw ?? po.otw ?? details?.air_otw ?? null;
+  const autoRw = po.auto_rw ?? po.qty_rw_auto ?? details?.auto_rw ?? null;
 
   return (
     <div className="fixed inset-0 z-50 flex">
@@ -65,7 +65,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
             sentOut={po.qty_sent_out}
             gfs={totalGfs}
             airOtw={airOtw}
-            manualRw={manualRw}
+            autoRw={autoRw}
             shippedPct={po.shipped_percent}
           />
           <DelayBlock po={po} />
