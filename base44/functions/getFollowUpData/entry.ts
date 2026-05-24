@@ -127,7 +127,9 @@ Deno.serve(async (req) => {
         mrw.manual_rw AS manual_rw_calc,
         dpo.destinations,
         prk.po_rank,
-        sds.bulk_fabric_approval
+        sds.bulk_fabric_approval,
+        pps.receipt_date AS pps_receipt_date,
+        pmt.tag AS pm_tag_label
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -135,6 +137,8 @@ Deno.serve(async (req) => {
       LEFT JOIN collections c ON c.id = scv.collection
       LEFT JOIN style_colors sc ON sc.id = scv.id
       LEFT JOIN style_dev_suppliers sds ON sds.id = sc.style_dev_supplier
+      LEFT JOIN style_color_pps pps ON pps.style_color = scv.id
+      LEFT JOIN pm_tags pmt ON pmt.id = pov.pm_tags
       LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
@@ -256,6 +260,8 @@ Deno.serve(async (req) => {
         destination: destinations.join(' · '),
         sub_pos: subPos,
         pm_tags: po.pm_tags,
+        pm_tags_label: po.pm_tag_label || null,
+        pps_receipt_date: po.pps_receipt_date,
         // Effective/computed
         effective_delayed_due_date: effectiveDelayedDD,
         effective_dd_status: effectiveDdStatus,
@@ -269,9 +275,15 @@ Deno.serve(async (req) => {
         hold_age_days: holdAgeDays,
         days_same_status: daysSameStatus,
         flags: po.urgent ? 'URGENT' : (qtyError || nextUpdatePassed ? 'REVIEW' : ''),
-        // Latest DDD info
+        // Latest DDD info — `reason` may be string (legacy) or array (new). Normalize for the UI.
         current_status: latestDDD ? latestDDD.status : null,
-        ddd_reason: latestDDD ? latestDDD.reason : null,
+        ddd_reason: latestDDD
+          ? (Array.isArray(latestDDD.reason) ? (latestDDD.reason[0] || null) : latestDDD.reason)
+          : null,
+        ddd_reasons: latestDDD
+          ? (Array.isArray(latestDDD.reason) ? latestDDD.reason : (latestDDD.reason ? [latestDDD.reason] : []))
+          : [],
+        ddd_reason_other_text: latestDDD ? latestDDD.reason_other_text : null,
         ddd_comment: latestDDD ? latestDDD.ddd_comment : null,
         delay_response_comment: latestDDD ? latestDDD.delay_response_comment : null,
         internal_note: latestDDD ? latestDDD.internal_note : null,

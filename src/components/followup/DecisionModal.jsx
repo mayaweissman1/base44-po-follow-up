@@ -6,15 +6,22 @@ import { base44 } from '@/api/base44Client';
 export default function DecisionModal({ po, decision, onClose, onSaved }) {
   const [comment, setComment] = useState('');
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
 
   if (!po || !decision) return null;
 
   const newLabel = STATUS_ENUM[decision]?.name || decision;
   const isOverride = po.current_status && po.current_status !== 'HOLD';
   const currentLabel = po.current_status ? STATUS_ENUM[po.current_status]?.name : null;
+  const commentRequired = decision === 'REJECTED';
 
   async function handleConfirm() {
     if (!po.last_ddd_update_id) return;
+    if (commentRequired && !comment.trim()) {
+      setError('A comment is required when rejecting a delay request.');
+      return;
+    }
+    setError('');
     setSaving(true);
     const res = await base44.functions.invoke('saveFollowUpAction', {
       action_type: 'DECISION',
@@ -46,14 +53,21 @@ export default function DecisionModal({ po, decision, onClose, onSaved }) {
             }
           </p>
           <div>
-            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">Delay Response Comment <span className="text-[#A3A3A3] font-normal">(optional)</span></label>
+            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">
+              Delay Response Comment {commentRequired
+                ? <span className="text-red-500">*</span>
+                : <span className="text-[#A3A3A3] font-normal">(optional)</span>}
+            </label>
             <textarea
-              className="w-full px-3 py-2.5 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 resize-none min-h-[72px]"
-              placeholder="Add context for the DD team (will be saved in the activity log)…"
+              className={`w-full px-3 py-2.5 border rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 resize-none min-h-[72px] ${error ? 'border-red-400' : 'border-[#D4D4D4]'}`}
+              placeholder={commentRequired ? 'Explain why this delay is being rejected…' : 'Add context for the DD team (will be saved in the activity log)…'}
               value={comment}
-              onChange={e => setComment(e.target.value)}
+              onChange={e => { setComment(e.target.value); if (error) setError(''); }}
             />
-            <div className="text-[11px] text-[#A3A3A3] mt-1">Leave blank to confirm without a comment.</div>
+            <div className="text-[11px] text-[#A3A3A3] mt-1">
+              {commentRequired ? 'Required — the DD team will see this explanation.' : 'Leave blank to confirm without a comment.'}
+            </div>
+            {error && <div className="text-xs text-red-500 font-medium mt-1.5">{error}</div>}
           </div>
         </div>
         <div className="px-5 py-4 border-t border-[#E5E5E5] flex justify-end gap-3">

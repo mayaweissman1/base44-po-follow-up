@@ -1,13 +1,20 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Check } from 'lucide-react';
 import { DD_REASONS_BY_GROUP, fmtDate } from '@/lib/followUpConstants';
 import { base44 } from '@/api/base44Client';
+
+// Normalize legacy single-reason rows into an array
+function toReasonArray(r) {
+  if (!r) return [];
+  return Array.isArray(r) ? r : [r];
+}
 
 export default function LogDelayModal({ po, posBulk, onClose, onSaved, currentUser }) {
   const isBulk = !po && !!posBulk?.length;
 
   const [delayedDD, setDelayedDD] = useState(isBulk ? '' : (po?.effective_delayed_due_date || ''));
-  const [reason, setReason] = useState(isBulk ? '' : (po?.ddd_reason || ''));
+  const [reasons, setReasons] = useState(isBulk ? [] : toReasonArray(po?.ddd_reason));
+  const [otherText, setOtherText] = useState(isBulk ? '' : (po?.ddd_reason_other_text || ''));
   const [comment, setComment] = useState(isBulk ? '' : (po?.ddd_comment || ''));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -15,10 +22,19 @@ export default function LogDelayModal({ po, posBulk, onClose, onSaved, currentUs
   if (!po && !posBulk?.length) return null;
 
   const isEdit = !isBulk && !!po.effective_delayed_due_date;
+  const otherSelected = reasons.includes('Other');
+
+  function toggleReason(r) {
+    setReasons(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
+  }
 
   async function handleSave() {
-    if (!delayedDD || !reason || !comment.trim()) {
-      setError('All three fields are required.');
+    if (!delayedDD || reasons.length === 0 || !comment.trim()) {
+      setError('Date, at least one reason, and a comment are required.');
+      return;
+    }
+    if (otherSelected && !otherText.trim()) {
+      setError('Please describe the "Other" reason.');
       return;
     }
     if (!isBulk && delayedDD <= po.due_date) {
@@ -35,7 +51,8 @@ export default function LogDelayModal({ po, posBulk, onClose, onSaved, currentUs
           po_number: target.po_number,
           payload: {
             new_due_date: delayedDD,
-            reason,
+            reasons,
+            reason_other_text: otherSelected ? otherText.trim() : null,
             ddd_comment: comment.trim(),
             previous_due_date: target.effective_delayed_due_date || target.due_date,
             original_due_date: target.due_date,
@@ -58,7 +75,7 @@ export default function LogDelayModal({ po, posBulk, onClose, onSaved, currentUs
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-[14px] w-[520px] max-w-[calc(100vw-32px)] max-h-[90vh] flex flex-col shadow-[0_8px_24px_rgba(227,27,127,.10),0_4px_8px_rgba(0,0,0,.04)] animate-scale-in">
+      <div className="relative bg-white rounded-[14px] w-[560px] max-w-[calc(100vw-32px)] max-h-[90vh] flex flex-col shadow-[0_8px_24px_rgba(227,27,127,.10),0_4px_8px_rgba(0,0,0,.04)] animate-scale-in">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E5]">
           <h2 className="text-base font-semibold text-[#0A0A0A]">
             {isBulk ? `Report delay · ${posBulk.length} POs` : isEdit ? 'Edit delay' : 'Report delay'}
@@ -94,15 +111,59 @@ export default function LogDelayModal({ po, posBulk, onClose, onSaved, currentUs
           </div>
 
           <div className="mb-4">
-            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">DD Reason <span className="text-red-500">*</span></label>
-            <select className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10" value={reason} onChange={e => setReason(e.target.value)}>
-              <option value="">Select a reason…</option>
+            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">
+              DD Reasons <span className="text-red-500">*</span>
+              <span className="text-[11px] font-normal text-[#A3A3A3] ml-1.5">select one or more</span>
+            </label>
+            <div className="border border-[#D4D4D4] rounded-[6px] max-h-[220px] overflow-y-auto bg-white">
               {DD_REASONS_BY_GROUP.map(g => (
-                <optgroup key={g.group} label={g.group}>
-                  {g.reasons.map(r => <option key={r} value={r}>{r}</option>)}
-                </optgroup>
+                <div key={g.group} className="border-b border-[#E5E5E5] last:border-0">
+                  <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-[.06em] text-[#A3A3A3] bg-[#FAFAFA]">{g.group}</div>
+                  {g.reasons.map(r => {
+                    const selected = reasons.includes(r);
+                    return (
+                      <button
+                        key={r}
+                        type="button"
+                        onClick={() => toggleReason(r)}
+                        className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-[#FFF0F7] transition-colors ${selected ? 'bg-[#FFF0F7]' : ''}`}
+                      >
+                        <span className={`w-4 h-4 rounded-[3px] border flex items-center justify-center flex-shrink-0 ${selected ? 'bg-[#E31B7F] border-[#E31B7F]' : 'border-[#D4D4D4] bg-white'}`}>
+                          {selected && <Check size={11} className="text-white" />}
+                        </span>
+                        <span className={selected ? 'text-[#E31B7F] font-semibold' : 'text-[#0A0A0A]'}>{r}</span>
+                      </button>
+                    );
+                  })}
+                </div>
               ))}
-            </select>
+              {/* Other option */}
+              <div className="border-t border-[#E5E5E5]">
+                <button
+                  type="button"
+                  onClick={() => toggleReason('Other')}
+                  className={`w-full flex items-center gap-2 px-3 py-1.5 text-xs text-left hover:bg-[#FFF0F7] transition-colors ${otherSelected ? 'bg-[#FFF0F7]' : ''}`}
+                >
+                  <span className={`w-4 h-4 rounded-[3px] border flex items-center justify-center flex-shrink-0 ${otherSelected ? 'bg-[#E31B7F] border-[#E31B7F]' : 'border-[#D4D4D4] bg-white'}`}>
+                    {otherSelected && <Check size={11} className="text-white" />}
+                  </span>
+                  <span className={otherSelected ? 'text-[#E31B7F] font-semibold' : 'text-[#0A0A0A]'}>Other (custom)</span>
+                </button>
+              </div>
+            </div>
+            {otherSelected && (
+              <input
+                type="text"
+                className="mt-2 w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
+                placeholder="Describe the other reason…"
+                value={otherText}
+                onChange={e => setOtherText(e.target.value)}
+                maxLength={120}
+              />
+            )}
+            {reasons.length > 0 && (
+              <div className="text-[11px] text-[#525252] mt-1.5">{reasons.length} reason{reasons.length > 1 ? 's' : ''} selected</div>
+            )}
           </div>
 
           <div className="mb-4">

@@ -17,10 +17,11 @@ function DaysCell({ value }) {
 function DdCommentLog({ log }) {
   if (!log || log.length === 0) return <span className="text-[#A3A3A3]">—</span>;
   return (
-    <div className="max-w-[200px]">
+    <div className="max-w-[200px] space-y-0.5">
       {log.map((e, i) => (
-        <div key={i} className="text-[11px] truncate leading-snug" title={e.text}>
-          <span className="font-mono opacity-60">{ddmm(e.date)}</span> — {e.text}
+        <div key={i} className="text-[11px] truncate leading-snug flex items-baseline gap-1" title={`${ddmm(e.date)} — ${e.text}`}>
+          <span className="font-mono font-semibold text-[#E31B7F] flex-shrink-0">{ddmm(e.date)}</span>
+          <span className="text-[#525252] truncate">{e.text}</span>
         </div>
       ))}
     </div>
@@ -144,13 +145,14 @@ function useColResize(initialWidths) {
 }
 
 // ─── SortableResizableTh ───────────────────────────────────────────────────────
-function Th({ col, sortCol, sortDir, onSort, width, onResizeStart, className, children, style = {} }) {
+function Th({ col, sortCol, sortDir, onSort, width, onResizeStart, className, children, style = {}, tooltip }) {
   const isActive = sortCol === col;
   return (
     <th
       className={`${className} relative select-none`}
       style={{ minWidth: width || 80, ...style }}
       onClick={col ? () => onSort(col) : undefined}
+      title={tooltip || undefined}
     >
       <div className="flex items-center gap-1 pr-3 cursor-pointer">
         <span className="truncate">{children}</span>
@@ -170,6 +172,23 @@ function Th({ col, sortCol, sortDir, onSort, width, onResizeStart, className, ch
     </th>
   );
 }
+
+// Column header tooltips — single source of truth
+const TIPS = {
+  po_rank: 'Sub-PO order within the same destination + style_color, ranked by delayed/original due date',
+  current_status: 'Delay decision (HOLD / APPROVED / REJECTED / ACKNOWLEDGED)',
+  effective_dd_status: 'Production stage (e.g. Cutting, Sewing, OTW to Office)',
+  priority: 'URGENT (flagged) · Deadline at risk (>3 days late) · Normal',
+  hold_age_days: 'Days the delay request has been awaiting Main Office decision',
+  days_late_counting: 'Difference between delayed DD and original Due Date',
+  countdown: 'Days remaining until the Final DD (negative = past due)',
+  ddd_count: 'How many times the delivery date has been changed',
+  days_same_status: 'Days since the production stage last changed',
+  pm_tags: 'Product Management tag — risk flag',
+  bulk_fabric_approval: 'Has the bulk fabric been approved for production?',
+  pps_receipt_date: 'Date the PPS (pre-production sample) was received',
+};
+
 
 const PAGE_SIZE = 100;
 
@@ -269,34 +288,35 @@ export default function FollowUpTable({
                   <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
                 </th>
                 <th className={thCls} style={{ width: 56 }}></th>
-                <Th {...thProps} col="po_number" width={colWidths['po_number'] || 160}>PO Number</Th>
-                <Th {...thProps} col="flags" width={colWidths['flags'] || 80}>Flags</Th>
-                <Th {...thProps} col="supplier" width={colWidths['supplier'] || 100}>Supplier</Th>
-                <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 100}>DD Manager</Th>
-                <Th {...thProps} col="style_color" width={colWidths['style_color'] || 120}>Style Color</Th>
-                <Th {...thProps} col="current_status" width={colWidths['current_status'] || 100}>DDD Status</Th>
-                <Th {...thProps} col="due_date" width={colWidths['due_date'] || 100}>Original DD</Th>
-                <Th {...thProps} col="effective_delayed_due_date" width={colWidths['effective_delayed_due_date'] || 100}>Delayed DD</Th>
-                <Th {...thProps} col="ddd_count" width={colWidths['ddd_count'] || 80}>DDD Count</Th>
-                <Th {...thProps} col="countdown" width={colWidths['countdown'] || 90}>Countdown</Th>
-                <Th {...thProps} col="ddd_reason" width={colWidths['ddd_reason'] || 140}>DDD Reason</Th>
-                <Th {...thProps} col="ddd_comment" width={colWidths['ddd_comment'] || 180}>DDD Comment</Th>
-                <Th {...thProps} col="set_with" width={colWidths['set_with'] || 100}>Set With</Th>
-                <Th {...thProps} col="ordered_qty" width={colWidths['ordered_qty'] || 90}>Order Qty</Th>
-                <Th {...thProps} col="qty_received" width={colWidths['qty_received'] || 100}>Qty Received</Th>
-                <Th {...thProps} col="qty_rw_manual" width={colWidths['qty_rw_manual'] || 90}>Manual RW</Th>
-                <Th {...thProps} col="qty_rw_auto" width={colWidths['qty_rw_auto'] || 80}>Auto RW</Th>
-                <Th {...thProps} col="bulk_fabric_approval" width={colWidths['bulk_fabric_approval'] || 130}>Bulk Fabric Approval</Th>
-                <Th {...thProps} col="goods_received" width={colWidths['goods_received'] || 110}>Goods Received</Th>
-                <Th {...thProps} col="order_date" width={colWidths['order_date'] || 100}>Order Date</Th>
-                <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 120}>DD Status</Th>
-                <Th {...thProps} col={null} width={colWidths['dd_comment_log'] || 180}>DD Comment</Th>
-                <Th {...thProps} col="days_same_status" width={colWidths['days_same_status'] || 110}>Days Same Status</Th>
-                <Th {...thProps} col="effective_next_update" width={colWidths['effective_next_update'] || 110}>Next Update</Th>
-                <Th {...thProps} col="drop" width={colWidths['drop'] || 90}>Drop</Th>
-                <Th {...thProps} col="collection" width={colWidths['collection'] || 100}>Collection</Th>
-                <Th {...thProps} col="pm_tags" width={colWidths['pm_tags'] || 90}>PM Tags</Th>
-                <Th {...thProps} col="type" width={colWidths['type'] || 80}>Type</Th>
+                <Th {...thProps} col="po_number" width={colWidths['po_number'] || 140}>PO Number</Th>
+                <Th {...thProps} col="flags" width={colWidths['flags'] || 70}>Flags</Th>
+                <Th {...thProps} col="supplier" width={colWidths['supplier'] || 90}>Supplier</Th>
+                <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>
+                <Th {...thProps} col="style_color" width={colWidths['style_color'] || 110}>Style Color</Th>
+                <Th {...thProps} col="current_status" width={colWidths['current_status'] || 90} tooltip={TIPS.current_status}>DDD Status</Th>
+                <Th {...thProps} col="due_date" width={colWidths['due_date'] || 85}>Original DD</Th>
+                <Th {...thProps} col="effective_delayed_due_date" width={colWidths['effective_delayed_due_date'] || 85}>Delayed DD</Th>
+                <Th {...thProps} col="ddd_count" width={colWidths['ddd_count'] || 70} tooltip={TIPS.ddd_count}>DDD Count</Th>
+                <Th {...thProps} col="countdown" width={colWidths['countdown'] || 80} tooltip={TIPS.countdown}>Countdown</Th>
+                <Th {...thProps} col="ddd_reason" width={colWidths['ddd_reason'] || 120}>DDD Reason</Th>
+                <Th {...thProps} col="ddd_comment" width={colWidths['ddd_comment'] || 160}>DDD Comment</Th>
+                <Th {...thProps} col="set_with" width={colWidths['set_with'] || 85}>Set With</Th>
+                <Th {...thProps} col="ordered_qty" width={colWidths['ordered_qty'] || 80}>Order Qty</Th>
+                <Th {...thProps} col="qty_received" width={colWidths['qty_received'] || 85}>Qty Received</Th>
+                <Th {...thProps} col="qty_rw_manual" width={colWidths['qty_rw_manual'] || 75}>Manual RW</Th>
+                <Th {...thProps} col="qty_rw_auto" width={colWidths['qty_rw_auto'] || 70}>Auto RW</Th>
+                <Th {...thProps} col="bulk_fabric_approval" width={colWidths['bulk_fabric_approval'] || 110} tooltip={TIPS.bulk_fabric_approval}>Bulk Fabric</Th>
+                <Th {...thProps} col="pps_receipt_date" width={colWidths['pps_receipt_date'] || 95} tooltip={TIPS.pps_receipt_date}>PPS Received</Th>
+                <Th {...thProps} col="goods_received" width={colWidths['goods_received'] || 95}>Goods Received</Th>
+                <Th {...thProps} col="order_date" width={colWidths['order_date'] || 85}>Order Date</Th>
+                <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>
+                <Th {...thProps} col={null} width={colWidths['dd_comment_log'] || 170}>DD Comment</Th>
+                <Th {...thProps} col="days_same_status" width={colWidths['days_same_status'] || 95} tooltip={TIPS.days_same_status}>Days Same Status</Th>
+                <Th {...thProps} col="effective_next_update" width={colWidths['effective_next_update'] || 95}>Next Update</Th>
+                <Th {...thProps} col="drop" width={colWidths['drop'] || 75}>Drop</Th>
+                <Th {...thProps} col="collection" width={colWidths['collection'] || 90}>Collection</Th>
+                <Th {...thProps} col="pm_tags" width={colWidths['pm_tags'] || 85} tooltip={TIPS.pm_tags}>PM Tags</Th>
+                <Th {...thProps} col="type" width={colWidths['type'] || 70}>Type</Th>
                 <th className={`${thCls} sticky right-0 z-20 shadow-[-4px_0_8px_rgba(0,0,0,.04)]`}>Actions</th>
               </tr>
             </thead>
@@ -329,7 +349,7 @@ export default function FollowUpTable({
                         {countdown != null ? (countdown > 0 ? `+${countdown}` : countdown) : '—'}
                       </span>
                     </td>
-                    <td className={`${tdCls} ${rowBg}`}><ReasonTag reason={po.ddd_reason} /></td>
+                    <td className={`${tdCls} ${rowBg}`}><ReasonTag reasons={po.ddd_reasons} reason={po.ddd_reason} /></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="text-[#A3A3A3] truncate max-w-[180px] inline-block" title={po.ddd_comment}>{po.ddd_comment || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#A3A3A3]">{po.set_with || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ordered_qty ?? '—'}</span></td>
@@ -337,6 +357,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_manual ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}>{po.qty_rw_auto ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">Yes</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}>{po.bulk_fabric_approval === true ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">Approved</span> : po.bulk_fabric_approval === false ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">Pending</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.pps_receipt_date)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.goods_received)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3]">{fmtDate(po.order_date)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><DdStatusBadge status={po.effective_dd_status} /></td>
@@ -345,7 +366,7 @@ export default function FollowUpTable({
                     <td className={`${tdCls} ${rowBg}`}>{po.effective_next_update ? <span className="font-mono">{fmtDate(po.effective_next_update)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[#A3A3A3] text-xs">{fmtDate(po.drop)}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-teal-50 text-teal-600">{po.collection}</span></td>
-                    <td className={`${tdCls} ${rowBg}`}>{po.pm_tags ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200">{po.pm_tags}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
+                    <td className={`${tdCls} ${rowBg}`}>{po.pm_tags_label ? <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-bold bg-red-50 text-red-500 border border-red-200" title={po.pm_tags_label}>{po.pm_tags_label}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#525252]">{po.type || '—'}</span></td>
                     <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionBg}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
@@ -389,27 +410,27 @@ export default function FollowUpTable({
               </th>
               <th className={thCls} style={{ width: 36 }}></th>
               <th className={thCls} style={{ width: 56 }}></th>
-              <Th {...thProps} col="po_number"                     width={colWidths['po_number'] || 170}>PO Number</Th>
-              <Th {...thProps} col="style_color"                   width={colWidths['style_color'] || 130}>Style Color</Th>
-              <Th {...thProps} col="po_rank"                       width={colWidths['po_rank'] || 80}>PO Rank</Th>
-              <Th {...thProps} col="effective_dd_status"           width={colWidths['effective_dd_status'] || 130}>Current Status</Th>
-              <Th {...thProps} col="current_status"                width={colWidths['current_status'] || 120}>DDD Status</Th>
-              <Th {...thProps} col="priority"                      width={colWidths['priority'] || 100}>Priority</Th>
-              <Th {...thProps} col="dd_manager_name"               width={colWidths['dd_manager_name'] || 110}>DD Manager</Th>
-              <Th {...thProps} col="supplier"                      width={colWidths['supplier'] || 100}>Supplier</Th>
-              <Th {...thProps} col="delivery_date_status"          width={colWidths['delivery_date_status'] || 170}>Delivery Date Status</Th>
-              <Th {...thProps} col="due_date"                      width={colWidths['due_date'] || 95}>Due Date</Th>
-              <Th {...thProps} col="effective_delayed_due_date"    width={colWidths['effective_delayed_due_date'] || 100}>Delayed DD</Th>
-              <Th {...thProps} col="final_dd"                      width={colWidths['final_dd'] || 90}>Final DD</Th>
-              <Th {...thProps} col="days_late_counting"            width={colWidths['days_late_counting'] || 90}>Days Late</Th>
-              <Th {...thProps} col="ddd_reason"                    width={colWidths['ddd_reason'] || 140}>DD Reason</Th>
-              <Th {...thProps} col="ddd_comment"                   width={colWidths['ddd_comment'] || 180}>DDD Comment</Th>
-              <Th {...thProps} col={null}                          width={colWidths['dd_comment_log'] || 190}>DD Comment</Th>
-              {role === 'main_office' && <Th {...thProps} col="hold_age_days" width={colWidths['hold_age_days'] || 95}>HOLD Age</Th>}
-              <Th {...thProps} col="delay_response_comment"        width={colWidths['delay_response_comment'] || 150}>Delay Response</Th>
-              {role === 'main_office' && <Th {...thProps} col="internal_note" width={colWidths['internal_note'] || 170}>Last Comment (internal)</Th>}
-              <Th {...thProps} col="effective_next_update"         width={colWidths['effective_next_update'] || 110}>Next Update</Th>
-              <Th {...thProps} col="ddd_count"                     width={colWidths['ddd_count'] || 90}>DDD Count</Th>
+              <Th {...thProps} col="po_number"                     width={colWidths['po_number'] || 140}>PO Number</Th>
+              <Th {...thProps} col="style_color"                   width={colWidths['style_color'] || 110}>Style Color</Th>
+              <Th {...thProps} col="po_rank"                       width={colWidths['po_rank'] || 60}  tooltip={TIPS.po_rank}>Rank</Th>
+              <Th {...thProps} col="effective_dd_status"           width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>
+              <Th {...thProps} col="current_status"                width={colWidths['current_status'] || 95}  tooltip={TIPS.current_status}>DDD Status</Th>
+              <Th {...thProps} col="priority"                      width={colWidths['priority'] || 85}  tooltip={TIPS.priority}>Priority</Th>
+              <Th {...thProps} col="dd_manager_name"               width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>
+              <Th {...thProps} col="supplier"                      width={colWidths['supplier'] || 90}>Supplier</Th>
+              <Th {...thProps} col="delivery_date_status"          width={colWidths['delivery_date_status'] || 140}>Delivery Status</Th>
+              <Th {...thProps} col="due_date"                      width={colWidths['due_date'] || 80}>Due Date</Th>
+              <Th {...thProps} col="effective_delayed_due_date"    width={colWidths['effective_delayed_due_date'] || 85}>Delayed DD</Th>
+              <Th {...thProps} col="final_dd"                      width={colWidths['final_dd'] || 80}>Final DD</Th>
+              <Th {...thProps} col="days_late_counting"            width={colWidths['days_late_counting'] || 75} tooltip={TIPS.days_late_counting}>Days Late</Th>
+              <Th {...thProps} col="ddd_reason"                    width={colWidths['ddd_reason'] || 120}>DD Reason</Th>
+              <Th {...thProps} col="ddd_comment"                   width={colWidths['ddd_comment'] || 160}>DDD Comment</Th>
+              <Th {...thProps} col={null}                          width={colWidths['dd_comment_log'] || 170}>DD Comment</Th>
+              {role === 'main_office' && <Th {...thProps} col="hold_age_days" width={colWidths['hold_age_days'] || 80} tooltip={TIPS.hold_age_days}>HOLD Age</Th>}
+              <Th {...thProps} col="delay_response_comment"        width={colWidths['delay_response_comment'] || 130}>Delay Response</Th>
+              {role === 'main_office' && <Th {...thProps} col="internal_note" width={colWidths['internal_note'] || 150}>Last Comment (internal)</Th>}
+              <Th {...thProps} col="effective_next_update"         width={colWidths['effective_next_update'] || 95}>Next Update</Th>
+              <Th {...thProps} col="ddd_count"                     width={colWidths['ddd_count'] || 70}  tooltip={TIPS.ddd_count}>DDD Count</Th>
               <th className={`${thCls} sticky right-0 z-20 shadow-[-4px_0_8px_rgba(0,0,0,.04)]`}>Actions</th>
             </tr>
           </thead>
@@ -445,7 +466,7 @@ export default function FollowUpTable({
                     <td className={tdBase}>{po.effective_delayed_due_date ? <span className="font-mono font-semibold">{fmtDate(po.effective_delayed_due_date)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>
                     <td className={tdBase}><span className="font-mono font-semibold">{fmtDate(po.final_dd)}</span></td>
                     <td className={tdBase}><DaysCell value={po.days_late_counting} /></td>
-                    <td className={tdBase}><ReasonTag reason={po.ddd_reason} /></td>
+                    <td className={tdBase}><ReasonTag reasons={po.ddd_reasons} reason={po.ddd_reason} /></td>
                     <td className={tdBase}><span className="text-[#A3A3A3] text-xs max-w-[180px] truncate inline-block" title={po.ddd_comment}>{po.ddd_comment || '—'}</span></td>
                     <td className={tdBase}><DdCommentLog log={po.dd_comment_log} /></td>
                     {role === 'main_office' && (

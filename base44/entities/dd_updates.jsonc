@@ -29,27 +29,35 @@
       "description": "DDD_UPDATE only - new delayed due date"
     },
     "reason": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Force Majeure",
+          "DD Temporary",
+          "PPS Approval Late",
+          "Fabric Approval Late",
+          "QC Approval Late",
+          "Wrong Packing Materials",
+          "Labels Arrive Late",
+          "QC Reproduction",
+          "QC ReWork",
+          "PPS Submission Late",
+          "Fabric Issue",
+          "Production Capacity Issue",
+          "Technical problem - washing",
+          "Technical problem - printing",
+          "Technical problem - sewing / handmade",
+          "Packing Issue",
+          "Special details late",
+          "Other"
+        ]
+      },
+      "description": "DDD_UPDATE only - one or more delay reasons"
+    },
+    "reason_other_text": {
       "type": "string",
-      "enum": [
-        "Force Majeure",
-        "DD Temporary",
-        "PPS Approval Late",
-        "Fabric Approval Late",
-        "QC Approval Late",
-        "Wrong Packing Materials",
-        "Labels Arrive Late",
-        "QC Reproduction",
-        "QC ReWork",
-        "PPS Submission Late",
-        "Fabric Issue",
-        "Production Capacity Issue",
-        "Technical problem - washing",
-        "Technical problem - printing",
-        "Technical problem - sewing / handmade",
-        "Packing Issue",
-        "Special details late"
-      ],
-      "description": "DDD_UPDATE only - delay reason"
+      "description": "DDD_UPDATE only - free text when 'Other' is one of the selected reasons"
     },
     "responsibility": {
       "type": "string",
@@ -58,7 +66,7 @@
         "EDIKTED",
         "SUPPLIER"
       ],
-      "description": "DDD_UPDATE only - derived from reason"
+      "description": "DDD_UPDATE only - derived from reasons (worst-case takes precedence: SUPPLIER > EDIKTED > OTHER)"
     },
     "ddd_comment": {
       "type": "string",

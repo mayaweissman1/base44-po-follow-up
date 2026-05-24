@@ -61,8 +61,15 @@ function passesFilters(row, filters, role) {
   }
   if (urgent && !row.urgent) return false;
   if (ddStatus && row.effective_dd_status !== ddStatus) return false;
-  if (reason && row.ddd_reason !== reason) return false;
-  if (responsibility && REASON_TO_RESPONSIBILITY[row.ddd_reason] !== responsibility) return false;
+  if (reason) {
+    const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
+    if (!rs.includes(reason)) return false;
+  }
+  if (responsibility) {
+    const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
+    const matches = rs.some(r => REASON_TO_RESPONSIBILITY[r] === responsibility);
+    if (!matches) return false;
+  }
   if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
   if (lateFuture && row.late_future !== lateFuture) return false;
   if (poRank && String(row.po_rank) !== poRank) return false;
@@ -112,6 +119,10 @@ export default function FollowUp() {
   const userRolesKey = Array.isArray(user?.roles) ? user.roles.join(',') : '';
   const availableRoles = useMemo(() => {
     if (isAdmin) return ALL_ROLES;
+    // Main office users can switch between all role views (per product decision)
+    const assignedHasMainOffice = (Array.isArray(user?.roles) && user.roles.includes('main_office'))
+      || user?.role === 'main_office';
+    if (assignedHasMainOffice) return ALL_ROLES;
     const assigned = Array.isArray(user?.roles) && user.roles.length > 0
       ? user.roles
       : (ALL_ROLES.includes(user?.role) ? [user.role] : []);

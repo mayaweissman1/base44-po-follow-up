@@ -20,12 +20,23 @@ const REASON_TO_RESPONSIBILITY = {
   'Special details late': 'SUPPLIER',
 };
 
-// Auto-approve if delay is 3 days or less and reason is not SUPPLIER
-function shouldAutoApprove(originalDueDate, newDueDate, reason) {
+// Worst-case responsibility for a set of reasons: SUPPLIER > EDIKTED > OTHER
+function computeResponsibility(reasons) {
+  let best = 'OTHER';
+  for (const r of reasons) {
+    const resp = REASON_TO_RESPONSIBILITY[r] || 'OTHER';
+    if (resp === 'SUPPLIER') return 'SUPPLIER';
+    if (resp === 'EDIKTED') best = 'EDIKTED';
+  }
+  return best;
+}
+
+// Auto-approve if delay ≤ 3 days AND no reason is SUPPLIER-side
+function shouldAutoApprove(originalDueDate, newDueDate, reasons) {
   if (!originalDueDate || !newDueDate) return false;
   const diffDays = Math.round((new Date(newDueDate) - new Date(originalDueDate)) / 86400000);
-  const responsibility = REASON_TO_RESPONSIBILITY[reason] || 'OTHER';
-  return diffDays <= 3 && responsibility !== 'SUPPLIER';
+  const resp = computeResponsibility(reasons);
+  return diffDays <= 3 && resp !== 'SUPPLIER';
 }
 
 Deno.serve(async (req) => {
@@ -45,19 +56,26 @@ Deno.serve(async (req) => {
 
     // ── DDD_UPDATE ─────────────────────────────────────────────
     if (action_type === 'DDD_UPDATE') {
-      const { new_due_date, reason, ddd_comment, previous_due_date, original_due_date, is_urgent } = payload;
+      const { new_due_date, ddd_comment, previous_due_date, original_due_date, is_urgent, reason_other_text } = payload;
 
-      if (!new_due_date || !reason || !ddd_comment) {
-        return Response.json({ error: 'new_due_date, reason, and ddd_comment are required' }, { status: 400 });
+      // Accept legacy `reason` (string) or new `reasons` (array)
+      let reasons = payload.reasons;
+      if (!reasons && payload.reason) {
+        reasons = Array.isArray(payload.reason) ? payload.reason : [payload.reason];
+      }
+      reasons = Array.isArray(reasons) ? reasons.filter(Boolean) : [];
+
+      if (!new_due_date || reasons.length === 0 || !ddd_comment) {
+        return Response.json({ error: 'new_due_date, at least one reason, and ddd_comment are required' }, { status: 400 });
       }
 
-      const responsibility = REASON_TO_RESPONSIBILITY[reason] || 'OTHER';
+      const responsibility = computeResponsibility(reasons);
       const originalDate = original_due_date || previous_due_date;
       const cumulativeDelay = originalDate
         ? Math.round((new Date(new_due_date) - new Date(originalDate)) / 86400000)
         : 0;
 
-      const autoApprove = shouldAutoApprove(originalDate, new_due_date, reason);
+      const autoApprove = shouldAutoApprove(originalDate, new_due_date, reasons);
       const status = autoApprove ? 'AUTOMATICALLY' : (is_urgent ? 'HOLD' : 'HOLD');
       const now = new Date().toISOString();
 
@@ -68,7 +86,8 @@ Deno.serve(async (req) => {
         type: 'DDD_UPDATE',
         previous_due_date,
         new_due_date,
-        reason,
+        reason: reasons,
+        reason_other_text: reason_other_text || null,
         responsibility,
         ddd_comment,
         status,
