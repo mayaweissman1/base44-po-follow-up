@@ -469,7 +469,13 @@ export default function FollowUp() {
       {detailsPo && (
         <PoDetailsDrawer
           po={detailsPo}
+          role={activeRole}
           onClose={() => setDetailsPo(null)}
+          onDecide={(po, decision) => { setDetailsPo(null); setDecisionState({ po, decision }); }}
+          onLogDelay={po => { setDetailsPo(null); setLogDelayPo(po); }}
+          onGeneralUpdate={po => { setDetailsPo(null); setGeneralUpdatePo(po); }}
+          onInternalNote={po => { setDetailsPo(null); setInternalNotePo(po); }}
+          onViewLogs={po => { setDetailsPo(null); setLogsDrawerPo(po); }}
         />
       )}
 
