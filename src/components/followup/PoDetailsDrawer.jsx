@@ -6,10 +6,9 @@ import ProgressBlock from './po-details/ProgressBlock';
 import DelayBlock from './po-details/DelayBlock';
 import MetaBlock from './po-details/MetaBlock';
 import TimelineBlock from './po-details/TimelineBlock';
-import DrawerActionsBar from './po-details/DrawerActionsBar';
 import StyleThumbnail from './StyleThumbnail';
 
-export default function PoDetailsDrawer({ po, role, onClose, onDecide, onLogDelay, onGeneralUpdate, onInternalNote, onViewLogs }) {
+export default function PoDetailsDrawer({ po, onClose }) {
   const [details, setDetails] = useState(null);
 
   useEffect(() => {
@@ -76,17 +75,6 @@ export default function PoDetailsDrawer({ po, role, onClose, onDecide, onLogDela
           <MetaBlock po={po} destStr={destStr} orderType={orderType} />
           <TimelineBlock log={po.dd_comment_log} />
         </div>
-
-        {/* Sticky actions bar */}
-        <DrawerActionsBar
-          po={po}
-          role={role}
-          onDecide={onDecide}
-          onLogDelay={onLogDelay}
-          onGeneralUpdate={onGeneralUpdate}
-          onInternalNote={onInternalNote}
-          onViewLogs={onViewLogs}
-        />
       </div>
     </div>
   );
