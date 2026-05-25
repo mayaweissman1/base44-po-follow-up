@@ -4,9 +4,12 @@ import { getResponsibility } from '@/lib/followUpConstants';
 import ReasonTag from '../ReasonTag';
 
 export default function DelayBlock({ po }) {
-  if (!po.ddd_reason && !po.ddd_comment && !po.delay_response_comment) return null;
+  const reasons = po.ddd_reasons?.length ? po.ddd_reasons : (po.ddd_reason ? [po.ddd_reason] : []);
+  if (!reasons.length && !po.ddd_comment && !po.delay_response_comment) return null;
 
-  const responsibility = getResponsibility(po.ddd_reason);
+  // Worst-case responsibility across all reasons: SUPPLIER > EDIKTED > OTHER
+  const respSet = new Set(reasons.map(getResponsibility).filter(Boolean));
+  const responsibility = respSet.has('SUPPLIER') ? 'SUPPLIER' : respSet.has('EDIKTED') ? 'EDIKTED' : respSet.has('OTHER') ? 'OTHER' : null;
   const respColor = responsibility === 'SUPPLIER'
     ? 'bg-orange-50 text-orange-600 border-orange-200'
     : responsibility === 'EDIKTED'
@@ -20,8 +23,8 @@ export default function DelayBlock({ po }) {
           <AlertCircle size={11} className="text-red-400" />
           Delay Info
         </div>
-        <div className="flex items-center gap-1.5">
-          {po.ddd_reason && <ReasonTag reason={po.ddd_reason} />}
+        <div className="flex items-center gap-1.5 flex-wrap justify-end">
+          {reasons.map((r, i) => <ReasonTag key={i} reason={r} />)}
           {responsibility && (
             <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase border ${respColor}`}>
               {responsibility}
