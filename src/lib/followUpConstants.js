@@ -24,8 +24,60 @@ export const DD_REASONS_BY_GROUP = [
 ];
 
 export const DD_STATUS_OPTIONS = [
-  'Empty status', 'Ready For Production', 'In Production - Sewing', 'In Production - ACC', 'Rework', 'OTW to Office',
+  'Empty status',
+  'Order Fabric',
+  'PPS At Risk',
+  'PPS Send To Approval - Pre Prod',
+  'PPS Send To Approval - Post Prod',
+  'Ready For Production',
+  'In Production - Cutting',
+  'In Production - Knitting',
+  'In Production - Sewing',
+  'In Production - Washing',
+  'In Production - ACC',
+  'Reproduction',
+  'Supplier Self Inspection',
+  'QC in factory',
+  'QC in Office',
+  'Under Packing in Factory',
+  'Rework',
+  'OTW to Office',
+  'Partially Received',
+  'Goods Received',
 ];
+
+// Status-aware comment templates. Selecting a template pre-fills the comment textarea.
+// [date], [X/Y], [date/hour] are placeholders the user fills in.
+export const STATUS_COMMENT_TEMPLATES = {
+  'In Production - ACC':            ['will finish on "[date]"'],
+  'OTW to Office':                  [
+    'will arrive on [date] - need qc in office',
+    'will arrive on [date] before 6 pm - ready for shipment..',
+    'will arrive on [date] after 6pm - ready for shipment..',
+  ],
+  'Rework':                         ['plan reqc on "[date]"'],
+  'Ready For Production':           [
+    'Will start production on [date]',
+    'Will start cutting on [date]',
+    'Under embroidering will start cutting on [date]',
+    'Under printing will start cutting on [date]',
+    'beads work, will start cutting on [date]',
+  ],
+  'Reproduction':                   ['will start production on "[date]"'],
+  'Supplier Self Inspection':       ['BOOKED QC check on [date]'],
+  'In Production - Sewing':         ['finish sewing on [date]'],
+  'In Production - Washing':        ['finish washing on [date]'],
+  'Under Packing in Factory':       ['will send the goods today', 'will send the goods tmr'],
+  'QC in factory':                  ['results will be on [date/hour]'],
+  'Partially Received':             ['received [X/Y] rest will arrive on [date]'],
+  'Goods Received':                 ['received [X/Y] all arrived. no rest..'],
+  'Order Fabric':                   ['fabric will arrive on [date]'],
+  'In Production - Cutting':        ['will be ready for sewing on [date]'],
+  'PPS Send To Approval - Pre Prod':['will arrive to LA on [date]', 'will arrive to main office on [date]', 'arrived on [date] waiting for approval'],
+  'In Production - Knitting':       ['will finish knitting on [date]'],
+  'PPS At Risk':                    ['PPS will be ready on [date]'],
+  'PPS Send To Approval - Post Prod':['pps will arrive to the office on [date]'],
+};
 
 export const DD_COMMENT_OPTIONS = [
   'On track', 'Awaiting supplier response', 'Sample sent', 'Sample approved',

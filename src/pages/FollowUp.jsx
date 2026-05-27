@@ -34,7 +34,6 @@ const DEFAULT_FILTERS = (role) => ({
   nextUpdate: '',
   lateFuture: '',
   poRank: '',
-  destination: '',
   delayResponse: '',
 });
 
@@ -42,7 +41,7 @@ function passesFilters(row, filters, role) {
   const {
     po, style, status, priority, supplier, ddManager, ddStatus, reason,
     responsibility, urgent, collection, orderType, flag, nextUpdate,
-    lateFuture, poRank, destination, delayResponse,
+    lateFuture, poRank, delayResponse,
   } = filters;
 
   if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
@@ -73,7 +72,6 @@ function passesFilters(row, filters, role) {
   if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
   if (lateFuture && row.late_future !== lateFuture) return false;
   if (poRank && String(row.po_rank) !== poRank) return false;
-  if (destination && row.destination !== destination) return false;
   if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
 
   if (priority) {
@@ -84,8 +82,9 @@ function passesFilters(row, filters, role) {
     if (priority === 'Drop' && row.priority !== 'Drop') return false;
   }
 
-  if (status === 'HOLD' && row.current_status !== 'HOLD') return false;
-  else if (status === 'HANDLED' && !['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(row.current_status)) return false;
+  if (status === 'HOLD') { if (row.current_status !== 'HOLD') return false; }
+  else if (status === 'HANDLED') { if (!['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(row.current_status)) return false; }
+  else if (status === 'ARCHIVE') { if (row.effective_dd_status !== 'Goods Received') return false; }
   else if (status === 'ALL') { /* show all */ }
   else if (['APPROVED', 'REJECTED', 'ACKNOWLEDGED', 'AUTOMATICALLY'].includes(status) && row.current_status !== status) return false;
 
@@ -192,6 +191,11 @@ export default function FollowUp() {
       approved_today:     { status: 'APPROVED' },
       rejected_today:     { status: 'REJECTED' },
       acknowledged_today: { status: 'ACKNOWLEDGED' },
+      not_updated:        { status: 'ALL', nextUpdate: new Date().toISOString().slice(0, 10) },
+      emp_pending:        { status: 'HOLD' },
+      emp_acknowledged:   { status: 'HANDLED' },
+      emp_rejected:       { status: 'REJECTED' },
+      emp_received_upd:   { status: 'ALL' },
     };
     setFilters(f => ({ ...DEFAULT_FILTERS(activeRole), ...(overrides[filterKey] || {}) }));
   }
@@ -244,21 +248,55 @@ export default function FollowUp() {
     () => rows.filter(r => passesFilters(r, filters, activeRole)),
     [rows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections, destinations } = useMemo(() => {
-    const sup = new Set(), mgr = new Set(), col = new Set(), dest = new Set();
+  const { suppliers, ddManagers, collections } = useMemo(() => {
+    const sup = new Set(), mgr = new Set(), col = new Set();
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
       if (r.collection) col.add(r.collection);
-      if (r.destination) dest.add(r.destination);
     }
     return {
       suppliers: [...sup].sort(),
       ddManagers: [...mgr].sort(),
       collections: [...col].sort(),
-      destinations: [...dest].sort(),
     };
   }, [rows]);
+
+  // Augment server KPIs with client-computed values
+  const displayKpis = useMemo(() => {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // "Not Updated": next_update_date = today but no dd_updates row created today
+    // We approximate: effective_next_update = today AND dd_comment_log has no entry from today
+    const notUpdated = rows.filter(r => {
+      if (r.effective_next_update?.slice(0, 10) !== today) return false;
+      const log = r.dd_comment_log || [];
+      return !log.some(e => e.date?.slice(0, 10) === today);
+    }).length;
+
+    // DD Employee KPIs — scoped to currently visible rows (already filtered to their own POs)
+    const scopedRows = activeRole === 'dd_team_employee'
+      ? rows.filter(r => !filters.ddManager || r.dd_manager_name === filters.ddManager)
+      : rows;
+
+    const empPending      = scopedRows.filter(r => r.current_status === 'HOLD').length;
+    const empAcknowledged = scopedRows.filter(r => ['APPROVED', 'ACKNOWLEDGED'].includes(r.current_status)).length;
+    const empRejected     = scopedRows.filter(r => r.current_status === 'REJECTED').length;
+    const empReceivedUpd  = scopedRows.filter(r => {
+      const log = r.dd_comment_log || [];
+      const latest = log[0];
+      return latest?.text?.toLowerCase().startsWith('receiving noticed') && r.effective_dd_status !== 'Goods Received';
+    }).length;
+
+    return {
+      ...kpis,
+      not_updated:        notUpdated,
+      emp_pending:        empPending,
+      emp_acknowledged:   empAcknowledged,
+      emp_rejected:       empRejected,
+      emp_received_upd:   empReceivedUpd,
+    };
+  }, [rows, kpis, activeRole, filters.ddManager]);
   const showRoleSwitcher = true;
 
   return (
@@ -354,7 +392,7 @@ export default function FollowUp() {
         {/* KPI Cards */}
         <KpiCards
           role={activeRole}
-          kpis={kpis}
+          kpis={displayKpis}
           activeFilter={activeKpiFilter}
           onFilterClick={handleKpiFilterClick}
         />
@@ -373,7 +411,6 @@ export default function FollowUp() {
           suppliers={suppliers}
           ddManagers={ddManagers}
           collections={collections}
-          destinations={destinations}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}
         />

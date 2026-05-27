@@ -1,27 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import { DD_STATUS_OPTIONS, DD_COMMENT_OPTIONS, fmtDate } from '@/lib/followUpConstants';
+import { DD_STATUS_OPTIONS, STATUS_COMMENT_TEMPLATES, fmtDate } from '@/lib/followUpConstants';
 import { base44 } from '@/api/base44Client';
 
 export default function GeneralUpdateModal({ po, posBulk, onClose, onSaved }) {
   const isBulk = !po && !!posBulk?.length;
 
   const [ddStatus, setDdStatus] = useState('');
-  const [commentSel, setCommentSel] = useState('');
-  const [commentOther, setCommentOther] = useState('');
+  const [templateSel, setTemplateSel] = useState('');
+  const [commentText, setCommentText] = useState('');
   const [nextUpdate, setNextUpdate] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Reset template + comment when status changes
+  useEffect(() => {
+    setTemplateSel('');
+    setCommentText('');
+  }, [ddStatus]);
+
+  // Pre-fill text area when a template is chosen
+  useEffect(() => {
+    if (templateSel) setCommentText(templateSel);
+  }, [templateSel]);
+
   if (!po && !posBulk?.length) return null;
 
+  const templates = ddStatus ? (STATUS_COMMENT_TEMPLATES[ddStatus] || []) : [];
+  const hasTemplates = templates.length > 0;
+
   async function handleSave() {
-    if (!ddStatus && !commentSel && !nextUpdate) {
+    if (!ddStatus && !commentText.trim() && !nextUpdate) {
       setError('Change at least one field.');
-      return;
-    }
-    if (commentSel === 'Other' && !commentOther.trim()) {
-      setError('Write the "Other" comment text.');
       return;
     }
     setSaving(true);
@@ -34,8 +44,8 @@ export default function GeneralUpdateModal({ po, posBulk, onClose, onSaved }) {
           po_number: target.po_number,
           payload: {
             dd_status: ddStatus || null,
-            general_comment: commentSel || null,
-            general_comment_other_text: commentSel === 'Other' ? commentOther.trim() : null,
+            general_comment: commentText.trim() ? 'Other' : null,
+            general_comment_other_text: commentText.trim() || null,
             next_update_date: nextUpdate || null,
             current_dd_status: target.effective_dd_status,
           },
@@ -72,38 +82,61 @@ export default function GeneralUpdateModal({ po, posBulk, onClose, onSaved }) {
             <dl className="grid text-xs mb-4 bg-[#FAFAFA] border border-[#E5E5E5] rounded-[8px] p-3" style={{ gridTemplateColumns: 'max-content 1fr', gap: '6px 16px' }}>
               <dt className="text-[#525252] font-semibold">PO</dt><dd className="font-mono font-bold">{po.po_number}</dd>
               <dt className="text-[#525252] font-semibold">Style</dt><dd className="font-mono">{po.style_color}</dd>
-              <dt className="text-[#525252] font-semibold">Current DD Status</dt><dd>{po.effective_dd_status || '—'}</dd>
-              <dt className="text-[#525252] font-semibold">Current Next Update</dt><dd>{fmtDate(po.effective_next_update) || '—'}</dd>
+              <dt className="text-[#525252] font-semibold">Current Stage</dt><dd>{po.effective_dd_status || '—'}</dd>
+              <dt className="text-[#525252] font-semibold">Next Update</dt><dd>{fmtDate(po.effective_next_update) || '—'}</dd>
             </dl>
           )}
 
+          {/* DD Status */}
           <div className="mb-4">
-            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">DD Status</label>
-            <select className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10" value={ddStatus} onChange={e => setDdStatus(e.target.value)}>
+            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">Production Stage</label>
+            <select
+              className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
+              value={ddStatus}
+              onChange={e => setDdStatus(e.target.value)}
+            >
               <option value="">— No change —</option>
               {DD_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
             </select>
-            <div className="text-[11px] text-[#A3A3A3] mt-1">Production stage. Leave as "No change" to keep the current value.</div>
+            <div className="text-[11px] text-[#A3A3A3] mt-1">Leave as "No change" to keep the current value.</div>
           </div>
 
+          {/* Comment — template picker if status has templates, else free text */}
           <div className="mb-4">
-            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">DD Comment</label>
-            <select className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10" value={commentSel} onChange={e => setCommentSel(e.target.value)}>
-              <option value="">— No new comment —</option>
-              {DD_COMMENT_OPTIONS.map(c => <option key={c} value={c}>{c === 'Other' ? 'Other…' : c}</option>)}
-            </select>
+            <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">Comment</label>
+
+            {hasTemplates && (
+              <select
+                className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 mb-2"
+                value={templateSel}
+                onChange={e => setTemplateSel(e.target.value)}
+              >
+                <option value="">— Pick a template or write freely below —</option>
+                {templates.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            )}
+
+            <textarea
+              className="w-full px-3 py-2.5 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 resize-none min-h-[72px]"
+              maxLength={500}
+              value={commentText}
+              onChange={e => setCommentText(e.target.value)}
+              placeholder={hasTemplates ? 'Select a template above, or type freely. Replace [date] / [X/Y] with actual values.' : 'Describe the update…'}
+            />
+            {hasTemplates && commentText.includes('[') && (
+              <div className="text-[11px] text-amber-500 mt-1">Replace all [ ] placeholders with actual values before saving.</div>
+            )}
           </div>
 
-          {commentSel === 'Other' && (
-            <div className="mb-4">
-              <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">Other (free text) <span className="text-red-500">*</span></label>
-              <textarea className="w-full px-3 py-2.5 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 resize-none min-h-[72px]" maxLength={280} value={commentOther} onChange={e => setCommentOther(e.target.value)} placeholder="Describe the update…" />
-            </div>
-          )}
-
+          {/* Next Update */}
           <div className="mb-4">
             <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">Next Update date</label>
-            <input type="date" className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10" value={nextUpdate} onChange={e => setNextUpdate(e.target.value)} />
+            <input
+              type="date"
+              className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
+              value={nextUpdate}
+              onChange={e => setNextUpdate(e.target.value)}
+            />
           </div>
 
           {error && <div className="text-sm text-red-500 font-medium mb-2">{error}</div>}

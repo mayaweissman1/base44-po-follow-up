@@ -81,7 +81,6 @@ const CHIP_FORMATTERS = {
   nextUpdate:     v => `Next Upd: ${v}`,
   lateFuture:     v => ({ LATE: 'Late DD', FUTURE: 'Future DD' }[v] || v),
   poRank:         v => `Rank: ${v}`,
-  destination:    v => `Dest: ${v}`,
   delayResponse:  v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
 };
 
@@ -122,7 +121,7 @@ export default function FilterToolbar({
     status: 'ALL',
     priority: '', supplier: '', ddManager: '', ddStatus: '', reason: '',
     responsibility: '', urgent: false, collection: '', orderType: '', flag: '',
-    nextUpdate: '', lateFuture: '', poRank: '', destination: '', delayResponse: '',
+    nextUpdate: '', lateFuture: '', poRank: '', delayResponse: '',
   };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
@@ -193,6 +192,7 @@ export default function FilterToolbar({
               <option value="REJECTED">Rejected</option>
               <option value="ACKNOWLEDGED">Acknowledged</option>
               <option value="AUTOMATICALLY">Auto-approved</option>
+              {role === 'dd_team_manager' && <option value="ARCHIVE">Archive (Goods Received)</option>}
             </select>
           </FilterField>
           <FilterField label="Style Color">
@@ -274,15 +274,16 @@ export default function FilterToolbar({
                 {['1', '2', '3', '4', '5'].map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </FilterField>
-            <FilterField label="Destination">
-              <select className={selectCls} value={filters.destination} onChange={e => set('destination', e.target.value)}>
+            <FilterField label="Order Type">
+              <select className={selectCls} value={filters.orderType} onChange={e => set('orderType', e.target.value)}>
                 <option value="">All</option>
-                <option value="UK">UK</option>
-                <option value="US">US</option>
-                {destinations.filter(d => d !== 'UK' && d !== 'US').map(d => (
-                  <option key={d} value={d}>{d}</option>
-                ))}
+                <option value="Regular">Regular</option>
+                <option value="ACC">ACC</option>
+                <option value="CL">CL</option>
               </select>
+            </FilterField>
+            <FilterField label="Collection">
+              <SearchableSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} allLabel="All collections" />
             </FilterField>
             <FilterField label="Delay Response">
               <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />

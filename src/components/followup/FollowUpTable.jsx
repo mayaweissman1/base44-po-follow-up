@@ -301,6 +301,7 @@ export default function FollowUpTable({
                 <Th {...thProps} col="countdown" width={colWidths['countdown'] || 80} tooltip={TIPS.countdown}>Countdown</Th>
                 <Th {...thProps} col="ddd_reason" width={colWidths['ddd_reason'] || 120}>DDD Reason</Th>
                 <Th {...thProps} col="ddd_comment" width={colWidths['ddd_comment'] || 160}>DDD Comment</Th>
+                <Th {...thProps} col="delay_response_comment" width={colWidths['delay_response_comment'] || 140}>MO Response</Th>
                 <Th {...thProps} col="set_with" width={colWidths['set_with'] || 85}>Set With</Th>
                 <Th {...thProps} col="ordered_qty" width={colWidths['ordered_qty'] || 80}>Order Qty</Th>
                 <Th {...thProps} col="qty_received" width={colWidths['qty_received'] || 85}>Qty Received</Th>
@@ -352,6 +353,11 @@ export default function FollowUpTable({
                     </td>
                     <td className={`${tdCls} ${rowBg}`}><ReasonTag reasons={po.ddd_reasons} reason={po.ddd_reason} /></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="text-[#A3A3A3] truncate max-w-[180px] inline-block" title={po.ddd_comment}>{po.ddd_comment || '—'}</span></td>
+                    <td className={`${tdCls} ${rowBg}`}>
+                      {po.delay_response_comment
+                        ? <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-blue-50 text-blue-600 max-w-[150px] truncate" title={po.delay_response_comment}>{po.delay_response_comment}</span>
+                        : <span className="text-[#A3A3A3]">—</span>}
+                    </td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-xs text-[#A3A3A3]">{po.set_with || '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono">{po.ordered_qty ?? '—'}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono font-semibold">{po.qty_received ?? 0}</span></td>
