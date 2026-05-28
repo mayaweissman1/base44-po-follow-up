@@ -1,67 +1,66 @@
-import React from 'react';
-import { User, Truck, MapPin, Package, Calendar, Tag, Activity, Bell, Hash, Clock, CheckCircle, Layers, Send, Inbox } from 'lucide-react';
+import React, { useState } from 'react';
+import { User, Truck, MapPin, Package, Calendar, Tag, Bell, Hash, Layers, Send, Inbox, ChevronDown, MessageCircle } from 'lucide-react';
 import { fmtDate } from '@/lib/followUpConstants';
-import DdStatusBadge from '../DdStatusBadge';
 import PmTagsPills from '../PmTagsPills';
 
 /**
- * Details block — grouped, scannable layout.
+ * Details block — focused, scannable.
  *
- * Logical groups:
- *   1. People (DD Manager, Supplier)
- *   2. Order Info (Destinations, Collection, Order Type, Order Date, Set With, Drop, PO Rank)
- *   3. Status (DD Status, Days Same Status, DD Date, Delivery Status, Next Update, Goods Received)
- *   4. Production Approvals (Bulk Fabric, PPS Receipt Date)
- * Plus a highlighted PM Tags row at the bottom.
+ * Primary content (always visible):
+ *   • Delivery Status note from supplier (quote, top)
+ *   • People & Routing (DD Manager, Supplier, Destinations)
+ *   • Order (Collection, Order Type, Order Date, Next Update)
+ *   • PM Tags
+ *
+ * Secondary content (collapsed under "More"):
+ *   • Set With, PO Rank, Drop, Goods Received
  */
 export default function MetaBlock({ po, destStr, orderType }) {
-  const hasPmTags = !!po.pm_tags_label;
+  const [showMore, setShowMore] = useState(false);
 
-  const people = [
+  const hasPmTags = !!po.pm_tags_label;
+  const deliveryStatus = po.delivery_date_status;
+
+  const peopleRouting = [
     po.dd_manager_name && { icon: User, label: 'DD Manager', value: po.dd_manager_name, variant: 'pink' },
     po.supplier && { icon: Truck, label: 'Supplier', value: po.supplier, variant: 'teal' },
+    destStr && { icon: MapPin, label: 'Destinations', value: destStr },
   ].filter(Boolean);
 
-  const orderInfo = [
-    destStr && { icon: MapPin, label: 'Destinations', value: destStr },
+  const order = [
     po.collection && { icon: Package, label: 'Collection', value: po.collection, mono: true },
     orderType && { icon: Tag, label: 'Order Type', value: orderType, variant: 'gray' },
     po.order_date && { icon: Calendar, label: 'Order Date', value: fmtDate(po.order_date), mono: true },
-    po.set_with && { icon: Layers, label: 'Set With', value: po.set_with, mono: true },
-    po.drop && { icon: Send, label: 'Drop', value: fmtDate(po.drop), mono: true },
-    po.po_rank != null && { icon: Hash, label: 'PO Rank', value: String(po.po_rank), mono: true },
+    po.effective_next_update && { icon: Bell, label: 'Next Update', value: fmtDate(po.effective_next_update), mono: true },
   ].filter(Boolean);
 
-  const status = [
-    po.effective_dd_status && { icon: Activity, label: 'DD Status', value: po.effective_dd_status, variant: 'dd-status' },
-    po.days_same_status != null && { icon: Clock, label: 'Days Same Status', value: `${po.days_same_status}d`, mono: true },
-    po.delivery_date && { icon: Calendar, label: 'DD Date', value: fmtDate(po.delivery_date), mono: true },
-    po.delivery_date_status && { icon: Activity, label: 'Delivery Status', value: po.delivery_date_status },
-    po.effective_next_update && { icon: Bell, label: 'Next Update', value: fmtDate(po.effective_next_update), mono: true },
+  const more = [
+    po.set_with && { icon: Layers, label: 'Set With', value: po.set_with, mono: true },
+    po.po_rank != null && { icon: Hash, label: 'PO Rank', value: String(po.po_rank), mono: true },
+    po.drop && { icon: Send, label: 'Drop', value: fmtDate(po.drop), mono: true },
     po.goods_received && { icon: Inbox, label: 'Goods Received', value: fmtDate(po.goods_received), mono: true },
   ].filter(Boolean);
 
-  const production = [
-    po.bulk_fabric_approval != null && {
-      icon: CheckCircle,
-      label: 'Bulk Fabric',
-      value: po.bulk_fabric_approval ? 'Approved' : 'Pending',
-      variant: po.bulk_fabric_approval ? 'success' : 'warning',
-    },
-    po.pps_receipt_date && { icon: Calendar, label: 'PPS Receipt Date', value: fmtDate(po.pps_receipt_date), mono: true },
-  ].filter(Boolean);
-
-  if (people.length === 0 && orderInfo.length === 0 && status.length === 0 && production.length === 0 && !hasPmTags) return null;
+  const hasContent = !!deliveryStatus || peopleRouting.length || order.length || more.length || hasPmTags;
+  if (!hasContent) return null;
 
   return (
     <div className="px-5 py-4 border-b border-[#E5E5E5]">
       <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-3">Details</div>
 
+      {deliveryStatus && (
+        <div className="mb-3 pl-3 border-l-2 border-[#E31B7F] bg-[#FFF0F7]/40 py-1.5 pr-2 rounded-r-[6px]">
+          <div className="flex items-center gap-1.5 mb-0.5">
+            <MessageCircle size={10} className="text-[#E31B7F]" />
+            <span className="text-[9px] font-bold text-[#E31B7F] uppercase tracking-[.06em]">Supplier note</span>
+          </div>
+          <div className="text-[12px] text-[#0A0A0A] leading-snug">{deliveryStatus}</div>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {people.length > 0 && <DetailGroup rows={people} />}
-        {orderInfo.length > 0 && <DetailGroup rows={orderInfo} />}
-        {status.length > 0 && <DetailGroup rows={status} />}
-        {production.length > 0 && <DetailGroup rows={production} />}
+        {peopleRouting.length > 0 && <DetailGroup rows={peopleRouting} />}
+        {order.length > 0 && <DetailGroup rows={order} />}
       </div>
 
       {hasPmTags && (
@@ -73,6 +72,23 @@ export default function MetaBlock({ po, destStr, orderType }) {
           <div className="flex flex-wrap gap-1">
             <PmTagsPills label={po.pm_tags_label} max={20} />
           </div>
+        </div>
+      )}
+
+      {more.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-[#F0F0F0]">
+          <button
+            onClick={() => setShowMore(s => !s)}
+            className="w-full flex items-center justify-between text-[10px] font-bold text-[#525252] uppercase tracking-[.08em] hover:text-[#E31B7F] transition-colors"
+          >
+            <span>More info ({more.length})</span>
+            <ChevronDown size={12} className={`transition-transform ${showMore ? 'rotate-180' : ''}`} />
+          </button>
+          {showMore && (
+            <div className="mt-2">
+              <DetailGroup rows={more} />
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -112,15 +128,6 @@ function ValueRenderer({ value, variant, mono }) {
   }
   if (variant === 'gray') {
     return <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-white text-[#525252] border border-[#E5E5E5]">{value}</span>;
-  }
-  if (variant === 'success') {
-    return <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">{value}</span>;
-  }
-  if (variant === 'warning') {
-    return <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">{value}</span>;
-  }
-  if (variant === 'dd-status') {
-    return <DdStatusBadge status={value} />;
   }
   return (
     <span

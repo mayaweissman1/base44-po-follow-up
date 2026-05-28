@@ -3,6 +3,7 @@ import { X } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import HeroBlock from './po-details/HeroBlock';
 import ProgressBlock from './po-details/ProgressBlock';
+import ReadinessBlock from './po-details/ReadinessBlock';
 import DelayBlock from './po-details/DelayBlock';
 import MetaBlock from './po-details/MetaBlock';
 import TimelineBlock from './po-details/TimelineBlock';
@@ -62,6 +63,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
           <HeroBlock po={po} />
+          <ReadinessBlock po={po} />
           <ProgressBlock
             ordered={totalOrdered}
             received={totalReceived}
