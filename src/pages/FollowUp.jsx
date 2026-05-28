@@ -36,13 +36,14 @@ const DEFAULT_FILTERS = (role) => ({
   lateFuture: '',
   poRank: '',
   delayResponse: '',
+  deliveryStatus: '',
 });
 
 function passesFilters(row, filters, role) {
   const {
     po, style, status, priority, supplier, ddManager, ddStatus, reason,
     responsibility, urgent, archive, collection, orderType, flag, nextUpdate,
-    lateFuture, poRank, delayResponse,
+    lateFuture, poRank, delayResponse, deliveryStatus,
   } = filters;
 
   if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
@@ -72,6 +73,7 @@ function passesFilters(row, filters, role) {
   if (lateFuture && row.late_future !== lateFuture) return false;
   if (poRank && String(row.po_rank) !== poRank) return false;
   if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
+  if (deliveryStatus && !row.delivery_date_status?.toLowerCase().startsWith(deliveryStatus.toLowerCase())) return false;
 
   if (priority) {
     if (priority === 'URGENT' && row.priority !== 'URGENT') return false;
@@ -205,7 +207,7 @@ export default function FollowUp() {
       emp_pending:        { status: 'HOLD' },
       emp_acknowledged:   { status: 'HANDLED' },
       emp_rejected:       { status: 'REJECTED' },
-      emp_received_upd:   { status: 'ALL' },
+      emp_received_upd:   { status: 'ALL', deliveryStatus: 'Received Update' },
     };
     setFilters({ ...DEFAULT_FILTERS(activeRole), ...empScope, ...(overrides[filterKey] || {}) });
   }
@@ -285,11 +287,9 @@ export default function FollowUp() {
     const empPending      = scopedRows.filter(r => r.current_status === 'HOLD').length;
     const empAcknowledged = scopedRows.filter(r => ['APPROVED', 'ACKNOWLEDGED'].includes(r.current_status)).length;
     const empRejected     = scopedRows.filter(r => r.current_status === 'REJECTED').length;
-    const empReceivedUpd  = scopedRows.filter(r => {
-      const log = r.dd_comment_log || [];
-      const latest = log[0];
-      return latest?.text?.toLowerCase().startsWith('receiving noticed') && r.effective_dd_status !== 'Goods Received';
-    }).length;
+    const empReceivedUpd  = scopedRows.filter(r =>
+      r.delivery_date_status?.toLowerCase().startsWith('received update')
+    ).length;
 
     return {
       ...kpis,

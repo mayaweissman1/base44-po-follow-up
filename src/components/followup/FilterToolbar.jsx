@@ -85,6 +85,7 @@ const CHIP_FORMATTERS = {
   lateFuture:     v => ({ LATE: 'Late DD', FUTURE: 'Future DD' }[v] || v),
   poRank:         v => `Rank: ${v}`,
   delayResponse:  v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
+  deliveryStatus: v => `Delivery: ${v}`,
 };
 
 function ActiveChips({ filters, defaultFilters, onChange }) {
@@ -124,7 +125,7 @@ export default function FilterToolbar({
     status: 'ALL',
     priority: '', supplier: '', ddManager: '', ddStatus: '', reason: '',
     responsibility: '', urgent: false, archive: false, collection: '', orderType: '', flag: '',
-    nextUpdate: '', lateFuture: '', poRank: '', delayResponse: '',
+    nextUpdate: '', lateFuture: '', poRank: '', delayResponse: '', deliveryStatus: '',
   };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
