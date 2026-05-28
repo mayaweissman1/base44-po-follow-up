@@ -90,6 +90,7 @@ function passesFilters(row, filters, role) {
 
   if (status === 'HOLD') { if (row.current_status !== 'HOLD') return false; }
   else if (status === 'HANDLED') { if (!['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(row.current_status)) return false; }
+  else if (status === 'ACK_APPROVED') { if (!['APPROVED', 'ACKNOWLEDGED'].includes(row.current_status)) return false; }
   else if (status === 'ALL') { /* show all */ }
   else if (['APPROVED', 'REJECTED', 'ACKNOWLEDGED', 'AUTOMATICALLY'].includes(status) && row.current_status !== status) return false;
 
@@ -202,12 +203,13 @@ export default function FollowUp() {
       urgent_pending:     { status: 'HOLD', urgent: true },
       approved_today:     { status: 'APPROVED' },
       rejected_today:     { status: 'REJECTED' },
-      acknowledged_today: { status: 'ACKNOWLEDGED' },
+      acknowledged_today: { status: 'ACK_APPROVED' },
       not_updated:        { status: 'ALL', nextUpdate: new Date().toISOString().slice(0, 10) },
       emp_pending:        { status: 'HOLD' },
-      emp_acknowledged:   { status: 'HANDLED' },
+      emp_acknowledged:   { status: 'ACK_APPROVED' },
       emp_rejected:       { status: 'REJECTED' },
       emp_received_upd:   { status: 'ALL', deliveryStatus: 'Received Update' },
+      mgr_received_upd:   { status: 'ALL', deliveryStatus: 'Received Update' },
     };
     setFilters({ ...DEFAULT_FILTERS(activeRole), ...empScope, ...(overrides[filterKey] || {}) });
   }
@@ -290,6 +292,9 @@ export default function FollowUp() {
     const empReceivedUpd  = scopedRows.filter(r =>
       r.delivery_date_status?.toLowerCase().startsWith('received update')
     ).length;
+    const mgrReceivedUpd  = rows.filter(r =>
+      r.delivery_date_status?.toLowerCase().startsWith('received update')
+    ).length;
 
     return {
       ...kpis,
@@ -298,6 +303,7 @@ export default function FollowUp() {
       emp_acknowledged:   empAcknowledged,
       emp_rejected:       empRejected,
       emp_received_upd:   empReceivedUpd,
+      mgr_received_upd:   mgrReceivedUpd,
     };
   }, [rows, kpis, activeRole, filters.ddManager]);
   const showRoleSwitcher = true;

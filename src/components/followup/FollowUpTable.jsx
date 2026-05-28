@@ -565,9 +565,6 @@ export default function FollowUpTable({
     const ddmColSpan = 4 + visibleDdmCols.length + 1;
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
-        <div className="flex justify-end px-3 pt-2.5 pb-1 border-b border-[#F0F0F0]">
-          <ColumnPicker visibleCols={ddmOptCols} onChange={handleDdmColChange} />
-        </div>
         <div className="overflow-auto max-h-[calc(100vh-280px)]">
           <table className="border-collapse w-full text-[13px]" style={{ borderSpacing: 0 }}>
             <thead>
@@ -636,12 +633,20 @@ export default function FollowUpTable({
             </tbody>
           </table>
         </div>
-        <LoadMoreFooter
-          visible={visibleRows.length}
-          total={sortedRows.length}
-          onLoadMore={() => setVisibleCount(c => c + PAGE_SIZE)}
-          onShowAll={() => setVisibleCount(sortedRows.length)}
-        />
+        <div className="px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E5E5] flex items-center justify-between text-[11px]">
+          <ColumnPicker visibleCols={ddmOptCols} onChange={handleDdmColChange} />
+          {visibleRows.length < sortedRows.length ? (
+            <div className="flex items-center gap-2">
+              <span className="text-[#525252]">
+                Showing <strong className="text-[#0A0A0A]">{visibleRows.length}</strong> of <strong className="text-[#0A0A0A]">{sortedRows.length}</strong>
+              </span>
+              <button onClick={() => setVisibleCount(c => c + PAGE_SIZE)} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white text-[#E31B7F] border border-[#E5E5E5] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">Load more</button>
+              <button onClick={() => setVisibleCount(sortedRows.length)} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] text-[#525252] hover:text-[#0A0A0A] hover:bg-white transition-colors">Show all ({sortedRows.length})</button>
+            </div>
+          ) : (
+            <span className="text-[#A3A3A3]">Showing all {sortedRows.length} row{sortedRows.length === 1 ? '' : 's'}</span>
+          )}
+        </div>
       </div>
     );
   }

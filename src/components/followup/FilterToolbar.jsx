@@ -69,7 +69,7 @@ const toggleCls = (active) => `h-8 px-3 rounded-[6px] text-xs font-semibold bord
 const CHIP_FORMATTERS = {
   po:             v => `PO: ${v}`,
   style:          v => `Style: ${v}`,
-  status:         v => ({ HOLD: 'DDD: Pending', HANDLED: 'DDD: Handled', APPROVED: 'DDD: Approved', REJECTED: 'DDD: Rejected', ACKNOWLEDGED: 'DDD: Acknowledged', AUTOMATICALLY: 'DDD: Auto' }[v] || `DDD: ${v}`),
+  status:         v => ({ HOLD: 'DDD: Pending', HANDLED: 'DDD: Handled', APPROVED: 'DDD: Approved', REJECTED: 'DDD: Rejected', ACKNOWLEDGED: 'DDD: Acknowledged', ACK_APPROVED: 'DDD: Acknowledged', AUTOMATICALLY: 'DDD: Auto' }[v] || `DDD: ${v}`),
   priority:       v => ({ URGENT: 'URGENT', Deadline: 'Deadline at risk', Normal: 'Normal', MISSING_SIZES: 'Missing sizes', Drop: 'Drop' }[v] || v),
   supplier:       v => `Supplier: ${v}`,
   ddManager:      v => `Mgr: ${v}`,
