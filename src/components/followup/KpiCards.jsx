@@ -46,7 +46,7 @@ export default function KpiCards({ role, kpis, activeFilter, onFilterClick }) {
       { key: 'acknowledged_today', label: 'Acknowledged',        value: (kpis.approved_today ?? 0) + (kpis.acknowledged_today ?? 0),     meta: 'Approved or acknowledged',  colorClass: 'text-green-500', filterKey: 'acknowledged_today' },
       { key: 'rejected_today',     label: 'Rejected today',      value: kpis.rejected_today ?? 0,                                        meta: 'Rejected · today',          colorClass: 'text-red-500',   filterKey: 'rejected_today' },
       { key: 'not_updated',        label: 'Not Updated',         value: kpis.not_updated ?? 0,                                           meta: 'Due today — not touched',   colorClass: 'text-red-600',   filterKey: 'not_updated', alwaysRed: true },
-      { key: 'mgr_received_upd',   label: 'Received Update',     value: kpis.mgr_received_upd ?? 0,                                      meta: 'Delivery status updated',   colorClass: 'text-amber-500', filterKey: 'mgr_received_upd' },
+      { key: 'mgr_received_upd',   label: 'Receiving Notice',     value: kpis.mgr_received_upd ?? 0,                                      meta: 'Delivery status updated',   colorClass: 'text-amber-500', filterKey: 'mgr_received_upd' },
     ];
     return (
       <div style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }} className="grid gap-3 mb-4">
@@ -62,7 +62,7 @@ export default function KpiCards({ role, kpis, activeFilter, onFilterClick }) {
       { key: 'emp_pending',      label: 'Pending',         value: kpis.emp_pending ?? 0,      meta: 'My HOLDs awaiting decision',  colorClass: 'text-red-500',   filterKey: 'emp_pending' },
       { key: 'emp_acknowledged', label: 'Acknowledged',    value: kpis.emp_acknowledged ?? 0, meta: 'Approved or acknowledged',    colorClass: 'text-green-500', filterKey: 'emp_acknowledged' },
       { key: 'emp_rejected',     label: 'Rejected',        value: kpis.emp_rejected ?? 0,     meta: 'Rejected by main office',     colorClass: 'text-red-500',   filterKey: 'emp_rejected' },
-      { key: 'emp_received_upd', label: 'Received Update', value: kpis.emp_received_upd ?? 0, meta: 'Delivery status updated',     colorClass: 'text-amber-500', filterKey: 'emp_received_upd' },
+      { key: 'emp_received_upd', label: 'Receiving Notice', value: kpis.emp_received_upd ?? 0, meta: 'Delivery status updated',     colorClass: 'text-amber-500', filterKey: 'emp_received_upd' },
     ];
     return (
       <div style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }} className="grid gap-3 mb-4">

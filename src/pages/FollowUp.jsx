@@ -208,8 +208,8 @@ export default function FollowUp() {
       emp_pending:        { status: 'HOLD' },
       emp_acknowledged:   { status: 'ACK_APPROVED' },
       emp_rejected:       { status: 'REJECTED' },
-      emp_received_upd:   { status: 'ALL', deliveryStatus: 'Received Update' },
-      mgr_received_upd:   { status: 'ALL', deliveryStatus: 'Received Update' },
+      emp_received_upd:   { status: 'ALL', deliveryStatus: 'Receiving Notice' },
+      mgr_received_upd:   { status: 'ALL', deliveryStatus: 'Receiving Notice' },
     };
     setFilters({ ...DEFAULT_FILTERS(activeRole), ...empScope, ...(overrides[filterKey] || {}) });
   }
@@ -290,10 +290,10 @@ export default function FollowUp() {
     const empAcknowledged = scopedRows.filter(r => ['APPROVED', 'ACKNOWLEDGED'].includes(r.current_status)).length;
     const empRejected     = scopedRows.filter(r => r.current_status === 'REJECTED').length;
     const empReceivedUpd  = scopedRows.filter(r =>
-      r.delivery_date_status?.toLowerCase().startsWith('received update')
+      r.delivery_date_status?.toLowerCase().startsWith('receiving notice')
     ).length;
     const mgrReceivedUpd  = rows.filter(r =>
-      r.delivery_date_status?.toLowerCase().startsWith('received update')
+      r.delivery_date_status?.toLowerCase().startsWith('receiving notice')
     ).length;
 
     return {
