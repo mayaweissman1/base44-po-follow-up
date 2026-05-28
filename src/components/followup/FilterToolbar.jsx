@@ -64,6 +64,7 @@ function FilterField({ label, children }) {
 
 const inputCls = "h-8 px-2.5 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors";
 const selectCls = "h-8 pl-2.5 pr-7 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white appearance-none cursor-pointer focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors";
+const toggleCls = (active) => `h-8 px-3 rounded-[6px] text-xs font-semibold border transition-colors ${active ? 'bg-[#FFF0F7] text-[#E31B7F] border-[#E31B7F]' : 'border-[#D4D4D4] text-[#525252] hover:border-[#E31B7F] hover:text-[#E31B7F]'}`;
 
 const CHIP_FORMATTERS = {
   po:             v => `PO: ${v}`,
@@ -75,6 +76,7 @@ const CHIP_FORMATTERS = {
   reason:         v => v,
   responsibility: v => ({ OTHER: 'Resp: Other', EDIKTED: 'Resp: Edikted', SUPPLIER: 'Resp: Supplier' }[v] || v),
   urgent:         _ => 'Urgent only',
+  archive:        _ => 'Archive',
   collection:     v => `Collection: ${v}`,
   orderType:      v => `Type: ${v}`,
   flag:           v => ({ URGENT: 'Flag: URGENT', REVIEW: 'Flag: REVIEW', NONE: 'No flag' }[v] || v),
@@ -112,7 +114,7 @@ function ActiveChips({ filters, defaultFilters, onChange }) {
 
 export default function FilterToolbar({
   role, filters, onChange, onReset,
-  suppliers, ddManagers, collections = [], destinations = [],
+  suppliers, ddManagers, collections = [], orderTypes = [],
   advancedOpen, onAdvancedToggle,
 }) {
   const setAdvancedOpen = onAdvancedToggle || (() => {});
@@ -120,11 +122,14 @@ export default function FilterToolbar({
     po: '', style: '',
     status: 'ALL',
     priority: '', supplier: '', ddManager: '', ddStatus: '', reason: '',
-    responsibility: '', urgent: false, collection: '', orderType: '', flag: '',
+    responsibility: '', urgent: false, archive: false, collection: '', orderType: '', flag: '',
     nextUpdate: '', lateFuture: '', poRank: '', delayResponse: '',
   };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
+
+  // Order Type select — uses dynamic values from data; falls back to static if empty
+  const orderTypeOptions = orderTypes.length > 0 ? orderTypes : ['Regular', 'ACC', 'CL'];
 
   if (role === 'dd_team_employee') {
     return (
@@ -145,12 +150,7 @@ export default function FilterToolbar({
           <SearchableSelect value={filters.ddManager} onChange={v => set('ddManager', v)} options={ddManagers} />
         </FilterField>
         <FilterField label="Order Type">
-          <select className={selectCls} value={filters.orderType} onChange={e => set('orderType', e.target.value)}>
-            <option value="">All</option>
-            <option value="Regular">Regular</option>
-            <option value="ACC">ACC</option>
-            <option value="CL">CL</option>
-          </select>
+          <SearchableSelect value={filters.orderType} onChange={v => set('orderType', v)} options={orderTypeOptions} allLabel="All types" />
         </FilterField>
         <FilterField label="Flag">
           <select className={selectCls} value={filters.flag} onChange={e => set('flag', e.target.value)}>
@@ -192,7 +192,6 @@ export default function FilterToolbar({
               <option value="REJECTED">Rejected</option>
               <option value="ACKNOWLEDGED">Acknowledged</option>
               <option value="AUTOMATICALLY">Auto-approved</option>
-              {role === 'dd_team_manager' && <option value="ARCHIVE">Archive (Goods Received)</option>}
             </select>
           </FilterField>
           <FilterField label="Style Color">
@@ -275,12 +274,7 @@ export default function FilterToolbar({
               </select>
             </FilterField>
             <FilterField label="Order Type">
-              <select className={selectCls} value={filters.orderType} onChange={e => set('orderType', e.target.value)}>
-                <option value="">All</option>
-                <option value="Regular">Regular</option>
-                <option value="ACC">ACC</option>
-                <option value="CL">CL</option>
-              </select>
+              <SearchableSelect value={filters.orderType} onChange={v => set('orderType', v)} options={orderTypeOptions} allLabel="All types" />
             </FilterField>
             <FilterField label="Collection">
               <SearchableSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} allLabel="All collections" />
@@ -289,13 +283,21 @@ export default function FilterToolbar({
               <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />
             </FilterField>
             <FilterField label="Urgent">
-              <button
-                onClick={() => set('urgent', !filters.urgent)}
-                className={`h-8 px-3 rounded-[6px] text-xs font-semibold border transition-colors ${filters.urgent ? 'bg-[#FFF0F7] text-[#E31B7F] border-[#E31B7F]' : 'border-[#D4D4D4] text-[#525252] hover:border-[#E31B7F] hover:text-[#E31B7F]'}`}
-              >
+              <button onClick={() => set('urgent', !filters.urgent)} className={toggleCls(filters.urgent)}>
                 {filters.urgent ? 'Urgent only ✓' : 'Urgent only'}
               </button>
             </FilterField>
+            {role === 'dd_team_manager' && (
+              <FilterField label="Archive">
+                <button
+                  onClick={() => set('archive', !filters.archive)}
+                  className={toggleCls(filters.archive)}
+                  title="Show POs with no delay request history (never entered the HOLD workflow)"
+                >
+                  {filters.archive ? 'Archive ✓' : 'Archive'}
+                </button>
+              </FilterField>
+            )}
           </div>
           <ActiveChips filters={filters} defaultFilters={defaultFilters} onChange={onChange} />
         </div>

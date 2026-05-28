@@ -28,6 +28,7 @@ const DEFAULT_FILTERS = (role) => ({
   reason: '',
   responsibility: '',
   urgent: false,
+  archive: false,
   collection: '',
   orderType: '',
   flag: '',
@@ -40,7 +41,7 @@ const DEFAULT_FILTERS = (role) => ({
 function passesFilters(row, filters, role) {
   const {
     po, style, status, priority, supplier, ddManager, ddStatus, reason,
-    responsibility, urgent, collection, orderType, flag, nextUpdate,
+    responsibility, urgent, archive, collection, orderType, flag, nextUpdate,
     lateFuture, poRank, delayResponse,
   } = filters;
 
@@ -49,12 +50,8 @@ function passesFilters(row, filters, role) {
   if (supplier && row.supplier !== supplier) return false;
   if (ddManager && row.dd_manager_name !== ddManager) return false;
   if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
-  if (orderType) {
-    const raw = row.type || '';
-    const mapped = raw === 'REP' ? 'Regular' : raw === 'ACC' ? 'ACC' : raw === 'CL' ? 'CL'
-      : (row.po_number.endsWith('-CL') ? 'CL' : row.po_number.endsWith('-AC') ? 'ACC' : 'Regular');
-    if (mapped !== orderType) return false;
-  }
+  // po_type contains the raw DB value from po_types.type (e.g. "Regular", "ACC", "CL")
+  if (orderType && row.po_type !== orderType) return false;
   if (flag) {
     if (flag === 'URGENT' && row.flags !== 'URGENT') return false;
     if (flag === 'REVIEW' && row.flags !== 'REVIEW') return false;
@@ -84,9 +81,13 @@ function passesFilters(row, filters, role) {
     if (priority === 'Drop' && row.priority !== 'Drop') return false;
   }
 
+  // Archive toggle: POs that never entered the HOLD workflow (no delay request logged)
+  if (archive) {
+    return !row.current_status;
+  }
+
   if (status === 'HOLD') { if (row.current_status !== 'HOLD') return false; }
   else if (status === 'HANDLED') { if (!['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(row.current_status)) return false; }
-  else if (status === 'ARCHIVE') { if (row.effective_dd_status !== 'Goods Received') return false; }
   else if (status === 'ALL') { /* show all */ }
   else if (['APPROVED', 'REJECTED', 'ACKNOWLEDGED', 'AUTOMATICALLY'].includes(status) && row.current_status !== status) return false;
 
@@ -182,10 +183,17 @@ export default function FollowUp() {
   function handleKpiFilterClick(filterKey) {
     if (activeKpiFilter === filterKey) {
       setActiveKpiFilter(null);
-      setFilters(DEFAULT_FILTERS(activeRole));
+      // For dd_team_employee, restore the ddManager filter to the logged-in user
+      const base = DEFAULT_FILTERS(activeRole);
+      if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = user.full_name;
+      setFilters(base);
       return;
     }
     setActiveKpiFilter(filterKey);
+    // For employee KPIs, always scope to logged-in user
+    const empScope = activeRole === 'dd_team_employee' && user?.full_name
+      ? { ddManager: user.full_name }
+      : {};
     const overrides = {
       new_pending:        { status: 'HOLD' },
       total_pending:      { status: 'HOLD' },
@@ -199,7 +207,7 @@ export default function FollowUp() {
       emp_rejected:       { status: 'REJECTED' },
       emp_received_upd:   { status: 'ALL' },
     };
-    setFilters(f => ({ ...DEFAULT_FILTERS(activeRole), ...(overrides[filterKey] || {}) }));
+    setFilters({ ...DEFAULT_FILTERS(activeRole), ...empScope, ...(overrides[filterKey] || {}) });
   }
 
   function handleSelectRow(poNumber) {
@@ -241,17 +249,19 @@ export default function FollowUp() {
     () => rows.filter(r => passesFilters(r, filters, activeRole)),
     [rows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections } = useMemo(() => {
-    const sup = new Set(), mgr = new Set(), col = new Set();
+  const { suppliers, ddManagers, collections, orderTypes } = useMemo(() => {
+    const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
       if (r.collection) col.add(r.collection);
+      if (r.po_type) types.add(r.po_type);
     }
     return {
       suppliers: [...sup].sort(),
       ddManagers: [...mgr].sort(),
       collections: [...col].sort(),
+      orderTypes: [...types].sort(),
     };
   }, [rows]);
 
@@ -400,10 +410,16 @@ export default function FollowUp() {
           role={activeRole}
           filters={filters}
           onChange={setFilters}
-          onReset={() => { setFilters(DEFAULT_FILTERS(activeRole)); setActiveKpiFilter(null); }}
+          onReset={() => {
+            const base = DEFAULT_FILTERS(activeRole);
+            if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = user.full_name;
+            setFilters(base);
+            setActiveKpiFilter(null);
+          }}
           suppliers={suppliers}
           ddManagers={ddManagers}
           collections={collections}
+          orderTypes={orderTypes}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}
         />
@@ -419,7 +435,7 @@ export default function FollowUp() {
           selectedRows={selectedRows}
           onSelectRow={handleSelectRow}
           onSelectAll={handleSelectAll}
-          onPoDetails={po => setDetailsPo(po)}
+          onPoDetails={activeRole !== 'dd_team_employee' ? po => setDetailsPo(po) : undefined}
           onDecide={(po, decision) => setDecisionState({ po, decision })}
           onLogDelay={po => setLogDelayPo(po)}
           onGeneralUpdate={po => setGeneralUpdatePo(po)}
