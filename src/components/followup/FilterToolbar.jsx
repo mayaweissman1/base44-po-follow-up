@@ -73,7 +73,7 @@ const CHIP_FORMATTERS = {
   priority:       v => ({ URGENT: 'URGENT', Deadline: 'Deadline at risk', Normal: 'Normal', MISSING_SIZES: 'Missing sizes', Drop: 'Drop' }[v] || v),
   supplier:       v => `Supplier: ${v}`,
   ddManager:      v => `Mgr: ${v}`,
-  ddStatus:       v => `DD Status: ${v}`,
+  ddStatus:       v => `Production Stage: ${v}`,
   reason:         v => v,
   responsibility: v => ({ OTHER: 'Resp: Other', EDIKTED: 'Resp: Edikted', SUPPLIER: 'Resp: Supplier' }[v] || v),
   urgent:         _ => 'Urgent only',
@@ -171,7 +171,7 @@ export default function FilterToolbar({
             <option value="ACKNOWLEDGED">Acknowledged</option>
           </select>
         </FilterField>
-        <FilterField label="DD Status">
+        <FilterField label="Production Stage">
           <select className={selectCls} value={filters.ddStatus} onChange={e => set('ddStatus', e.target.value)}>
             <option value="">All</option>
             {DD_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -239,7 +239,7 @@ export default function FilterToolbar({
             <FilterField label="Supplier">
               <SearchableSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} />
             </FilterField>
-            <FilterField label="DD Status">
+            <FilterField label="Production Stage">
               <select className={selectCls} value={filters.ddStatus} onChange={e => set('ddStatus', e.target.value)}>
                 <option value="">All</option>
                 {DD_STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}

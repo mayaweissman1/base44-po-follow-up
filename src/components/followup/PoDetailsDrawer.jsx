@@ -63,7 +63,6 @@ export default function PoDetailsDrawer({ po, onClose }) {
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto">
           <HeroBlock po={po} />
-          <ReadinessBlock po={po} />
           <ProgressBlock
             ordered={totalOrdered}
             received={totalReceived}
@@ -76,6 +75,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
           <DelayBlock po={po} />
           <MetaBlock po={po} destStr={destStr} orderType={orderType} />
           <TimelineBlock log={po.dd_comment_log} />
+          <ReadinessBlock po={po} />
         </div>
       </div>
     </div>

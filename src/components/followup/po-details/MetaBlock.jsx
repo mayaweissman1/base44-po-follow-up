@@ -1,48 +1,34 @@
-import React, { useState } from 'react';
-import { User, Truck, MapPin, Package, Calendar, Tag, Bell, Hash, Layers, Send, Inbox, ChevronDown, MessageCircle } from 'lucide-react';
+import React from 'react';
+import { User, Truck, MapPin, Package, Calendar, Tag, Bell, Hash, Layers, Send, Inbox, MessageCircle } from 'lucide-react';
 import { fmtDate } from '@/lib/followUpConstants';
 import PmTagsPills from '../PmTagsPills';
 
 /**
- * Details block — focused, scannable.
+ * Details block — single consolidated section.
  *
- * Primary content (always visible):
  *   • Delivery Status note from supplier (quote, top)
- *   • People & Routing (DD Manager, Supplier, Destinations)
- *   • Order (Collection, Order Type, Order Date, Next Update)
- *   • PM Tags
- *
- * Secondary content (collapsed under "More"):
- *   • Set With, PO Rank, Drop, Goods Received
+ *   • One unified detail list (people, routing, order, extras)
+ *   • PM Tags row at the bottom
  */
 export default function MetaBlock({ po, destStr, orderType }) {
-  const [showMore, setShowMore] = useState(false);
-
   const hasPmTags = !!po.pm_tags_label;
   const deliveryStatus = po.delivery_date_status;
 
-  const peopleRouting = [
+  const details = [
     po.dd_manager_name && { icon: User, label: 'DD Manager', value: po.dd_manager_name, variant: 'pink' },
     po.supplier && { icon: Truck, label: 'Supplier', value: po.supplier, variant: 'teal' },
     destStr && { icon: MapPin, label: 'Destinations', value: destStr },
-  ].filter(Boolean);
-
-  const order = [
     po.collection && { icon: Package, label: 'Collection', value: po.collection, mono: true },
     orderType && { icon: Tag, label: 'Order Type', value: orderType, variant: 'gray' },
     po.order_date && { icon: Calendar, label: 'Order Date', value: fmtDate(po.order_date), mono: true },
     po.effective_next_update && { icon: Bell, label: 'Next Update', value: fmtDate(po.effective_next_update), mono: true },
-  ].filter(Boolean);
-
-  const more = [
     po.set_with && { icon: Layers, label: 'Set With', value: po.set_with, mono: true },
     po.po_rank != null && { icon: Hash, label: 'PO Rank', value: String(po.po_rank), mono: true },
     po.drop && { icon: Send, label: 'Drop', value: fmtDate(po.drop), mono: true },
     po.goods_received && { icon: Inbox, label: 'Goods Received', value: fmtDate(po.goods_received), mono: true },
   ].filter(Boolean);
 
-  const hasContent = !!deliveryStatus || peopleRouting.length || order.length || more.length || hasPmTags;
-  if (!hasContent) return null;
+  if (!deliveryStatus && details.length === 0 && !hasPmTags) return null;
 
   return (
     <div className="px-5 py-4 border-b border-[#E5E5E5]">
@@ -58,10 +44,11 @@ export default function MetaBlock({ po, destStr, orderType }) {
         </div>
       )}
 
-      <div className="space-y-3">
-        {peopleRouting.length > 0 && <DetailGroup rows={peopleRouting} />}
-        {order.length > 0 && <DetailGroup rows={order} />}
-      </div>
+      {details.length > 0 && (
+        <div className="bg-[#FAFAFA] rounded-[8px] border border-[#F0F0F0] divide-y divide-[#F0F0F0]">
+          {details.map((r, i) => <DetailRow key={i} {...r} />)}
+        </div>
+      )}
 
       {hasPmTags && (
         <div className="mt-3 pt-3 border-t border-[#F0F0F0]">
@@ -74,33 +61,6 @@ export default function MetaBlock({ po, destStr, orderType }) {
           </div>
         </div>
       )}
-
-      {more.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-[#F0F0F0]">
-          <button
-            onClick={() => setShowMore(s => !s)}
-            className="w-full flex items-center justify-between text-[10px] font-bold text-[#525252] uppercase tracking-[.08em] hover:text-[#E31B7F] transition-colors"
-          >
-            <span>More info ({more.length})</span>
-            <ChevronDown size={12} className={`transition-transform ${showMore ? 'rotate-180' : ''}`} />
-          </button>
-          {showMore && (
-            <div className="mt-2">
-              <DetailGroup rows={more} />
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function DetailGroup({ rows }) {
-  return (
-    <div className="bg-[#FAFAFA] rounded-[8px] border border-[#F0F0F0] divide-y divide-[#F0F0F0]">
-      {rows.map((r, i) => (
-        <DetailRow key={i} {...r} />
-      ))}
     </div>
   );
 }
