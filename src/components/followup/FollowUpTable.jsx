@@ -253,7 +253,7 @@ function ColumnPicker({ visibleCols, onChange }) {
         {hiddenCount > 0 ? `Columns (${hiddenCount} hidden)` : 'Columns'}
       </button>
       {open && (
-        <div className="absolute right-0 bottom-full mb-1 bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_4px_16px_rgba(0,0,0,.12)] z-50 w-56 overflow-hidden">
+        <div className="absolute left-0 bottom-full mb-1 bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_4px_16px_rgba(0,0,0,.12)] z-50 w-56 overflow-hidden">
           <div className="max-h-[420px] overflow-y-auto py-1">
             <div className="px-3 py-1.5 text-[9px] font-bold text-[#A3A3A3] uppercase tracking-wider">Standard</div>
             {standardCols.map(col => (
