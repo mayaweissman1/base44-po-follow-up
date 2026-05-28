@@ -50,8 +50,10 @@ function passesFilters(row, filters, role) {
   if (ddManager && row.dd_manager_name !== ddManager) return false;
   if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
   if (orderType) {
-    const t = row.po_number.endsWith('-CL') ? 'CL' : row.po_number.endsWith('-AC') ? 'ACC' : 'Regular';
-    if (t !== orderType) return false;
+    const raw = row.type || '';
+    const mapped = raw === 'REP' ? 'Regular' : raw === 'ACC' ? 'ACC' : raw === 'CL' ? 'CL'
+      : (row.po_number.endsWith('-CL') ? 'CL' : row.po_number.endsWith('-AC') ? 'ACC' : 'Regular');
+    if (mapped !== orderType) return false;
   }
   if (flag) {
     if (flag === 'URGENT' && row.flags !== 'URGENT') return false;
@@ -218,19 +220,10 @@ export default function FollowUp() {
     });
   }
 
-  async function handleBulkDecision(decision) {
+  function handleBulkDecision(decision) {
     const selectedPOs = filteredRows.filter(r => selectedRows.has(r.po_number));
     if (!selectedPOs.length) return;
-    if (!window.confirm(`Mark ${selectedPOs.length} PO${selectedPOs.length > 1 ? 's' : ''} as ${decision}?`)) return;
-    for (const po of selectedPOs) {
-      await base44.functions.invoke('saveFollowUpAction', {
-        action_type: 'DECISION',
-        po_number: po.po_number,
-        payload: { decision, last_ddd_update_id: po.last_ddd_update_id },
-      });
-    }
-    setSelectedRows(new Set());
-    loadData();
+    setDecisionState({ po: null, decision, posBulk: selectedPOs });
   }
 
   function onActionSaved() {
@@ -274,9 +267,9 @@ export default function FollowUp() {
       return !log.some(e => e.date?.slice(0, 10) === today);
     }).length;
 
-    // DD Employee KPIs — scoped to currently visible rows (already filtered to their own POs)
+    // DD Employee KPIs — scoped to the logged-in user's POs (not the filter state)
     const scopedRows = activeRole === 'dd_team_employee'
-      ? rows.filter(r => !filters.ddManager || r.dd_manager_name === filters.ddManager)
+      ? rows.filter(r => !user?.full_name || r.dd_manager_name === user.full_name)
       : rows;
 
     const empPending      = scopedRows.filter(r => r.current_status === 'HOLD').length;
@@ -467,6 +460,7 @@ export default function FollowUp() {
       {decisionState && (
         <DecisionModal
           po={decisionState.po}
+          posBulk={decisionState.posBulk}
           decision={decisionState.decision}
           onClose={() => setDecisionState(null)}
           onSaved={onActionSaved}

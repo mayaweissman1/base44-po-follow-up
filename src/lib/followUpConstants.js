@@ -79,6 +79,18 @@ export const STATUS_COMMENT_TEMPLATES = {
   'PPS Send To Approval - Post Prod':['pps will arrive to the office on [date]'],
 };
 
+export const DELAY_RESPONSE_OPTIONS = [
+  { key: 'SEND_VIA_EMAIL',  label: 'Please send via email' },
+  { key: 'PUSH_XS_EARLIER', label: 'Push to send XS size earlier' },
+  { key: 'PUSH_S_EARLIER',  label: 'Push to send S size earlier' },
+  { key: 'PUSH_DD_UK',      label: 'Push to advance the DD for the UK qty' },
+  { key: 'PUSH_DD_US',      label: 'Push to advance the DD for the US qty' },
+  { key: 'SHORTEN_DD',      label: 'Push to shorten the DD' },
+  { key: 'PARTIAL_QTY',     label: 'Push to send partial qty in advance' },
+  { key: 'SEND_ON_DATE',    label: 'Push to send on [date]' },
+  { key: 'OTHER',           label: 'Other…' },
+];
+
 export const DD_COMMENT_OPTIONS = [
   'On track', 'Awaiting supplier response', 'Sample sent', 'Sample approved',
   'Bulk fabric received', 'Production started', 'Quality check in progress',

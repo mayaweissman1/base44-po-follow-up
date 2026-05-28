@@ -24,7 +24,7 @@ export default function BulkActionBar({ count, role, onApproveAll, onAcknowledge
           </>
         )}
 
-        {role === 'dd_team_manager' && (
+        {(role === 'dd_team_manager' || role === 'dd_team_employee') && (
           <>
             <button onClick={onBulkLogDelay} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors">
               Report delay
