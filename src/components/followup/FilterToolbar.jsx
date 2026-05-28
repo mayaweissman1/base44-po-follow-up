@@ -69,6 +69,7 @@ const toggleCls = (active) => `h-8 px-3 rounded-[6px] text-xs font-semibold bord
 const CHIP_FORMATTERS = {
   po:             v => `PO: ${v}`,
   style:          v => `Style: ${v}`,
+  status:         v => ({ HOLD: 'DDD: Pending', HANDLED: 'DDD: Handled', APPROVED: 'DDD: Approved', REJECTED: 'DDD: Rejected', ACKNOWLEDGED: 'DDD: Acknowledged', AUTOMATICALLY: 'DDD: Auto' }[v] || `DDD: ${v}`),
   priority:       v => ({ URGENT: 'URGENT', Deadline: 'Deadline at risk', Normal: 'Normal', MISSING_SIZES: 'Missing sizes', Drop: 'Drop' }[v] || v),
   supplier:       v => `Supplier: ${v}`,
   ddManager:      v => `Mgr: ${v}`,
@@ -158,6 +159,15 @@ export default function FilterToolbar({
             <option value="URGENT">URGENT</option>
             <option value="REVIEW">REVIEW</option>
             <option value="NONE">No flag</option>
+          </select>
+        </FilterField>
+        <FilterField label="DDD Status">
+          <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
+            <option value="ALL">All</option>
+            <option value="HOLD">Pending</option>
+            <option value="APPROVED">Approved</option>
+            <option value="REJECTED">Rejected</option>
+            <option value="ACKNOWLEDGED">Acknowledged</option>
           </select>
         </FilterField>
         <FilterField label="DD Status">
