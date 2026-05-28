@@ -1,5 +1,5 @@
 import React from 'react';
-import { CheckCircle2, XCircle, Clock, Calendar, Beaker } from 'lucide-react';
+import { CheckCircle2, XCircle, Clock, Calendar } from 'lucide-react';
 import { fmtDate } from '@/lib/followUpConstants';
 
 /**
@@ -11,12 +11,11 @@ import { fmtDate } from '@/lib/followUpConstants';
  *   • DD Date (the supplier's committed delivery date)
  */
 export default function ReadinessBlock({ po }) {
-  const hasFabric = po.bulk_fabric_approval != null;
   const hasPps = po.pps_receipt_date !== undefined;
   const hasDss = po.days_same_status != null;
   const hasDdDate = !!po.delivery_date;
 
-  if (!hasFabric && !hasPps && !hasDss && !hasDdDate) return null;
+  if (!hasPps && !hasDss && !hasDdDate) return null;
 
   const dssAlert = (po.days_same_status ?? 0) >= 7;
 
@@ -26,14 +25,6 @@ export default function ReadinessBlock({ po }) {
         Production Readiness
       </div>
       <div className="grid grid-cols-2 gap-2">
-        {hasFabric && (
-          <ReadinessCell
-            icon={Beaker}
-            label="Bulk Fabric"
-            value={po.bulk_fabric_approval ? 'Approved' : 'Pending'}
-            tone={po.bulk_fabric_approval ? 'success' : 'warning'}
-          />
-        )}
         {hasPps && (
           <ReadinessCell
             icon={po.pps_receipt_date ? CheckCircle2 : XCircle}
