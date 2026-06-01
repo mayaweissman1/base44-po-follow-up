@@ -13,7 +13,7 @@ import InternalNoteModal from '@/components/followup/InternalNoteModal';
 import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
 import BulkActionBar from '@/components/followup/BulkActionBar';
-import OperationalKpis from '@/components/followup/OperationalKpis';
+import OperationalKpisStrip from '@/components/followup/OperationalKpisStrip';
 import InsightsStrip from '@/components/followup/InsightsStrip';
 
 const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
@@ -447,13 +447,14 @@ export default function FollowUp() {
         <KpiCards
           role={activeRole}
           kpis={displayKpis}
+          rows={rows}
           activeFilter={activeKpiFilter}
           onFilterClick={handleKpiFilterClick}
         />
 
         {/* Zone 2 — Operational KPIs (main_office only) */}
         {activeRole === 'main_office' && (
-          <OperationalKpis
+          <OperationalKpisStrip
             rows={rows}
             activeKey={activeOpKpi}
             onApplyFilters={handleOpKpiClick}

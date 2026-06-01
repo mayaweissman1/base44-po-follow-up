@@ -1,4 +1,5 @@
 import React from 'react';
+import HoldsResponsibilityCard from './HoldsResponsibilityCard';
 
 function KpiCard({ label, value, meta, colorClass, alwaysRed, onClick, active }) {
   return (
@@ -19,7 +20,7 @@ function KpiCard({ label, value, meta, colorClass, alwaysRed, onClick, active })
   );
 }
 
-export default function KpiCards({ role, kpis, activeFilter, onFilterClick }) {
+export default function KpiCards({ role, kpis, rows, activeFilter, onFilterClick }) {
   if (role === 'main_office') {
     const cards = [
       { key: 'new_pending',        label: 'New pending (today)', value: kpis.new_pending ?? 0,                                           meta: 'HOLDs created today',       colorClass: '',              filterKey: 'new_pending' },
@@ -30,10 +31,11 @@ export default function KpiCards({ role, kpis, activeFilter, onFilterClick }) {
       { key: 'not_updated',        label: 'Not Updated',         value: kpis.not_updated ?? 0,                                           meta: 'Due today — not touched',   colorClass: 'text-red-600',  filterKey: 'not_updated', alwaysRed: true },
     ];
     return (
-      <div style={{ gridTemplateColumns: `repeat(${cards.length}, minmax(0, 1fr))` }} className="grid gap-3 mb-4">
+      <div style={{ gridTemplateColumns: `repeat(${cards.length + 1}, minmax(0, 1fr))` }} className="grid gap-3 mb-4">
         {cards.map(c => (
           <KpiCard key={c.key} label={c.label} value={c.value} meta={c.meta} colorClass={c.colorClass} alwaysRed={c.alwaysRed} active={activeFilter === c.filterKey} onClick={() => onFilterClick(c.filterKey)} />
         ))}
+        <HoldsResponsibilityCard rows={rows || []} />
       </div>
     );
   }
