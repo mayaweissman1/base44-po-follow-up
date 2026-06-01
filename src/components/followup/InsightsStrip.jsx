@@ -56,20 +56,14 @@ export default function InsightsStrip({ rows }) {
   const suppliersAboveThr = useMemo(() => supplierStats.filter(s => s.total >= 5 && s.latePct >= LATE_THRESHOLD_PCT).length, [supplierStats]);
 
   // HOLD responsibility breakdown — only for actual pending HOLDs
-  const { respCounts, holdsTotal, topReason } = useMemo(() => {
+  const { respCounts, holdsTotal } = useMemo(() => {
     const holds = rows.filter(r => r.current_status === 'HOLD');
     const counts = { OTHER: 0, EDIKTED: 0, SUPPLIER: 0 };
     holds.forEach(r => {
       const resp = REASON_TO_RESPONSIBILITY[r.ddd_reason] || 'OTHER';
       counts[resp]++;
     });
-    const reasonCounts = {};
-    rows.forEach(r => {
-      if (!r.ddd_reason) return;
-      reasonCounts[r.ddd_reason] = (reasonCounts[r.ddd_reason] || 0) + 1;
-    });
-    const top = Object.entries(reasonCounts).sort((a, b) => b[1] - a[1])[0] || ['—', 0];
-    return { respCounts: counts, holdsTotal: holds.length, topReason: top };
+    return { respCounts: counts, holdsTotal: holds.length };
   }, [rows]);
 
   const topLateMgr      = useMemo(() => [...managerStats].sort((a, b) => b.late - a.late)[0] || null, [managerStats]);
@@ -95,8 +89,8 @@ export default function InsightsStrip({ rows }) {
 
       {open && (
         <>
-          {/* HOLDs by responsibility + Top delay reason */}
-          <div className="border-t border-[#E5E5E5] grid gap-3 px-3 py-3" style={{ gridTemplateColumns: 'minmax(0,2fr) minmax(0,1fr)' }}>
+          {/* HOLDs by responsibility */}
+          <div className="border-t border-[#E5E5E5] px-3 py-3">
             <div className="bg-[#FAFAFA] border border-[#F0F0F0] rounded-[8px] px-4 py-3">
               <div className="text-[10px] font-bold text-[#525252] uppercase tracking-[.08em] mb-2.5">HOLDs by responsibility</div>
               {holdsTotal === 0 ? (
@@ -115,11 +109,6 @@ export default function InsightsStrip({ rows }) {
                   </div>
                 </>
               )}
-            </div>
-            <div className="bg-[#FAFAFA] border border-[#F0F0F0] rounded-[8px] px-4 py-3">
-              <div className="text-[10px] font-bold text-[#525252] uppercase tracking-[.08em] mb-2">Top delay reason</div>
-              <div className="text-[13px] font-semibold text-[#0A0A0A] leading-snug mb-0.5 truncate">{topReason[0]}</div>
-              <div className="font-mono text-[11px] font-semibold text-[#E31B7F]">{topReason[1]} {topReason[1] === 1 ? 'PO' : 'POs'}</div>
             </div>
           </div>
 
