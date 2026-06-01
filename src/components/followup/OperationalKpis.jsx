@@ -8,24 +8,19 @@ const TABS = [
 
 const STORAGE_KEY = 'followup.opKpis.activeTab';
 
-function OpKpiCard({ label, value, meta, soon, active, onClick, accent }) {
+function OpKpiCard({ label, value, meta, active, onClick, accent }) {
   return (
     <div
-      onClick={soon ? undefined : onClick}
+      onClick={onClick}
       className={[
         'relative bg-white border min-w-0 flex flex-col px-4 pt-4 pb-4 rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] transition-all duration-[200ms]',
-        soon ? 'opacity-60 cursor-default' : 'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)]',
+        'cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)]',
         active ? 'border-[#E31B7F] bg-[#FFF0F7]' : 'border-[#E5E5E5] hover:border-[#FFE5F2]',
       ].join(' ')}
     >
-      <div className="flex items-center justify-between gap-2">
-        <div className="text-[10px] font-bold text-[#525252] uppercase tracking-[.06em] truncate">{label}</div>
-        {soon && (
-          <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-[#F5F3FF] text-[#8B5CF6] border border-[#E9D5FF] flex-shrink-0">Soon</span>
-        )}
-      </div>
+      <div className="text-[10px] font-bold text-[#525252] uppercase tracking-[.06em] truncate">{label}</div>
       <div className={['font-mono font-bold leading-none text-2xl mt-1.5', accent || 'text-[#0A0A0A]'].join(' ')}>
-        {soon ? '—' : value}
+        {value}
       </div>
       <div className="text-[11px] text-[#A3A3A3] mt-1">{meta}</div>
     </div>
@@ -136,7 +131,6 @@ export default function OperationalKpis({ rows, activeKey, onApplyFilters }) {
             value={c.value}
             meta={c.meta}
             accent={c.accent}
-            soon={c.soon}
             active={activeKey === c.key}
             onClick={() => onApplyFilters(c.key, c.filters)}
           />
