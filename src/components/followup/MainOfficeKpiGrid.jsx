@@ -1,5 +1,4 @@
-import React, { useMemo, useRef } from 'react';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useMemo } from 'react';
 
 /* ───────── helpers ───────── */
 
@@ -41,6 +40,34 @@ function KpiCard({ kpi, active, onClick }) {
   );
 }
 
+/* ───────── compact card (for "All KPIs" row) ───────── */
+
+function CompactKpiCard({ kpi, active, onClick }) {
+  const { label, value, accent, alwaysRed } = kpi;
+  const colorClass =
+    accent === 'red' ? 'text-red-600'
+    : accent === 'amber' ? 'text-amber-600'
+    : accent === 'green' ? 'text-green-600'
+    : 'text-[#0A0A0A]';
+
+  return (
+    <button
+      onClick={onClick}
+      title={label}
+      className={[
+        'relative bg-white border text-left min-w-0 w-full h-[60px]',
+        'flex flex-col justify-between px-2.5 py-2 rounded-[8px] shadow-[0_1px_3px_rgba(0,0,0,.04)]',
+        'hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)] transition-all duration-[200ms]',
+        active ? 'border-[#E31B7F] bg-[#FFF0F7]' : 'border-[#E5E5E5] hover:border-[#FFE5F2]',
+        alwaysRed && !active ? 'border-red-200 bg-red-50 hover:border-red-400' : '',
+      ].join(' ')}
+    >
+      <div className="text-[9.5px] font-bold text-[#525252] uppercase tracking-[.04em] leading-tight line-clamp-2">{label}</div>
+      <div className={['font-mono font-bold leading-none text-[17px]', colorClass].join(' ')}>{value}</div>
+    </button>
+  );
+}
+
 /* ───────── main component ───────── */
 
 export default function MainOfficeKpiGrid({
@@ -51,8 +78,6 @@ export default function MainOfficeKpiGrid({
   activeOpKpi,
   onOpKpiClick,
 }) {
-  const scrollerRef = useRef(null);
-
   // Build all KPI definitions in one unified list. Each has:
   //   id, label, value, meta, accent, urgencyWeight (for prioritization),
   //   onClick → calls the appropriate handler with the right key.
@@ -125,59 +150,25 @@ export default function MainOfficeKpiGrid({
     return false;
   }
 
-  function renderCard(kpi) {
-    return <KpiCard key={kpi.id} kpi={kpi} active={isActive(kpi)} onClick={() => handleClick(kpi)} />;
-  }
-
-  function scrollBy(dir) {
-    const el = scrollerRef.current;
-    if (!el) return;
-    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
-  }
-
   return (
     <div className="mb-4 space-y-2.5">
       {/* Top row — 4 urgent */}
       <div>
         <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-1.5 px-0.5">🔥 Top priorities</div>
         <div className="grid grid-cols-4 gap-2.5">
-          {topKpis.map(renderCard)}
+          {topKpis.map(kpi => (
+            <KpiCard key={kpi.id} kpi={kpi} active={isActive(kpi)} onClick={() => handleClick(kpi)} />
+          ))}
         </div>
       </div>
 
-      {/* Bottom row — 4 visible + scroller */}
+      {/* Bottom — all remaining KPIs in a compact non-scrolling grid */}
       <div>
         <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em] mb-1.5 px-0.5">All KPIs</div>
-        <div className="relative">
-          <div
-            ref={scrollerRef}
-            className="overflow-x-auto scroll-smooth"
-            style={{ scrollbarWidth: 'thin' }}
-          >
-            <div
-              className="grid grid-flow-col auto-cols-[calc((100%-30px)/4)] gap-2.5 pb-1"
-            >
-              {restKpis.map(renderCard)}
-            </div>
-          </div>
-          {restKpis.length > 4 && (
-            <>
-              <button
-                onClick={() => scrollBy(-1)}
-                className="absolute left-0 top-1/2 -translate-y-1/2 -ml-3 w-7 h-7 rounded-full bg-white border border-[#E5E5E5] shadow-[0_2px_8px_rgba(0,0,0,.08)] flex items-center justify-center text-[#525252] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors z-10"
-                aria-label="Scroll left"
-              >
-                <ChevronLeft size={14} />
-              </button>
-              <button
-                onClick={() => scrollBy(1)}
-                className="absolute right-0 top-1/2 -translate-y-1/2 -mr-3 w-7 h-7 rounded-full bg-white border border-[#E5E5E5] shadow-[0_2px_8px_rgba(0,0,0,.08)] flex items-center justify-center text-[#525252] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors z-10"
-                aria-label="Scroll right"
-              >
-                <ChevronRight size={14} />
-              </button>
-            </>
-          )}
+        <div className="grid grid-cols-6 gap-2">
+          {restKpis.map(kpi => (
+            <CompactKpiCard key={kpi.id} kpi={kpi} active={isActive(kpi)} onClick={() => handleClick(kpi)} />
+          ))}
         </div>
       </div>
     </div>
