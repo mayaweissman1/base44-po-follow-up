@@ -1,6 +1,5 @@
 import React, { useMemo, useRef } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
 
 /* ───────── helpers ───────── */
 
@@ -42,65 +41,6 @@ function KpiCard({ kpi, active, onClick }) {
   );
 }
 
-/* ───────── responsibility mini-card (special) ───────── */
-
-function ResponsibilityCard({ rows, active, onClick }) {
-  const { respCounts, holdsTotal } = useMemo(() => {
-    const holds = rows.filter(r => r.current_status === 'HOLD');
-    const counts = { OTHER: 0, EDIKTED: 0, SUPPLIER: 0 };
-    holds.forEach(r => {
-      const resp = REASON_TO_RESPONSIBILITY[r.ddd_reason] || 'OTHER';
-      counts[resp]++;
-    });
-    return { respCounts: counts, holdsTotal: holds.length };
-  }, [rows]);
-
-  return (
-    <button
-      onClick={onClick}
-      className={[
-        'relative bg-white border text-left min-w-0 w-full h-[88px]',
-        'flex flex-col justify-between px-3.5 py-3 rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)]',
-        'hover:-translate-y-0.5 hover:shadow-[0_4px_16px_rgba(227,27,127,.08)] transition-all duration-[200ms]',
-        active ? 'border-[#E31B7F] bg-[#FFF0F7]' : 'border-[#E5E5E5] hover:border-[#FFE5F2]',
-      ].join(' ')}
-    >
-      <div className="text-[10px] font-bold text-[#525252] uppercase tracking-[.06em] truncate leading-tight">HOLDs by responsibility</div>
-      {holdsTotal === 0 ? (
-        <>
-          <div className="font-mono font-bold leading-none text-2xl text-[#A3A3A3]">0</div>
-          <div className="text-[10.5px] text-[#A3A3A3]">No active HOLDs</div>
-        </>
-      ) : (
-        <>
-          <div className="flex h-1.5 rounded-full overflow-hidden bg-[#E5E5E5]">
-            <span style={{ width: `${(respCounts.OTHER / holdsTotal) * 100}%`, background: '#F59E0B' }} />
-            <span style={{ width: `${(respCounts.EDIKTED / holdsTotal) * 100}%`, background: '#8B5CF6' }} />
-            <span style={{ width: `${(respCounts.SUPPLIER / holdsTotal) * 100}%`, background: '#EF4444' }} />
-          </div>
-          <div className="flex items-center justify-between gap-1 text-[10px]">
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-amber-400 flex-shrink-0" />
-              <span className="font-mono font-bold text-[#0A0A0A]">{respCounts.OTHER}</span>
-              <span className="text-[#A3A3A3] truncate">Ot.</span>
-            </div>
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-purple-500 flex-shrink-0" />
-              <span className="font-mono font-bold text-[#0A0A0A]">{respCounts.EDIKTED}</span>
-              <span className="text-[#A3A3A3] truncate">Ed.</span>
-            </div>
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-red-500 flex-shrink-0" />
-              <span className="font-mono font-bold text-[#0A0A0A]">{respCounts.SUPPLIER}</span>
-              <span className="text-[#A3A3A3] truncate">Sup.</span>
-            </div>
-          </div>
-        </>
-      )}
-    </button>
-  );
-}
-
 /* ───────── main component ───────── */
 
 export default function MainOfficeKpiGrid({
@@ -131,9 +71,6 @@ export default function MainOfficeKpiGrid({
       { id: 'rejected_today',     kind: 'kpi', label: 'Rejected today',      value: kpis.rejected_today ?? 0,                                    meta: 'Rejected · today',        accent: 'red',   filterKey: 'rejected_today',     urgencyWeight: 7 },
       { id: 'not_updated',        kind: 'kpi', label: 'Not Updated',         value: kpis.not_updated ?? 0,                                       meta: 'Due today — not touched', accent: 'red',   filterKey: 'not_updated',        urgencyWeight: 9, alwaysRed: true },
 
-      // ── HOLDs responsibility (special card) ──
-      { id: 'responsibility',     kind: 'responsibility', label: 'HOLDs by responsibility', value: rows.filter(r => r.current_status === 'HOLD').length, urgencyWeight: 0 },
-
       // ── Operational KPIs ──
       { id: 'col_current',        kind: 'op', label: 'Current collection',   value: currentCol.length,                                                                                                        meta: 'POs in current month',     accent: '',      filters: { collection: 'CURRENT' },                              urgencyWeight: 3 },
       { id: 'col_will_miss',      kind: 'op', label: 'Will miss collection', value: currentCol.filter(r => r.final_dd && new Date(r.final_dd) > cutoff).length,                                               meta: 'Risk EOM cutoff',          accent: 'red',   filters: { collection: 'CURRENT_AT_RISK' },                       urgencyWeight: 9 },
@@ -153,7 +90,7 @@ export default function MainOfficeKpiGrid({
   const accentRank = a => (a === 'red' ? 2 : a === 'amber' ? 1 : 0);
 
   const { topKpis, restKpis } = useMemo(() => {
-    const sortable = allKpis.filter(k => k.kind !== 'responsibility' && (Number(k.value) || 0) > 0);
+    const sortable = allKpis.filter(k => (Number(k.value) || 0) > 0);
     sortable.sort((a, b) => {
       if (b.urgencyWeight !== a.urgencyWeight) return b.urgencyWeight - a.urgencyWeight;
       if (accentRank(b.accent) !== accentRank(a.accent)) return accentRank(b.accent) - accentRank(a.accent);
@@ -175,9 +112,7 @@ export default function MainOfficeKpiGrid({
   }, [allKpis]);
 
   function handleClick(kpi) {
-    if (kpi.kind === 'kpi' || kpi.kind === 'responsibility') {
-      // responsibility card has no inherent filter; treat as no-op
-      if (kpi.kind === 'responsibility') return;
+    if (kpi.kind === 'kpi') {
       onKpiFilterClick(kpi.filterKey);
     } else if (kpi.kind === 'op') {
       onOpKpiClick(kpi.id, kpi.filters);
@@ -191,9 +126,6 @@ export default function MainOfficeKpiGrid({
   }
 
   function renderCard(kpi) {
-    if (kpi.kind === 'responsibility') {
-      return <ResponsibilityCard key={kpi.id} rows={rows} active={false} onClick={() => {}} />;
-    }
     return <KpiCard key={kpi.id} kpi={kpi} active={isActive(kpi)} onClick={() => handleClick(kpi)} />;
   }
 
