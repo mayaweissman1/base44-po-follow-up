@@ -14,6 +14,7 @@ import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
 import BulkActionBar from '@/components/followup/BulkActionBar';
 import OperationalKpisStrip from '@/components/followup/OperationalKpisStrip';
+import MainOfficeKpiGrid from '@/components/followup/MainOfficeKpiGrid';
 import InsightsStrip from '@/components/followup/InsightsStrip';
 
 const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
@@ -444,20 +445,22 @@ export default function FollowUp() {
         </div>
 
         {/* KPI Cards */}
-        <KpiCards
-          role={activeRole}
-          kpis={displayKpis}
-          rows={rows}
-          activeFilter={activeKpiFilter}
-          onFilterClick={handleKpiFilterClick}
-        />
-
-        {/* Zone 2 — Operational KPIs (main_office only) */}
-        {activeRole === 'main_office' && (
-          <OperationalKpisStrip
+        {activeRole === 'main_office' ? (
+          <MainOfficeKpiGrid
             rows={rows}
-            activeKey={activeOpKpi}
-            onApplyFilters={handleOpKpiClick}
+            kpis={displayKpis}
+            activeKpiFilter={activeKpiFilter}
+            onKpiFilterClick={handleKpiFilterClick}
+            activeOpKpi={activeOpKpi}
+            onOpKpiClick={handleOpKpiClick}
+          />
+        ) : (
+          <KpiCards
+            role={activeRole}
+            kpis={displayKpis}
+            rows={rows}
+            activeFilter={activeKpiFilter}
+            onFilterClick={handleKpiFilterClick}
           />
         )}
 
