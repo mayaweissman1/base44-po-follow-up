@@ -70,12 +70,8 @@ export default function OperationalKpis({ rows, activeKey, onApplyFilters }) {
       // Collection
       currentColOpen:   currentCol.length,
       willMissCol:      currentCol.filter(r => r.final_dd && new Date(r.final_dd) > cutoff).length,
-      lateNewOrders:    rows.filter(r => r.po_type === 'O' && r.late_future === 'LATE').length,
+      lateNewOrders:    rows.filter(r => r.po_type === 'New' && r.late_future === 'LATE').length,
       notStartedModels: rows.filter(r => !r.effective_dd_status || /^pending|^not started|^cutting prep/i.test(r.effective_dd_status)).length,
-
-      // Urgent
-      urgentNotUpdated: rows.filter(r => r.urgent && notUpdatedToday(r)).length,
-      notUpdatedAll:    rows.filter(notUpdatedToday).length,
 
       // Performance
       emptyStatus:      rows.filter(r => !r.effective_dd_status).length,
@@ -89,17 +85,15 @@ export default function OperationalKpis({ rows, activeKey, onApplyFilters }) {
     collection: [
       { key: 'col_current',       label: 'Open · Current collection',  value: counts.currentColOpen,   meta: 'Open POs in this month\'s collection', accent: '',              filters: { collection: 'CURRENT' } },
       { key: 'col_will_miss',     label: 'Will miss current collection', value: counts.willMissCol,    meta: 'Final DD within 5 days of month end',  accent: 'text-red-500',  filters: { collection: 'CURRENT_AT_RISK' } },
-      { key: 'col_late_new',      label: 'Late "O" (new) orders',      value: counts.lateNewOrders,    meta: 'New orders past Final DD',             accent: 'text-red-500',  filters: { orderType: 'O', lateFuture: 'LATE' } },
-      { key: 'col_not_started',   label: 'Models not started production', value: counts.notStartedModels, meta: 'Stage empty or pre-production',     accent: 'text-amber-500', filters: { ddStatus: 'NOT_STARTED' } },
+      { key: 'col_late_new',      label: 'Late new orders',            value: counts.lateNewOrders,    meta: 'PO type "New" past Final DD',          accent: 'text-red-500',  filters: { orderType: 'New', lateFuture: 'LATE' } },
+      { key: 'col_not_started',   label: 'Production not started',     value: counts.notStartedModels, meta: 'Stage empty or pre-production',        accent: 'text-amber-500', filters: { ddStatus: 'NOT_STARTED' } },
     ],
     urgent: [
-      { key: 'urg_not_updated',   label: 'Urgent · Not updated today', value: counts.urgentNotUpdated, meta: 'Urgent POs missing today\'s update',   accent: 'text-red-600',  filters: { urgent: true, nextUpdate: new Date().toISOString().slice(0,10) } },
       { key: 'urg_late_bs',       label: 'Late best sellers',          value: 0,                       meta: 'Open >1000 · Published last 45d · Late', accent: 'text-red-500',  soon: true },
       { key: 'urg_bs_not_started',label: 'Best sellers · Not started', value: 0,                       meta: 'Best sellers without production stage',accent: 'text-amber-500', soon: true },
       { key: 'urg_high_bno',      label: 'High BNO · Low OTW',         value: 0,                       meta: 'US>3000 / UK>1000, OTW<50% of balance',accent: 'text-red-500',  soon: true },
     ],
     performance: [
-      { key: 'perf_not_updated',  label: 'Not updated today',          value: counts.notUpdatedAll,    meta: 'Due today — no comment logged',        accent: 'text-red-600',  filters: { nextUpdate: new Date().toISOString().slice(0,10) } },
       { key: 'perf_empty_status', label: 'Empty status',               value: counts.emptyStatus,      meta: 'No production stage set',              accent: 'text-amber-500', filters: { ddStatus: 'EMPTY' } },
       { key: 'perf_same_5d',      label: 'Same status > 5 days',       value: counts.sameStatus5d,     meta: 'Stage unchanged for over 5 days',      accent: 'text-amber-500', filters: { staleStatus: true } },
       { key: 'perf_late_7plus',   label: 'Open > 7 days late',         value: counts.late7Plus,        meta: 'Days late past due date',              accent: 'text-red-500',  filters: { late7Plus: true } },
