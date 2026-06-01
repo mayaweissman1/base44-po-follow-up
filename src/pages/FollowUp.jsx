@@ -4,7 +4,6 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
 import KpiCards from '@/components/followup/KpiCards';
-import StatsRow from '@/components/followup/StatsRow';
 import FilterToolbar from '@/components/followup/FilterToolbar';
 import FollowUpTable from '@/components/followup/FollowUpTable';
 import LogDelayModal from '@/components/followup/LogDelayModal';
@@ -464,11 +463,6 @@ export default function FollowUp() {
         {/* Zone 3 — Insights strip (main_office only) */}
         {activeRole === 'main_office' && rows.length > 0 && (
           <InsightsStrip rows={rows} />
-        )}
-
-        {/* Stats Row — main_office only */}
-        {activeRole === 'main_office' && rows.length > 0 && (
-          <StatsRow rows={rows} />
         )}
 
         {/* Filter Toolbar */}
