@@ -67,7 +67,27 @@ Deno.serve(async (req) => {
     // Matches current project semantics: po_status IN (3,5), done=false.
     // Date window: ±60d / +180d, OR PO has base44 activity.
     const poSql = `
-      WITH manual_rw_per_po AS (
+      WITH bs_flag AS (
+        SELECT scv.style_color, scv.published
+        FROM style_colors_view scv
+        WHERE scv.published >= (CURRENT_DATE - INTERVAL '45 days')
+      ),
+      sub_bno_per_po AS (
+        SELECT
+          spv.po_number,
+          MAX(CASE WHEN sd.destination = 'Edikted'
+                   AND (COALESCE(spv.balance,0) - COALESCE(spv.qty_otw,0)) > 3000
+                   AND COALESCE(spv.qty_otw,0) < 0.5 * COALESCE(spv.balance,0)
+                   THEN 1 ELSE 0 END) AS us_flag,
+          MAX(CASE WHEN sd.destination = 'EdiktedUK'
+                   AND (COALESCE(spv.balance,0) - COALESCE(spv.qty_otw,0)) > 1000
+                   AND COALESCE(spv.qty_otw,0) < 0.5 * COALESCE(spv.balance,0)
+                   THEN 1 ELSE 0 END) AS uk_flag
+        FROM sub_po_view spv
+        LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+        GROUP BY spv.po_number
+      ),
+      manual_rw_per_po AS (
         SELECT spv.po_number, SUM(COALESCE(bl.rw, 0)) AS manual_rw
         FROM batch_lines bl
         JOIN batch_details bd ON bd.id = bl.batch_id
@@ -130,7 +150,11 @@ Deno.serve(async (req) => {
         sds.bulk_fabric_approval,
         pps.receipt_date AS pps_receipt_date,
         pmt.tag AS pm_tag_label,
-        scv.product_image AS product_image
+        scv.product_image AS product_image,
+        scv.published AS sc_published,
+        CASE WHEN bs.style_color IS NOT NULL AND pov.ordered_qty > 1000 THEN true ELSE false END AS is_best_seller,
+        COALESCE(sbn.us_flag, 0) AS bno_us_flag,
+        COALESCE(sbn.uk_flag, 0) AS bno_uk_flag
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -147,6 +171,8 @@ Deno.serve(async (req) => {
       LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
+      LEFT JOIN bs_flag bs ON bs.style_color = pov.style_color
+      LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
@@ -305,6 +331,8 @@ Deno.serve(async (req) => {
         shipped_percent: (Number(po.ordered_qty) > 0)
           ? Math.round((Number(po.qty_sent_out) || 0) / Number(po.ordered_qty) * 100)
           : null,
+        is_best_seller: !!po.is_best_seller,
+        bno_high_low_otw: (Number(po.bno_us_flag) || 0) + (Number(po.bno_uk_flag) || 0) > 0,
       };
     });
 

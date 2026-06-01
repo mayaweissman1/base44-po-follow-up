@@ -73,6 +73,11 @@ export default function OperationalKpis({ rows, activeKey, onApplyFilters }) {
       lateNewOrders:    rows.filter(r => r.po_type === 'New' && r.late_future === 'LATE').length,
       notStartedModels: rows.filter(r => !r.effective_dd_status || /^pending|^not started|^cutting prep/i.test(r.effective_dd_status)).length,
 
+      // Urgent
+      lateBestSellers:    rows.filter(r => r.is_best_seller && r.late_future === 'LATE').length,
+      bsNotStarted:       rows.filter(r => r.is_best_seller && (!r.effective_dd_status || /^pending|^not started|^cutting prep/i.test(r.effective_dd_status))).length,
+      highBnoLowOtw:      rows.filter(r => r.bno_high_low_otw).length,
+
       // Performance
       emptyStatus:      rows.filter(r => !r.effective_dd_status).length,
       sameStatus5d:     rows.filter(r => (r.days_same_status ?? 0) > 5).length,
@@ -89,9 +94,9 @@ export default function OperationalKpis({ rows, activeKey, onApplyFilters }) {
       { key: 'col_not_started',   label: 'Production not started',     value: counts.notStartedModels, meta: 'Stage empty or pre-production',        accent: 'text-amber-500', filters: { ddStatus: 'NOT_STARTED' } },
     ],
     urgent: [
-      { key: 'urg_late_bs',       label: 'Late best sellers',          value: 0,                       meta: 'Open >1000 · Published last 45d · Late', accent: 'text-red-500',  soon: true },
-      { key: 'urg_bs_not_started',label: 'Best sellers · Not started', value: 0,                       meta: 'Best sellers without production stage',accent: 'text-amber-500', soon: true },
-      { key: 'urg_high_bno',      label: 'High BNO · Low OTW',         value: 0,                       meta: 'US>3000 / UK>1000, OTW<50% of balance',accent: 'text-red-500',  soon: true },
+      { key: 'urg_late_bs',       label: 'Late best sellers',          value: counts.lateBestSellers, meta: 'Ordered >1000 · Published last 45d',   accent: 'text-red-500',   filters: { bestSeller: true, lateFuture: 'LATE' } },
+      { key: 'urg_bs_not_started',label: 'Best sellers · Not started', value: counts.bsNotStarted,    meta: 'Best sellers without production stage',accent: 'text-amber-500', filters: { bestSeller: true, ddStatus: 'NOT_STARTED' } },
+      { key: 'urg_high_bno',      label: 'High BNO · Low OTW',         value: counts.highBnoLowOtw,   meta: 'US>3000 / UK>1000 · OTW<50% balance',  accent: 'text-red-500',   filters: { highBno: true } },
     ],
     performance: [
       { key: 'perf_empty_status', label: 'Empty status',               value: counts.emptyStatus,      meta: 'No production stage set',              accent: 'text-amber-500', filters: { ddStatus: 'EMPTY' } },

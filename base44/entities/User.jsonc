@@ -30,5 +30,9 @@
       "type": "string",
       "description": "Only for dd_team_employee - matching edikted_employees.id from the Edikted DB"
     }
-  }
+  },
+  "required": [
+    "role",
+    "dd_employee_id"
+  ]
 }

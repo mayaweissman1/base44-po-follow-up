@@ -42,6 +42,8 @@ const DEFAULT_FILTERS = (role) => ({
   // Virtual filters driven by OperationalKpis
   staleStatus: false,
   late7Plus: false,
+  bestSeller: false,
+  highBno: false,
 });
 
 function isCurrentCollectionRow(r) {
@@ -78,6 +80,8 @@ function passesFilters(row, filters, role) {
   if (orderType && row.po_type !== orderType) return false;
   if (filters.staleStatus && !((row.days_same_status ?? 0) > 5)) return false;
   if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
+  if (filters.bestSeller && !row.is_best_seller) return false;
+  if (filters.highBno && !row.bno_high_low_otw) return false;
   if (flag) {
     if (flag === 'URGENT' && row.flags !== 'URGENT') return false;
     if (flag === 'REVIEW' && row.flags !== 'REVIEW') return false;
