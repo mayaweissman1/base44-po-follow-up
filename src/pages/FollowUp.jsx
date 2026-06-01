@@ -14,6 +14,8 @@ import InternalNoteModal from '@/components/followup/InternalNoteModal';
 import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
 import BulkActionBar from '@/components/followup/BulkActionBar';
+import OperationalKpis from '@/components/followup/OperationalKpis';
+import InsightsStrip from '@/components/followup/InsightsStrip';
 
 const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
@@ -37,7 +39,20 @@ const DEFAULT_FILTERS = (role) => ({
   poRank: '',
   delayResponse: '',
   deliveryStatus: '',
+  // Virtual filters driven by OperationalKpis
+  staleStatus: false,
+  late7Plus: false,
 });
+
+function isCurrentCollectionRow(r) {
+  if (!r.collection) return false;
+  const now = new Date();
+  const monthShort = now.toLocaleString('en-US', { month: 'short' }).toLowerCase();
+  const monthNum = String(now.getMonth() + 1).padStart(2, '0');
+  const year2 = String(now.getFullYear()).slice(2);
+  const c = r.collection.toLowerCase();
+  return c.includes(monthShort) || c.includes(`${monthNum}/${year2}`) || c.includes(`${monthNum}-${year2}`);
+}
 
 function passesFilters(row, filters, role) {
   const {
@@ -50,16 +65,31 @@ function passesFilters(row, filters, role) {
   if (style && !row.style_color?.toLowerCase().includes(style.toLowerCase())) return false;
   if (supplier && row.supplier !== supplier) return false;
   if (ddManager && row.dd_manager_name !== ddManager) return false;
-  if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
-  // po_type contains the raw DB value from po_types.type (e.g. "Regular", "ACC", "CL")
+  if (collection === 'CURRENT') {
+    if (!isCurrentCollectionRow(row)) return false;
+  } else if (collection === 'CURRENT_AT_RISK') {
+    if (!isCurrentCollectionRow(row)) return false;
+    if (!row.final_dd) return false;
+    const now = new Date();
+    const eom = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    const cutoff = new Date(eom); cutoff.setDate(eom.getDate() - 5);
+    if (new Date(row.final_dd) <= cutoff) return false;
+  } else if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
   if (orderType && row.po_type !== orderType) return false;
+  if (filters.staleStatus && !((row.days_same_status ?? 0) > 5)) return false;
+  if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
   if (flag) {
     if (flag === 'URGENT' && row.flags !== 'URGENT') return false;
     if (flag === 'REVIEW' && row.flags !== 'REVIEW') return false;
     if (flag === 'NONE' && row.flags) return false;
   }
   if (urgent && !row.urgent) return false;
-  if (ddStatus && row.effective_dd_status !== ddStatus) return false;
+  if (ddStatus === 'EMPTY') {
+    if (row.effective_dd_status) return false;
+  } else if (ddStatus === 'NOT_STARTED') {
+    const s = (row.effective_dd_status || '').toLowerCase();
+    if (s && s !== 'pending' && s !== 'not started' && s !== 'cutting prep') return false;
+  } else if (ddStatus && row.effective_dd_status !== ddStatus) return false;
   if (reason) {
     const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
     if (!rs.includes(reason)) return false;
@@ -142,6 +172,7 @@ export default function FollowUp() {
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState(DEFAULT_FILTERS(activeRole));
   const [activeKpiFilter, setActiveKpiFilter] = useState(null);
+  const [activeOpKpi, setActiveOpKpi] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
 
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -186,12 +217,12 @@ export default function FollowUp() {
   function handleKpiFilterClick(filterKey) {
     if (activeKpiFilter === filterKey) {
       setActiveKpiFilter(null);
-      // For dd_team_employee, restore the ddManager filter to the logged-in user
       const base = DEFAULT_FILTERS(activeRole);
       if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = user.full_name;
       setFilters(base);
       return;
     }
+    setActiveOpKpi(null);
     setActiveKpiFilter(filterKey);
     // For employee KPIs, always scope to logged-in user
     const empScope = activeRole === 'dd_team_employee' && user?.full_name
@@ -212,6 +243,17 @@ export default function FollowUp() {
       mgr_received_upd:   { status: 'ALL', deliveryStatus: 'Receiving Notice' },
     };
     setFilters({ ...DEFAULT_FILTERS(activeRole), ...empScope, ...(overrides[filterKey] || {}) });
+  }
+
+  function handleOpKpiClick(key, presetFilters) {
+    if (activeOpKpi === key) {
+      setActiveOpKpi(null);
+      setFilters(DEFAULT_FILTERS(activeRole));
+      return;
+    }
+    setActiveKpiFilter(null);
+    setActiveOpKpi(key);
+    setFilters({ ...DEFAULT_FILTERS(activeRole), ...(presetFilters || {}) });
   }
 
   function handleSelectRow(poNumber) {
@@ -406,6 +448,20 @@ export default function FollowUp() {
           onFilterClick={handleKpiFilterClick}
         />
 
+        {/* Zone 2 — Operational KPIs (main_office only) */}
+        {activeRole === 'main_office' && (
+          <OperationalKpis
+            rows={rows}
+            activeKey={activeOpKpi}
+            onApplyFilters={handleOpKpiClick}
+          />
+        )}
+
+        {/* Zone 3 — Insights strip (main_office only) */}
+        {activeRole === 'main_office' && rows.length > 0 && (
+          <InsightsStrip rows={rows} />
+        )}
+
         {/* Stats Row — main_office only */}
         {activeRole === 'main_office' && rows.length > 0 && (
           <StatsRow rows={rows} />
@@ -421,6 +477,7 @@ export default function FollowUp() {
             if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = user.full_name;
             setFilters(base);
             setActiveKpiFilter(null);
+            setActiveOpKpi(null);
           }}
           suppliers={suppliers}
           ddManagers={ddManagers}
