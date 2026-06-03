@@ -449,8 +449,6 @@ export default function FollowUp() {
           <MainOfficeKpiGrid
             rows={rows}
             kpis={displayKpis}
-            activeKpiFilter={activeKpiFilter}
-            onKpiFilterClick={handleKpiFilterClick}
             activeOpKpi={activeOpKpi}
             onOpKpiClick={handleOpKpiClick}
           />
