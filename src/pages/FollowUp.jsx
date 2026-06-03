@@ -109,8 +109,8 @@ function passesFilters(row, filters, role) {
     if (flag === 'NONE' && row.flags) return false;
   }
   if (urgent && !row.urgent) return false;
-  if (ddStatus === 'EMPTY') {
-    if (row.effective_dd_status) return false;
+  if (ddStatus === 'EMPTY' || ddStatus === 'Empty status') {
+    if (row.effective_dd_status && row.effective_dd_status !== 'Empty status') return false;
   } else if (ddStatus === 'NOT_STARTED') {
     const s = row.effective_dd_status || 'Empty status';
     if (!NOT_STARTED_DD_STATUSES.includes(s)) return false;

@@ -100,7 +100,7 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr) {
   const notStarted = scoped.filter(isNotStarted).length;
   const lateBs = scoped.filter(r => r.is_best_seller && r.late_future === 'LATE').length;
   const highBno = scoped.filter(r => r.bno_high_low_otw).length;
-  const emptyStatus = scoped.filter(r => !r.effective_dd_status).length;
+  const emptyStatus = scoped.filter(r => !r.effective_dd_status || r.effective_dd_status === 'Empty status').length;
   const sameStatus5 = scoped.filter(r => (r.days_same_status ?? 0) > 5).length;
 
   // Build cards. Each has a filterKey so we can later wire to setFilters via parent.
