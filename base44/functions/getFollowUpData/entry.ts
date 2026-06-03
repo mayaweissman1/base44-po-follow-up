@@ -72,6 +72,11 @@ Deno.serve(async (req) => {
         FROM po_urgent_status pus
         WHERE pus.reason ILIKE '%Best Seller%'
       ),
+      urgency_reason_per_po AS (
+        SELECT po_number, reason AS urgency_reason
+        FROM po_urgent_status
+        WHERE reason IS NOT NULL AND reason <> ''
+      ),
       sub_bno_per_po AS (
         SELECT
           spv.po_number,
@@ -153,6 +158,7 @@ Deno.serve(async (req) => {
         scv.product_image AS product_image,
         scv.published AS sc_published,
         CASE WHEN bs.po_number IS NOT NULL THEN true ELSE false END AS is_best_seller,
+        urp.urgency_reason AS urgency_reason,
         COALESCE(sbn.us_flag, 0) AS bno_us_flag,
         COALESCE(sbn.uk_flag, 0) AS bno_uk_flag
       FROM po_view pov
@@ -172,6 +178,7 @@ Deno.serve(async (req) => {
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
       LEFT JOIN bs_flag bs ON bs.po_number = pov.po_number
+      LEFT JOIN urgency_reason_per_po urp ON urp.po_number = pov.po_number
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
@@ -251,8 +258,11 @@ Deno.serve(async (req) => {
       const received = Number(po.qty_received) || 0;
       const fullyReceived = ordered > 0 && received >= ordered;
 
+      // Priority label: prefer the explicit urgency reason (e.g. "Best Seller New")
+      // when present; otherwise fall back to URGENT/Deadline/Normal.
       let priority = 'Normal';
-      if (po.urgent) priority = 'URGENT';
+      if (po.urgency_reason) priority = po.urgency_reason;
+      else if (po.urgent) priority = 'URGENT';
       else if (daysLateCounting > 3) priority = 'Deadline';
 
       const lateFuture = fullyReceived
