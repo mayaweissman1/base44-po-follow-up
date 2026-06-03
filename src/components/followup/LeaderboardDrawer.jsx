@@ -3,7 +3,12 @@ import { X } from 'lucide-react';
 
 export default function LeaderboardDrawer({ title, stats, sort = 'late', onClose }) {
   const sorted = useMemo(() => {
-    const arr = [...stats];
+    // Match the InsightsStrip qualification: percentage-based sorts require ≥5 POs
+    // so a 1-PO supplier at 100% doesn't outrank a real top performer.
+    let arr = [...stats];
+    if (sort === 'late' || sort === 'ontime') {
+      arr = arr.filter(s => s.total >= 5);
+    }
     if (sort === 'late')     arr.sort((a, b) => b.latePct - a.latePct || b.late - a.late);
     if (sort === 'ontime')   arr.sort((a, b) => b.ontimePct - a.ontimePct || b.total - a.total);
     if (sort === 'workload') arr.sort((a, b) => b.total - a.total);
@@ -15,8 +20,13 @@ export default function LeaderboardDrawer({ title, stats, sort = 'late', onClose
     <div className="fixed inset-0 z-50 flex">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
       <div className="relative ml-auto h-full w-[440px] max-w-[calc(100vw-32px)] bg-white shadow-[-4px_0_24px_rgba(0,0,0,.12)] flex flex-col">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E5] flex-shrink-0">
-          <div className="text-[14px] font-bold text-[#0A0A0A]">{title}</div>
+        <div className="flex items-start justify-between px-5 py-4 border-b border-[#E5E5E5] flex-shrink-0">
+          <div>
+            <div className="text-[14px] font-bold text-[#0A0A0A]">{title}</div>
+            {(sort === 'late' || sort === 'ontime') && (
+              <div className="text-[10.5px] text-[#A3A3A3] mt-0.5">Showing entries with 5+ open POs</div>
+            )}
+          </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#F8F8F8] hover:text-[#0A0A0A] transition-colors">
             <X size={16} />
           </button>
