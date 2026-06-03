@@ -396,8 +396,8 @@ export default function FollowUpTable({
 
   const allVisibleSelected = rows.length > 0 && rows.every(r => selectedRows.has(r.po_number));
 
-  const thCls = "px-3.5 py-3 text-left text-[11px] font-bold text-[#525252] uppercase tracking-[.08em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5] sticky top-0 z-10";
-  const tdCls = "px-3.5 py-3 border-b border-[#E5E5E5] bg-white whitespace-nowrap text-[13px] align-middle";
+  const thCls = "px-2 py-1.5 text-left text-[10px] font-bold text-[#525252] uppercase tracking-[.06em] whitespace-nowrap bg-[#F8F8F8] border-b border-[#E5E5E5] sticky top-0 z-10";
+  const tdCls = "px-2 py-1.5 border-b border-[#E5E5E5] bg-white whitespace-nowrap text-[12px] align-middle";
 
   const thProps = { sortCol, sortDir, onSort: handleSort, onResizeStart: startResize, className: thCls };
 
