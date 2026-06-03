@@ -124,20 +124,21 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
 
   // Build cards. Each has a filterKey so we can later wire to setFilters via parent.
   // For now, clicking applies a preset that includes the order type + the metric-specific filter.
-  const baseFilter = { orderType };
+  // Multi-select filters use arrays now.
+  const baseFilter = { orderType: [orderType] };
 
   return [
     { id: 'pending',          label: 'Pending',                  value: pending,             meta: 'HOLD requests',                accent: '',      filters: { ...baseFilter, status: 'HOLD' } },
-    { id: 'late',             label: 'Late',                     value: late,                meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: 'LATE' } },
+    { id: 'late',             label: 'Late',                     value: late,                meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: ['LATE'] } },
     { id: 'not_updated',      label: 'Not Updated',              value: notUpdated,          meta: 'Due today — not touched',      accent: 'red',   filters: { ...baseFilter, nextUpdate: todayStr }, alwaysRed: true },
-    { id: 'current_col',      label: 'Current Collection',       value: currentColLate.length, meta: 'Late · this month',          accent: 'amber', filters: { ...baseFilter, collection: 'CURRENT', lateFuture: 'LATE' } },
-    { id: 'will_miss',        label: 'Will miss collection',     value: willMiss,            meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: 'CURRENT_AT_RISK', lateFuture: 'LATE' } },
-    { id: 'not_started',      label: 'Manufactured Not Started', value: notStarted,          meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: 'NOT_STARTED' } },
-    { id: 'empty_status',     label: 'Empty Status',             value: emptyStatus,         meta: 'Missing DD status',            accent: 'amber', filters: { ...baseFilter, ddStatus: 'EMPTY' } },
-    { id: 'fabric_pps_risk',  label: 'Fabric / PPS at Risk',     value: fabricPpsRisk,       meta: 'PPS / Fabric stages',          accent: 'red',   filters: { ...baseFilter, ddStatus: 'FABRIC_PPS_RISK' } },
-    { id: 'rework_repro',     label: 'Rework / Reproduction',    value: reworkRepro,         meta: 'Rework or Reproduction',       accent: 'red',   filters: { ...baseFilter, ddStatus: 'REWORK_REPRO' } },
-    { id: 'qc_over_3d',       label: 'QC > 3 days',              value: qcOver3d,            meta: 'QC office / factory stuck',    accent: 'amber', filters: { ...baseFilter, ddStatus: 'QC_OVER_3D' } },
-    { id: 'old_collection',   label: 'Old Collection',           value: oldCollection,       meta: 'Previous collections',         accent: 'amber', filters: { ...baseFilter, collection: 'PREVIOUS' } },
+    { id: 'current_col',      label: 'Current Collection',       value: currentColLate.length, meta: 'Late · this month',          accent: 'amber', filters: { ...baseFilter, collection: ['CURRENT'], lateFuture: ['LATE'] } },
+    { id: 'will_miss',        label: 'Will miss collection',     value: willMiss,            meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: ['CURRENT_AT_RISK'], lateFuture: ['LATE'] } },
+    { id: 'not_started',      label: 'Manufactured Not Started', value: notStarted,          meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: ['NOT_STARTED'] } },
+    { id: 'empty_status',     label: 'Empty Status',             value: emptyStatus,         meta: 'Missing DD status',            accent: 'amber', filters: { ...baseFilter, ddStatus: ['EMPTY'] } },
+    { id: 'fabric_pps_risk',  label: 'Fabric / PPS at Risk',     value: fabricPpsRisk,       meta: 'PPS / Fabric stages',          accent: 'red',   filters: { ...baseFilter, ddStatus: ['FABRIC_PPS_RISK'] } },
+    { id: 'rework_repro',     label: 'Rework / Reproduction',    value: reworkRepro,         meta: 'Rework or Reproduction',       accent: 'red',   filters: { ...baseFilter, ddStatus: ['REWORK_REPRO'] } },
+    { id: 'qc_over_3d',       label: 'QC > 3 days',              value: qcOver3d,            meta: 'QC office / factory stuck',    accent: 'amber', filters: { ...baseFilter, ddStatus: ['QC_OVER_3D'] } },
+    { id: 'old_collection',   label: 'Old Collection',           value: oldCollection,       meta: 'Previous collections',         accent: 'amber', filters: { ...baseFilter, collection: ['PREVIOUS'] } },
     { id: 'drop_risk',        label: 'Drop Risk (< 7d)',         value: dropRisk,            meta: 'Final DD close to drop',       accent: 'red',   filters: { ...baseFilter, dropRisk: true } },
   ];
 }

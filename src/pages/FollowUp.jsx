@@ -4,12 +4,10 @@ import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import {
   ROLE_DISPLAY,
-  REASON_TO_RESPONSIBILITY,
   NOT_STARTED_DD_STATUSES,
   FABRIC_PPS_RISK_STATUSES,
   REWORK_REPRO_STATUSES,
   QC_STATUSES,
-  US_SUPPLIERS,
   isUsSupplier,
   isPreviousCollection,
 } from '@/lib/followUpConstants';
@@ -29,28 +27,36 @@ import InsightsStrip from '@/components/followup/InsightsStrip';
 
 const ALL_ROLES = ['main_office', 'dd_team_manager', 'dd_team_employee'];
 
+// Filters are arrays where multi-select makes sense. Empty array = no filter.
+// Single-value filters: status (radio), supplierRegion, free-text inputs, toggles, date ranges.
 const DEFAULT_FILTERS = (role) => ({
   po: '',
   style: '',
   status: 'ALL',
-  priority: '',
-  supplier: '',
+  priority: [],
+  supplier: [],
   ddManager: '',
-  ddStatus: '',
-  reason: '',
-  responsibility: '',
+  ddStatus: [],
+  reason: [],
   urgent: false,
   archive: false,
-  collection: '',
-  orderType: '',
-  flag: '',
+  collection: [],
+  orderType: [],
   nextUpdate: '',
-  lateFuture: '',
-  poRank: '',
+  lateFuture: [],
+  poRank: [],
   delayResponse: '',
-  deliveryStatus: '',
+  deliveryStatus: [],
   supplierRegion: 'CHINA', // CHINA | US | ALL — default to China
-  // Virtual filters driven by OperationalKpis
+  // New
+  shippedOver80: false,
+  dropDateFrom: '',
+  dropDateTo: '',
+  finalDdFrom: '',
+  finalDdTo: '',
+  delayDaysMin: '',
+  delayDaysMax: '',
+  // Virtual filters driven by KPIs
   staleStatus: false,
   late7Plus: false,
   bestSeller: false,
@@ -75,99 +81,116 @@ function isCurrentCollectionRow(r) {
   );
 }
 
-function passesFilters(row, filters, role) {
-  const {
-    po, style, status, priority, supplier, ddManager, ddStatus, reason,
-    responsibility, urgent, archive, collection, orderType, flag, nextUpdate,
-    lateFuture, poRank, delayResponse, deliveryStatus,
-  } = filters;
+// Helper: is array filter active?
+const has = (arr) => Array.isArray(arr) && arr.length > 0;
 
-  if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
-  if (style && !row.style_color?.toLowerCase().includes(style.toLowerCase())) return false;
-  if (supplier && row.supplier !== supplier) return false;
-  if (ddManager && row.dd_manager_name !== ddManager) return false;
-  if (collection === 'CURRENT') {
-    if (!isCurrentCollectionRow(row)) return false;
-  } else if (collection === 'CURRENT_AT_RISK') {
+// Helper: does row match priority token?
+function matchPriority(row, p) {
+  if (p === 'URGENT') return row.priority === 'URGENT';
+  if (p === 'Deadline') return (row.priority || '').includes('Deadline');
+  if (p === 'Normal') return row.priority === 'Normal';
+  if (p === 'MISSING_SIZES') return row.priority === 'MISSING SIZES';
+  if (p === 'Drop') return row.priority === 'Drop';
+  return row.priority === p;
+}
+
+// Helper: does row match a collection token (CURRENT, CURRENT_AT_RISK, PREVIOUS, or literal)?
+function matchCollection(row, token) {
+  if (token === 'CURRENT') return isCurrentCollectionRow(row);
+  if (token === 'CURRENT_AT_RISK') {
     if (!isCurrentCollectionRow(row)) return false;
     if (!row.final_dd) return false;
     const now = new Date();
     const eom = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const cutoff = new Date(eom); cutoff.setDate(eom.getDate() - 5);
-    if (new Date(row.final_dd) <= cutoff) return false;
-  } else if (collection === 'PREVIOUS') {
-    if (!isPreviousCollection(row.collection)) return false;
-  } else if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
-  if (orderType) {
-    const t = (row.po_type || '').toLowerCase();
-    // KPI grid uses 'New'/'Rep' as tokens — match by substring so the table
-    // filters the same way the KPI cards do.
-    if (orderType === 'New' && !t.includes('new')) return false;
-    else if (orderType === 'Rep' && !t.includes('rep')) return false;
-    else if (orderType !== 'New' && orderType !== 'Rep' && row.po_type !== orderType) return false;
+    return new Date(row.final_dd) > cutoff;
   }
+  if (token === 'PREVIOUS') return isPreviousCollection(row.collection);
+  return row.collection?.toLowerCase().includes(token.toLowerCase());
+}
+
+// Helper: does row match a ddStatus token (EMPTY, NOT_STARTED, FABRIC_PPS_RISK, REWORK_REPRO, QC_OVER_3D, or literal)?
+function matchDdStatus(row, token) {
+  if (token === 'EMPTY' || token === 'Empty status') {
+    return !row.effective_dd_status || row.effective_dd_status === 'Empty status';
+  }
+  if (token === 'NOT_STARTED') {
+    return NOT_STARTED_DD_STATUSES.includes(row.effective_dd_status || 'Empty status');
+  }
+  if (token === 'FABRIC_PPS_RISK') return FABRIC_PPS_RISK_STATUSES.includes(row.effective_dd_status);
+  if (token === 'REWORK_REPRO')    return REWORK_REPRO_STATUSES.includes(row.effective_dd_status);
+  if (token === 'QC_OVER_3D')      return QC_STATUSES.includes(row.effective_dd_status) && (row.days_same_status ?? 0) > 3;
+  return row.effective_dd_status === token;
+}
+
+// Helper: does row match an order type token (New/Rep substring or literal)?
+function matchOrderType(row, token) {
+  const t = (row.po_type || '').toLowerCase();
+  if (token === 'New') return t.includes('new');
+  if (token === 'Rep') return t.includes('rep');
+  return row.po_type === token;
+}
+
+function passesFilters(row, filters, role) {
+  const {
+    po, style, status, priority, supplier, ddManager, ddStatus, reason,
+    urgent, archive, collection, orderType, nextUpdate,
+    lateFuture, poRank, delayResponse, deliveryStatus,
+    shippedOver80, dropDateFrom, dropDateTo, finalDdFrom, finalDdTo,
+    delayDaysMin, delayDaysMax,
+  } = filters;
+
+  if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
+  if (style && !row.style_color?.toLowerCase().includes(style.toLowerCase())) return false;
+  if (has(supplier) && !supplier.includes(row.supplier)) return false;
+  if (ddManager && row.dd_manager_name !== ddManager) return false;
+  if (has(collection) && !collection.some(c => matchCollection(row, c))) return false;
+  if (has(orderType) && !orderType.some(t => matchOrderType(row, t))) return false;
+
   // Supplier region (default CHINA)
   if (filters.supplierRegion && filters.supplierRegion !== 'ALL') {
     const isUs = isUsSupplier(row.supplier);
     if (filters.supplierRegion === 'US' && !isUs) return false;
     if (filters.supplierRegion === 'CHINA' && isUs) return false;
   }
+
   if (filters.staleStatus && !((row.days_same_status ?? 0) > 5)) return false;
   if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
   if (filters.bestSeller && !row.is_best_seller) return false;
   if (filters.highBno && !row.bno_high_low_otw) return false;
-  if (flag) {
-    if (flag === 'URGENT' && row.flags !== 'URGENT') return false;
-    if (flag === 'REVIEW' && row.flags !== 'REVIEW') return false;
-    if (flag === 'NONE' && row.flags) return false;
-  }
   if (urgent && !row.urgent) return false;
-  if (ddStatus === 'EMPTY' || ddStatus === 'Empty status') {
-    if (row.effective_dd_status && row.effective_dd_status !== 'Empty status') return false;
-  } else if (ddStatus === 'NOT_STARTED') {
-    const s = row.effective_dd_status || 'Empty status';
-    if (!NOT_STARTED_DD_STATUSES.includes(s)) return false;
-  } else if (ddStatus === 'FABRIC_PPS_RISK') {
-    if (!FABRIC_PPS_RISK_STATUSES.includes(row.effective_dd_status)) return false;
-  } else if (ddStatus === 'REWORK_REPRO') {
-    if (!REWORK_REPRO_STATUSES.includes(row.effective_dd_status)) return false;
-  } else if (ddStatus === 'QC_OVER_3D') {
-    if (!QC_STATUSES.includes(row.effective_dd_status)) return false;
-    if ((row.days_same_status ?? 0) <= 3) return false;
-  } else if (ddStatus && row.effective_dd_status !== ddStatus) return false;
+
+  if (has(ddStatus) && !ddStatus.some(s => matchDdStatus(row, s))) return false;
 
   if (filters.dropRisk) {
     if (!row.final_dd || !row.drop) return false;
     const diff = (new Date(row.drop) - new Date(row.final_dd)) / 86400000;
     if (!(diff >= 0 && diff < 7)) return false;
   }
-  if (reason) {
-    const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
-    if (!rs.includes(reason)) return false;
-  }
-  if (responsibility) {
-    const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
-    const matches = rs.some(r => REASON_TO_RESPONSIBILITY[r] === responsibility);
-    if (!matches) return false;
-  }
-  if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
-  if (lateFuture && row.late_future !== lateFuture) return false;
-  if (poRank && String(row.po_rank) !== poRank) return false;
-  if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
-  if (deliveryStatus && !row.delivery_date_status?.toLowerCase().startsWith(deliveryStatus.toLowerCase())) return false;
 
-  if (priority) {
-    if (priority === 'URGENT' && row.priority !== 'URGENT') return false;
-    if (priority === 'Deadline' && !(row.priority || '').includes('Deadline')) return false;
-    if (priority === 'Normal' && row.priority !== 'Normal') return false;
-    if (priority === 'MISSING_SIZES' && row.priority !== 'MISSING SIZES') return false;
-    if (priority === 'Drop' && row.priority !== 'Drop') return false;
+  if (has(reason)) {
+    const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
+    if (!reason.some(r => rs.includes(r))) return false;
   }
+
+  if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
+  if (has(lateFuture) && !lateFuture.includes(row.late_future)) return false;
+  if (has(poRank) && !poRank.includes(String(row.po_rank))) return false;
+  if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
+  if (has(deliveryStatus) && !deliveryStatus.some(s => row.delivery_date_status?.toLowerCase().startsWith(s.toLowerCase()))) return false;
+  if (has(priority) && !priority.some(p => matchPriority(row, p))) return false;
+
+  // NEW filters
+  if (shippedOver80 && !((row.shipped_percent ?? 0) > 80)) return false;
+  if (dropDateFrom && (!row.drop || row.drop.slice(0, 10) < dropDateFrom)) return false;
+  if (dropDateTo   && (!row.drop || row.drop.slice(0, 10) > dropDateTo))   return false;
+  if (finalDdFrom  && (!row.final_dd || row.final_dd.slice(0, 10) < finalDdFrom)) return false;
+  if (finalDdTo    && (!row.final_dd || row.final_dd.slice(0, 10) > finalDdTo))   return false;
+  if (delayDaysMin !== '' && delayDaysMin != null && (row.days_late_counting ?? 0) < Number(delayDaysMin)) return false;
+  if (delayDaysMax !== '' && delayDaysMax != null && (row.days_late_counting ?? 0) > Number(delayDaysMax)) return false;
 
   // Archive toggle: POs that never entered the HOLD workflow (no delay request logged)
-  if (archive) {
-    return !row.current_status;
-  }
+  if (archive) return !row.current_status;
 
   if (status === 'HOLD') { if (row.current_status !== 'HOLD') return false; }
   else if (status === 'HANDLED') { if (!['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(row.current_status)) return false; }
@@ -232,7 +255,7 @@ export default function FollowUp() {
     setActiveOpKpi(null);
     setActiveKpiFilter(null);
     // Auto-apply order type filter so the table reflects the active view
-    setFilters(prev => ({ ...DEFAULT_FILTERS(activeRole), orderType: mode }));
+    setFilters(prev => ({ ...DEFAULT_FILTERS(activeRole), orderType: [mode] }));
   }
 
   const [selectedRows, setSelectedRows] = useState(new Set());
@@ -270,7 +293,7 @@ export default function FollowUp() {
       base.ddManager = user.full_name;
     }
     if (activeRole === 'main_office') {
-      base.orderType = mainOfficeViewMode;
+      base.orderType = [mainOfficeViewMode];
     }
     setFilters(base);
     setActiveKpiFilter(null);
@@ -302,8 +325,8 @@ export default function FollowUp() {
       emp_pending:        { status: 'HOLD' },
       emp_acknowledged:   { status: 'ACK_APPROVED' },
       emp_rejected:       { status: 'REJECTED' },
-      emp_received_upd:   { status: 'ALL', deliveryStatus: 'Receiving Notice' },
-      mgr_received_upd:   { status: 'ALL', deliveryStatus: 'Receiving Notice' },
+      emp_received_upd:   { status: 'ALL', deliveryStatus: ['Receiving Notice'] },
+      mgr_received_upd:   { status: 'ALL', deliveryStatus: ['Receiving Notice'] },
     };
     setFilters({ ...DEFAULT_FILTERS(activeRole), ...empScope, ...(overrides[filterKey] || {}) });
   }
@@ -363,7 +386,8 @@ export default function FollowUp() {
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
-      if (r.collection) col.add(r.collection);
+      // Collections only from open New orders
+      if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
     }
     return {
