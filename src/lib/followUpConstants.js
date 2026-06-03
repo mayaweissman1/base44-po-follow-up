@@ -133,6 +133,60 @@ export const NOT_STARTED_DD_STATUSES = [
   'Ready For Production',
 ];
 
+// Statuses for "Fabric/PPS at Risk" KPI
+export const FABRIC_PPS_RISK_STATUSES = [
+  'Fabric Send To Approval - Post Prod',
+  'PPS Send To Approval - Pre Prod',
+  'PPS Send To Approval - Post Prod',
+  'Fabric At Risk',
+  'Fabric in Process',
+  'PPS At Risk',
+];
+
+// Statuses for "Rework / Reproduction" KPI
+export const REWORK_REPRO_STATUSES = ['Rework', 'Reproduction'];
+
+// Statuses for "QC in Office / Factory" KPI
+export const QC_STATUSES = ['QC in factory', 'QC in Office'];
+
+// Returns true if the collection name refers to a month earlier than the current calendar month.
+// Looks for YYYY-MM, MM-YYYY, MM/YY, MM-YY or month-short tokens in the collection string.
+export function isPreviousCollection(collection) {
+  if (!collection) return false;
+  const c = String(collection).toLowerCase();
+  const now = new Date();
+  const curYear = now.getFullYear();
+  const curMonth = now.getMonth() + 1; // 1-12
+
+  const monthMap = { jan:1, feb:2, mar:3, apr:4, may:5, jun:6, jul:7, aug:8, sep:9, oct:10, nov:11, dec:12 };
+
+  // Try YYYY-MM
+  let m = c.match(/(20\d{2})[-/](\d{1,2})/);
+  if (m) {
+    const y = parseInt(m[1], 10), mo = parseInt(m[2], 10);
+    return y < curYear || (y === curYear && mo < curMonth);
+  }
+  // Try MM-YYYY
+  m = c.match(/(\d{1,2})[-/](20\d{2})/);
+  if (m) {
+    const y = parseInt(m[2], 10), mo = parseInt(m[1], 10);
+    return y < curYear || (y === curYear && mo < curMonth);
+  }
+  // Try MM/YY or MM-YY
+  m = c.match(/(\d{1,2})[-/](\d{2})\b/);
+  if (m) {
+    const y = 2000 + parseInt(m[2], 10), mo = parseInt(m[1], 10);
+    return y < curYear || (y === curYear && mo < curMonth);
+  }
+  // Try month-short name (assume current year)
+  for (const [abbr, mo] of Object.entries(monthMap)) {
+    if (c.includes(abbr)) {
+      return mo < curMonth;
+    }
+  }
+  return false;
+}
+
 // US suppliers — all others are treated as China for the Supplier Region filter.
 export const US_SUPPLIERS = ['LUCENTING', 'LUCENTINC', 'KILAT'];
 

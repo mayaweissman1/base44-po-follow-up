@@ -1,5 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { NOT_STARTED_DD_STATUSES, isUsSupplier } from '@/lib/followUpConstants';
+import {
+  NOT_STARTED_DD_STATUSES,
+  FABRIC_PPS_RISK_STATUSES,
+  REWORK_REPRO_STATUSES,
+  QC_STATUSES,
+  isUsSupplier,
+  isPreviousCollection,
+} from '@/lib/followUpConstants';
 
 /* ───────── helpers ───────── */
 
@@ -94,8 +101,6 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
     return !log.some(e => e.date?.slice(0, 10) === todayStr);
   }).length;
 
-  const urgents = scoped.filter(r => r.urgent && r.late_future === 'LATE').length;
-
   // Current Collection = scoped + late + in this month's collection
   const currentColLate = scoped.filter(r => r.late_future === 'LATE' && isCurrentCollection(r));
 
@@ -103,27 +108,37 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
   const willMiss = currentColLate.filter(r => r.final_dd && new Date(r.final_dd) > cutoff).length;
 
   const notStarted = scoped.filter(isNotStarted).length;
-  const lateBs = scoped.filter(r => r.is_best_seller && r.late_future === 'LATE').length;
-  const highBno = scoped.filter(r => r.bno_high_low_otw).length;
   const emptyStatus = scoped.filter(r => !r.effective_dd_status || r.effective_dd_status === 'Empty status').length;
-  const sameStatus5 = scoped.filter(r => (r.days_same_status ?? 0) > 5).length;
+
+  // NEW KPIs
+  const fabricPpsRisk = scoped.filter(r => FABRIC_PPS_RISK_STATUSES.includes(r.effective_dd_status)).length;
+  const reworkRepro   = scoped.filter(r => REWORK_REPRO_STATUSES.includes(r.effective_dd_status)).length;
+  const qcOver3d      = scoped.filter(r => QC_STATUSES.includes(r.effective_dd_status) && (r.days_same_status ?? 0) > 3).length;
+  const oldCollection = scoped.filter(r => isPreviousCollection(r.collection)).length;
+  // Drop-risk: final_dd is less than 7 days before drop date
+  const dropRisk = scoped.filter(r => {
+    if (!r.final_dd || !r.drop) return false;
+    const diff = (new Date(r.drop) - new Date(r.final_dd)) / 86400000;
+    return diff >= 0 && diff < 7;
+  }).length;
 
   // Build cards. Each has a filterKey so we can later wire to setFilters via parent.
   // For now, clicking applies a preset that includes the order type + the metric-specific filter.
   const baseFilter = { orderType };
 
   return [
-    { id: 'pending',         label: 'Pending',                value: pending,             meta: 'HOLD requests',                accent: '',      filters: { ...baseFilter, status: 'HOLD' } },
-    { id: 'late',            label: 'Late',                   value: late,                meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: 'LATE' } },
-    { id: 'not_updated',     label: 'Not Updated',            value: notUpdated,          meta: 'Due today — not touched',      accent: 'red',   filters: { ...baseFilter, nextUpdate: todayStr }, alwaysRed: true },
-    { id: 'urgents',         label: 'Late Urgents',           value: urgents,             meta: 'Urgent · past due',            accent: 'red',   filters: { ...baseFilter, urgent: true, lateFuture: 'LATE' } },
-    { id: 'current_col',     label: 'Current Collection',     value: currentColLate.length, meta: 'Late · this month',          accent: 'amber', filters: { ...baseFilter, collection: 'CURRENT', lateFuture: 'LATE' } },
-    { id: 'will_miss',       label: 'Will miss collection',   value: willMiss,            meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: 'CURRENT_AT_RISK', lateFuture: 'LATE' } },
-    { id: 'not_started',     label: 'Manufactured Not Started', value: notStarted,        meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: 'NOT_STARTED' } },
-    { id: 'late_bs',         label: 'Late Best Sellers',      value: lateBs,              meta: 'BS already late',              accent: 'red',   filters: { ...baseFilter, bestSeller: true, lateFuture: 'LATE' } },
-    { id: 'high_bno',        label: 'High BNO · Low OTW',     value: highBno,             meta: 'Demand vs supply gap',         accent: 'red',   filters: { ...baseFilter, highBno: true } },
-    { id: 'empty_status',    label: 'Empty Status',           value: emptyStatus,         meta: 'Missing DD status',            accent: 'amber', filters: { ...baseFilter, ddStatus: 'EMPTY' } },
-    { id: 'same_status_5d',  label: 'Same Status > 5d',       value: sameStatus5,         meta: 'Stale production',             accent: 'amber', filters: { ...baseFilter, staleStatus: true } },
+    { id: 'pending',          label: 'Pending',                  value: pending,             meta: 'HOLD requests',                accent: '',      filters: { ...baseFilter, status: 'HOLD' } },
+    { id: 'late',             label: 'Late',                     value: late,                meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: 'LATE' } },
+    { id: 'not_updated',      label: 'Not Updated',              value: notUpdated,          meta: 'Due today — not touched',      accent: 'red',   filters: { ...baseFilter, nextUpdate: todayStr }, alwaysRed: true },
+    { id: 'current_col',      label: 'Current Collection',       value: currentColLate.length, meta: 'Late · this month',          accent: 'amber', filters: { ...baseFilter, collection: 'CURRENT', lateFuture: 'LATE' } },
+    { id: 'will_miss',        label: 'Will miss collection',     value: willMiss,            meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: 'CURRENT_AT_RISK', lateFuture: 'LATE' } },
+    { id: 'not_started',      label: 'Manufactured Not Started', value: notStarted,          meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: 'NOT_STARTED' } },
+    { id: 'empty_status',     label: 'Empty Status',             value: emptyStatus,         meta: 'Missing DD status',            accent: 'amber', filters: { ...baseFilter, ddStatus: 'EMPTY' } },
+    { id: 'fabric_pps_risk',  label: 'Fabric / PPS at Risk',     value: fabricPpsRisk,       meta: 'PPS / Fabric stages',          accent: 'red',   filters: { ...baseFilter, ddStatus: 'FABRIC_PPS_RISK' } },
+    { id: 'rework_repro',     label: 'Rework / Reproduction',    value: reworkRepro,         meta: 'Rework or Reproduction',       accent: 'red',   filters: { ...baseFilter, ddStatus: 'REWORK_REPRO' } },
+    { id: 'qc_over_3d',       label: 'QC > 3 days',              value: qcOver3d,            meta: 'QC office / factory stuck',    accent: 'amber', filters: { ...baseFilter, ddStatus: 'QC_OVER_3D' } },
+    { id: 'old_collection',   label: 'Old Collection',           value: oldCollection,       meta: 'Previous collections',         accent: 'amber', filters: { ...baseFilter, collection: 'PREVIOUS' } },
+    { id: 'drop_risk',        label: 'Drop Risk (< 7d)',         value: dropRisk,            meta: 'Final DD close to drop',       accent: 'red',   filters: { ...baseFilter, dropRisk: true } },
   ];
 }
 

@@ -2,7 +2,17 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, ChevronDown, Download, LogOut, User as UserIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY, NOT_STARTED_DD_STATUSES, US_SUPPLIERS, isUsSupplier } from '@/lib/followUpConstants';
+import {
+  ROLE_DISPLAY,
+  REASON_TO_RESPONSIBILITY,
+  NOT_STARTED_DD_STATUSES,
+  FABRIC_PPS_RISK_STATUSES,
+  REWORK_REPRO_STATUSES,
+  QC_STATUSES,
+  US_SUPPLIERS,
+  isUsSupplier,
+  isPreviousCollection,
+} from '@/lib/followUpConstants';
 import KpiCards from '@/components/followup/KpiCards';
 import FilterToolbar from '@/components/followup/FilterToolbar';
 import FollowUpTable from '@/components/followup/FollowUpTable';
@@ -45,6 +55,7 @@ const DEFAULT_FILTERS = (role) => ({
   late7Plus: false,
   bestSeller: false,
   highBno: false,
+  dropRisk: false,
 });
 
 function isCurrentCollectionRow(r) {
@@ -84,6 +95,8 @@ function passesFilters(row, filters, role) {
     const eom = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     const cutoff = new Date(eom); cutoff.setDate(eom.getDate() - 5);
     if (new Date(row.final_dd) <= cutoff) return false;
+  } else if (collection === 'PREVIOUS') {
+    if (!isPreviousCollection(row.collection)) return false;
   } else if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
   if (orderType) {
     const t = (row.po_type || '').toLowerCase();
@@ -114,7 +127,20 @@ function passesFilters(row, filters, role) {
   } else if (ddStatus === 'NOT_STARTED') {
     const s = row.effective_dd_status || 'Empty status';
     if (!NOT_STARTED_DD_STATUSES.includes(s)) return false;
+  } else if (ddStatus === 'FABRIC_PPS_RISK') {
+    if (!FABRIC_PPS_RISK_STATUSES.includes(row.effective_dd_status)) return false;
+  } else if (ddStatus === 'REWORK_REPRO') {
+    if (!REWORK_REPRO_STATUSES.includes(row.effective_dd_status)) return false;
+  } else if (ddStatus === 'QC_OVER_3D') {
+    if (!QC_STATUSES.includes(row.effective_dd_status)) return false;
+    if ((row.days_same_status ?? 0) <= 3) return false;
   } else if (ddStatus && row.effective_dd_status !== ddStatus) return false;
+
+  if (filters.dropRisk) {
+    if (!row.final_dd || !row.drop) return false;
+    const diff = (new Date(row.drop) - new Date(row.final_dd)) / 86400000;
+    if (!(diff >= 0 && diff < 7)) return false;
+  }
   if (reason) {
     const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
     if (!rs.includes(reason)) return false;
