@@ -87,7 +87,7 @@ export default function InsightsStrip({ rows }) {
                 accent="text-red-500"
                 label={`Top late: ${topLateSupplier.name}`}
                 valueLabel={`${topLateSupplier.latePct}% · ${topLateSupplier.total} POs`}
-                onClick={() => setDrawer({ title: 'Suppliers · Most late', scope: 'supplier', sort: 'late' })}
+                onClick={() => setDrawer({ title: 'Suppliers · Most late', scope: 'supplier', sort: 'latePct' })}
               />
             )}
             {topOntimeSupplier && (
@@ -113,7 +113,7 @@ export default function InsightsStrip({ rows }) {
                 accent="text-red-600"
                 label={`${suppliersAboveThr} suppliers above ${LATE_THRESHOLD_PCT}% late`}
                 valueLabel="See all"
-                onClick={() => setDrawer({ title: `Suppliers above ${LATE_THRESHOLD_PCT}% late`, scope: 'supplier', sort: 'late' })}
+                onClick={() => setDrawer({ title: `Suppliers above ${LATE_THRESHOLD_PCT}% late`, scope: 'supplier', sort: 'latePct' })}
               />
             )}
           </div>
@@ -127,7 +127,7 @@ export default function InsightsStrip({ rows }) {
                 accent="text-red-500"
                 label={`Top late: ${topLateMgr.name}`}
                 valueLabel={`${topLateMgr.late} late POs`}
-                onClick={() => setDrawer({ title: 'Managers · Most late', scope: 'manager', sort: 'late' })}
+                onClick={() => setDrawer({ title: 'Managers · Most late', scope: 'manager', sort: 'lateAbs' })}
               />
             )}
             {topOntimeMgr && (
