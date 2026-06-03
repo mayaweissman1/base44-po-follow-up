@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronDown, ChevronRight, AlertTriangle, TrendingUp, TrendingDown, Users } from 'lucide-react';
 import LeaderboardDrawer from './LeaderboardDrawer';
+import { isUsSupplier } from '@/lib/followUpConstants';
 
 const LATE_THRESHOLD_PCT = 30;
 
@@ -46,8 +47,9 @@ export default function InsightsStrip({ rows }) {
   const [open, setOpen] = useState(false);
   const [drawer, setDrawer] = useState(null); // { title, scope: 'supplier'|'manager', sort: 'late'|'ontime'|'workload'|'urgent' }
 
-  const supplierStats = useMemo(() => buildStats(rows, 'supplier'), [rows]);
-  const managerStats  = useMemo(() => buildStats(rows, 'dd_manager_name'), [rows]);
+  const nonUsRows = useMemo(() => rows.filter(r => !isUsSupplier(r.supplier)), [rows]);
+  const supplierStats = useMemo(() => buildStats(nonUsRows, 'supplier'), [nonUsRows]);
+  const managerStats  = useMemo(() => buildStats(nonUsRows, 'dd_manager_name'), [nonUsRows]);
 
   const topLateSupplier   = useMemo(() => [...supplierStats].filter(s => s.total >= 5).sort((a, b) => b.latePct - a.latePct || b.late - a.late)[0] || null, [supplierStats]);
   const topOntimeSupplier = useMemo(() => [...supplierStats].filter(s => s.total >= 5).sort((a, b) => b.ontimePct - a.ontimePct || b.total - a.total)[0] || null, [supplierStats]);
