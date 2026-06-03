@@ -49,13 +49,13 @@ export default function InsightsStrip({ rows }) {
   const supplierStats = useMemo(() => buildStats(rows, 'supplier'), [rows]);
   const managerStats  = useMemo(() => buildStats(rows, 'dd_manager_name'), [rows]);
 
-  const topLateSupplier   = useMemo(() => [...supplierStats].filter(s => s.total >= 5).sort((a, b) => b.latePct - a.latePct)[0] || null, [supplierStats]);
-  const topOntimeSupplier = useMemo(() => [...supplierStats].filter(s => s.total >= 5).sort((a, b) => b.ontimePct - a.ontimePct)[0] || null, [supplierStats]);
+  const topLateSupplier   = useMemo(() => [...supplierStats].filter(s => s.total >= 5).sort((a, b) => b.latePct - a.latePct || b.late - a.late)[0] || null, [supplierStats]);
+  const topOntimeSupplier = useMemo(() => [...supplierStats].filter(s => s.total >= 5).sort((a, b) => b.ontimePct - a.ontimePct || b.total - a.total)[0] || null, [supplierStats]);
   const topWorkloadSup    = useMemo(() => [...supplierStats].sort((a, b) => b.total - a.total)[0] || null, [supplierStats]);
   const suppliersAboveThr = useMemo(() => supplierStats.filter(s => s.total >= 5 && s.latePct >= LATE_THRESHOLD_PCT).length, [supplierStats]);
 
   const topLateMgr      = useMemo(() => [...managerStats].sort((a, b) => b.late - a.late)[0] || null, [managerStats]);
-  const topOntimeMgr    = useMemo(() => [...managerStats].filter(m => m.total >= 5).sort((a, b) => b.ontimePct - a.ontimePct)[0] || null, [managerStats]);
+  const topOntimeMgr    = useMemo(() => [...managerStats].filter(m => m.total >= 5).sort((a, b) => b.ontimePct - a.ontimePct || b.total - a.total)[0] || null, [managerStats]);
   const topUrgentMgr    = useMemo(() => [...managerStats].sort((a, b) => b.urgent - a.urgent)[0] || null, [managerStats]);
 
   return (
