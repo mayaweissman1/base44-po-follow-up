@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { NOT_STARTED_DD_STATUSES } from '@/lib/followUpConstants';
+import { NOT_STARTED_DD_STATUSES, isUsSupplier } from '@/lib/followUpConstants';
 
 /* ───────── helpers ───────── */
 
@@ -68,9 +68,14 @@ function matchesOrderType(row, mode) {
   return false;
 }
 
-function buildKpisForOrderType(rows, kpis, orderType, todayStr) {
-  // Scope all KPIs to this order type
-  const scoped = rows.filter(r => matchesOrderType(r, orderType));
+function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) {
+  // Scope all KPIs to this order type AND the active supplier region (matches table default).
+  const scoped = rows.filter(r => {
+    if (!matchesOrderType(r, orderType)) return false;
+    if (supplierRegion === 'US' && !isUsSupplier(r.supplier)) return false;
+    if (supplierRegion === 'CHINA' && isUsSupplier(r.supplier)) return false;
+    return true;
+  });
 
   const now = new Date();
   const eom = new Date(now.getFullYear(), now.getMonth() + 1, 0);
@@ -131,12 +136,13 @@ export default function MainOfficeKpiGrid({
   onOpKpiClick,
   viewMode,
   onViewModeChange,
+  supplierRegion = 'CHINA',
 }) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const cards = useMemo(
-    () => buildKpisForOrderType(rows, kpis, viewMode, todayStr),
-    [rows, kpis, viewMode, todayStr]
+    () => buildKpisForOrderType(rows, kpis, viewMode, todayStr, supplierRegion),
+    [rows, kpis, viewMode, todayStr, supplierRegion]
   );
 
   function handleClick(card) {

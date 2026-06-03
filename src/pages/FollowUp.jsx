@@ -486,6 +486,7 @@ export default function FollowUp() {
             onOpKpiClick={handleOpKpiClick}
             viewMode={mainOfficeViewMode}
             onViewModeChange={handleMainOfficeViewModeChange}
+            supplierRegion={filters.supplierRegion || 'CHINA'}
           />
         ) : (
           <KpiCards
