@@ -68,9 +68,9 @@ Deno.serve(async (req) => {
     // Date window: ±60d / +180d, OR PO has base44 activity.
     const poSql = `
       WITH bs_flag AS (
-        SELECT scv.style_color, scv.published
-        FROM style_colors_view scv
-        WHERE scv.published >= (CURRENT_DATE - INTERVAL '45 days')
+        SELECT DISTINCT pus.po_number
+        FROM po_urgent_status pus
+        WHERE pus.reason ILIKE '%Best Seller%'
       ),
       sub_bno_per_po AS (
         SELECT
@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
         pmt.tag AS pm_tag_label,
         scv.product_image AS product_image,
         scv.published AS sc_published,
-        CASE WHEN bs.style_color IS NOT NULL AND pov.ordered_qty > 1000 THEN true ELSE false END AS is_best_seller,
+        CASE WHEN bs.po_number IS NOT NULL THEN true ELSE false END AS is_best_seller,
         COALESCE(sbn.us_flag, 0) AS bno_us_flag,
         COALESCE(sbn.uk_flag, 0) AS bno_uk_flag
       FROM po_view pov
@@ -171,7 +171,7 @@ Deno.serve(async (req) => {
       LEFT JOIN manual_rw_per_po mrw ON mrw.po_number = pov.po_number
       LEFT JOIN destinations_per_po dpo ON dpo.po_number = pov.po_number
       LEFT JOIN po_rank_per_po prk ON prk.po_number = pov.po_number
-      LEFT JOIN bs_flag bs ON bs.style_color = pov.style_color
+      LEFT JOIN bs_flag bs ON bs.po_number = pov.po_number
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
