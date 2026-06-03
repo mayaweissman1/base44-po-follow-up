@@ -134,7 +134,7 @@ export const NOT_STARTED_DD_STATUSES = [
 ];
 
 // US suppliers — all others are treated as China for the Supplier Region filter.
-export const US_SUPPLIERS = ['LUCENTING', 'KILAT'];
+export const US_SUPPLIERS = ['LUCENTING', 'LUCENTINC', 'KILAT'];
 
 export function isUsSupplier(supplierName) {
   if (!supplierName) return false;
