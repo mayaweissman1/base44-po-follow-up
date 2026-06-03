@@ -77,7 +77,14 @@ function passesFilters(row, filters, role) {
     const cutoff = new Date(eom); cutoff.setDate(eom.getDate() - 5);
     if (new Date(row.final_dd) <= cutoff) return false;
   } else if (collection && !row.collection?.toLowerCase().includes(collection.toLowerCase())) return false;
-  if (orderType && row.po_type !== orderType) return false;
+  if (orderType) {
+    const t = (row.po_type || '').toLowerCase();
+    // KPI grid uses 'New'/'Rep' as tokens — match by substring so the table
+    // filters the same way the KPI cards do.
+    if (orderType === 'New' && !t.includes('new')) return false;
+    else if (orderType === 'Rep' && !t.includes('rep')) return false;
+    else if (orderType !== 'New' && orderType !== 'Rep' && row.po_type !== orderType) return false;
+  }
   if (filters.staleStatus && !((row.days_same_status ?? 0) > 5)) return false;
   if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
   if (filters.bestSeller && !row.is_best_seller) return false;

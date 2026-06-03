@@ -48,9 +48,20 @@ function KpiCard({ kpi, active, onClick }) {
 
 /* ───────── KPI builder (shared logic for both views) ───────── */
 
+function matchesOrderType(row, mode) {
+  // mode is 'New' or 'Rep'. The po_types.type value in the DB is typically a
+  // longer string like "New Order" / "Repeat Order" / "Rep" / "New", so we
+  // do a case-insensitive substring match on the relevant token.
+  const t = (row.po_type || '').toLowerCase();
+  if (!t) return false;
+  if (mode === 'New') return t.includes('new');
+  if (mode === 'Rep') return t.includes('rep'); // matches "rep", "repeat"
+  return false;
+}
+
 function buildKpisForOrderType(rows, kpis, orderType, todayStr) {
   // Scope all KPIs to this order type
-  const scoped = rows.filter(r => r.po_type === orderType);
+  const scoped = rows.filter(r => matchesOrderType(r, orderType));
 
   const now = new Date();
   const eom = new Date(now.getFullYear(), now.getMonth() + 1, 0);
