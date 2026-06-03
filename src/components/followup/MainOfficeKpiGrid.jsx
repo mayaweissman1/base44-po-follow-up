@@ -128,9 +128,9 @@ export default function MainOfficeKpiGrid({
   kpis,
   activeOpKpi,
   onOpKpiClick,
+  viewMode,
+  onViewModeChange,
 }) {
-  const [viewMode, setViewMode] = useState('New'); // 'New' | 'Rep'
-
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
   const cards = useMemo(
@@ -156,7 +156,7 @@ export default function MainOfficeKpiGrid({
           {['New', 'Rep'].map(mode => (
             <button
               key={mode}
-              onClick={() => setViewMode(mode)}
+              onClick={() => onViewModeChange(mode)}
               className={[
                 'px-4 h-7 rounded-[6px] text-[11px] font-semibold transition-all',
                 viewMode === mode

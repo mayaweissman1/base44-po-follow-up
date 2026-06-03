@@ -192,6 +192,15 @@ export default function FollowUp() {
   const [activeKpiFilter, setActiveKpiFilter] = useState(null);
   const [activeOpKpi, setActiveOpKpi] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [mainOfficeViewMode, setMainOfficeViewMode] = useState('New'); // 'New' | 'Rep'
+
+  function handleMainOfficeViewModeChange(mode) {
+    setMainOfficeViewMode(mode);
+    setActiveOpKpi(null);
+    setActiveKpiFilter(null);
+    // Auto-apply order type filter so the table reflects the active view
+    setFilters(prev => ({ ...DEFAULT_FILTERS(activeRole), orderType: mode }));
+  }
 
   const [selectedRows, setSelectedRows] = useState(new Set());
   const [logDelayPo, setLogDelayPo] = useState(null);
@@ -227,10 +236,13 @@ export default function FollowUp() {
     if (activeRole === 'dd_team_employee' && user?.full_name) {
       base.ddManager = user.full_name;
     }
+    if (activeRole === 'main_office') {
+      base.orderType = mainOfficeViewMode;
+    }
     setFilters(base);
     setActiveKpiFilter(null);
     setSelectedRows(new Set());
-  }, [activeRole, user?.full_name]);
+  }, [activeRole, user?.full_name, mainOfficeViewMode]);
 
   function handleKpiFilterClick(filterKey) {
     if (activeKpiFilter === filterKey) {
@@ -465,6 +477,8 @@ export default function FollowUp() {
             kpis={displayKpis}
             activeOpKpi={activeOpKpi}
             onOpKpiClick={handleOpKpiClick}
+            viewMode={mainOfficeViewMode}
+            onViewModeChange={handleMainOfficeViewModeChange}
           />
         ) : (
           <KpiCards
