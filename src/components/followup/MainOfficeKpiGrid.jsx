@@ -94,7 +94,7 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
     return !log.some(e => e.date?.slice(0, 10) === todayStr);
   }).length;
 
-  const urgents = scoped.filter(r => r.urgent).length;
+  const urgents = scoped.filter(r => r.urgent && r.late_future === 'LATE').length;
 
   // Current Collection = scoped + late + in this month's collection
   const currentColLate = scoped.filter(r => r.late_future === 'LATE' && isCurrentCollection(r));
@@ -116,7 +116,7 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
     { id: 'pending',         label: 'Pending',                value: pending,             meta: 'HOLD requests',                accent: '',      filters: { ...baseFilter, status: 'HOLD' } },
     { id: 'late',            label: 'Late',                   value: late,                meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: 'LATE' } },
     { id: 'not_updated',     label: 'Not Updated',            value: notUpdated,          meta: 'Due today — not touched',      accent: 'red',   filters: { ...baseFilter, nextUpdate: todayStr }, alwaysRed: true },
-    { id: 'urgents',         label: 'Urgents',                value: urgents,             meta: 'Urgent-flagged POs',           accent: 'red',   filters: { ...baseFilter, urgent: true } },
+    { id: 'urgents',         label: 'Late Urgents',           value: urgents,             meta: 'Urgent · past due',            accent: 'red',   filters: { ...baseFilter, urgent: true, lateFuture: 'LATE' } },
     { id: 'current_col',     label: 'Current Collection',     value: currentColLate.length, meta: 'Late · this month',          accent: 'amber', filters: { ...baseFilter, collection: 'CURRENT', lateFuture: 'LATE' } },
     { id: 'will_miss',       label: 'Will miss collection',   value: willMiss,            meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: 'CURRENT_AT_RISK', lateFuture: 'LATE' } },
     { id: 'not_started',     label: 'Manufactured Not Started', value: notStarted,        meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: 'NOT_STARTED' } },
