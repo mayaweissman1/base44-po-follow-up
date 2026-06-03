@@ -4,10 +4,17 @@ function isCurrentCollection(r) {
   if (!r.collection) return false;
   const now = new Date();
   const monthShort = now.toLocaleString('en-US', { month: 'short' }).toLowerCase();
-  const monthNum = String(now.getMonth() + 1).padStart(2, '0');
-  const year2 = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  const yy = yyyy.slice(2);
   const c = r.collection.toLowerCase();
-  return c.includes(monthShort) || c.includes(`${monthNum}/${year2}`) || c.includes(`${monthNum}-${year2}`);
+  return (
+    c.includes(`${yyyy}-${mm}`) ||
+    c.includes(`${mm}-${yyyy}`) ||
+    c.includes(`${mm}/${yy}`) ||
+    c.includes(`${mm}-${yy}`) ||
+    c.includes(monthShort)
+  );
 }
 
 function Chip({ label, value, active, accent, onClick }) {

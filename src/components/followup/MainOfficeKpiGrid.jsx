@@ -6,10 +6,18 @@ function isCurrentCollection(r) {
   if (!r.collection) return false;
   const now = new Date();
   const monthShort = now.toLocaleString('en-US', { month: 'short' }).toLowerCase();
-  const monthNum = String(now.getMonth() + 1).padStart(2, '0');
-  const year2 = String(now.getFullYear()).slice(2);
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const yyyy = String(now.getFullYear());
+  const yy = yyyy.slice(2);
   const c = r.collection.toLowerCase();
-  return c.includes(monthShort) || c.includes(`${monthNum}/${year2}`) || c.includes(`${monthNum}-${year2}`);
+  // Supports formats like "ED-C2026-06-LA", "06/26", "06-26", "Jun 2026", "Jun-26"
+  return (
+    c.includes(`${yyyy}-${mm}`) ||      // 2026-06
+    c.includes(`${mm}-${yyyy}`) ||      // 06-2026
+    c.includes(`${mm}/${yy}`) ||        // 06/26
+    c.includes(`${mm}-${yy}`) ||        // 06-26
+    c.includes(monthShort)              // jun
+  );
 }
 
 function isNotStarted(r) {
