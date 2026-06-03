@@ -86,6 +86,7 @@ const CHIP_FORMATTERS = {
   poRank:         v => `Rank: ${v}`,
   delayResponse:  v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
   deliveryStatus: v => `Delivery: ${v}`,
+  supplierRegion: v => ({ US: 'Region: US', CHINA: 'Region: China', ALL: 'Region: All' }[v] || `Region: ${v}`),
 };
 
 function ActiveChips({ filters, defaultFilters, onChange }) {
@@ -126,6 +127,7 @@ export default function FilterToolbar({
     priority: '', supplier: '', ddManager: '', ddStatus: '', reason: '',
     responsibility: '', urgent: false, archive: false, collection: '', orderType: '', flag: '',
     nextUpdate: '', lateFuture: '', poRank: '', delayResponse: '', deliveryStatus: '',
+    supplierRegion: 'CHINA',
   };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
@@ -138,6 +140,13 @@ export default function FilterToolbar({
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 flex flex-wrap gap-2 items-end shadow-[0_1px_3px_rgba(0,0,0,.04)]">
         <FilterField label="PO Number">
           <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
+        </FilterField>
+        <FilterField label="Supplier Region">
+          <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
+            <option value="CHINA">China</option>
+            <option value="US">US</option>
+            <option value="ALL">All</option>
+          </select>
         </FilterField>
         <FilterField label="Supplier">
           <SearchableSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} />
@@ -190,7 +199,7 @@ export default function FilterToolbar({
   return (
     <>
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-2 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(4, minmax(140px,1fr)) auto auto' }}>
+        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(5, minmax(140px,1fr)) auto auto' }}>
           <FilterField label="PO Number">
             <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
           </FilterField>
@@ -216,6 +225,13 @@ export default function FilterToolbar({
               <option value="Normal">Normal</option>
               <option value="MISSING_SIZES">Missing sizes</option>
               <option value="Drop">Drop</option>
+            </select>
+          </FilterField>
+          <FilterField label="Supplier Region">
+            <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
+              <option value="CHINA">China</option>
+              <option value="US">US</option>
+              <option value="ALL">All</option>
             </select>
           </FilterField>
           <button

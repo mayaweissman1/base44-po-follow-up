@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { NOT_STARTED_DD_STATUSES } from '@/lib/followUpConstants';
 
 /* ───────── helpers ───────── */
 
@@ -21,8 +22,8 @@ function isCurrentCollection(r) {
 }
 
 function isNotStarted(r) {
-  const s = (r.effective_dd_status || '').toLowerCase();
-  return !s || s === 'pending' || s === 'not started' || s === 'cutting prep';
+  const s = r.effective_dd_status || 'Empty status';
+  return NOT_STARTED_DD_STATUSES.includes(s);
 }
 
 /* ───────── card ───────── */

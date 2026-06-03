@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, ChevronDown, Download, LogOut, User as UserIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
-import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY } from '@/lib/followUpConstants';
+import { ROLE_DISPLAY, REASON_TO_RESPONSIBILITY, NOT_STARTED_DD_STATUSES, US_SUPPLIERS, isUsSupplier } from '@/lib/followUpConstants';
 import KpiCards from '@/components/followup/KpiCards';
 import FilterToolbar from '@/components/followup/FilterToolbar';
 import FollowUpTable from '@/components/followup/FollowUpTable';
@@ -39,6 +39,7 @@ const DEFAULT_FILTERS = (role) => ({
   poRank: '',
   delayResponse: '',
   deliveryStatus: '',
+  supplierRegion: 'CHINA', // CHINA | US | ALL — default to China
   // Virtual filters driven by OperationalKpis
   staleStatus: false,
   late7Plus: false,
@@ -92,6 +93,12 @@ function passesFilters(row, filters, role) {
     else if (orderType === 'Rep' && !t.includes('rep')) return false;
     else if (orderType !== 'New' && orderType !== 'Rep' && row.po_type !== orderType) return false;
   }
+  // Supplier region (default CHINA)
+  if (filters.supplierRegion && filters.supplierRegion !== 'ALL') {
+    const isUs = isUsSupplier(row.supplier);
+    if (filters.supplierRegion === 'US' && !isUs) return false;
+    if (filters.supplierRegion === 'CHINA' && isUs) return false;
+  }
   if (filters.staleStatus && !((row.days_same_status ?? 0) > 5)) return false;
   if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
   if (filters.bestSeller && !row.is_best_seller) return false;
@@ -105,8 +112,8 @@ function passesFilters(row, filters, role) {
   if (ddStatus === 'EMPTY') {
     if (row.effective_dd_status) return false;
   } else if (ddStatus === 'NOT_STARTED') {
-    const s = (row.effective_dd_status || '').toLowerCase();
-    if (s && s !== 'pending' && s !== 'not started' && s !== 'cutting prep') return false;
+    const s = row.effective_dd_status || 'Empty status';
+    if (!NOT_STARTED_DD_STATUSES.includes(s)) return false;
   } else if (ddStatus && row.effective_dd_status !== ddStatus) return false;
   if (reason) {
     const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);

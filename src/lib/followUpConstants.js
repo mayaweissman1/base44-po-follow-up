@@ -118,3 +118,26 @@ export function ddmm(iso) {
 export function getResponsibility(reason) {
   return REASON_TO_RESPONSIBILITY[reason] || 'OTHER';
 }
+
+// DD statuses that count as "Manufactured Not Started"
+// (production hasn't truly begun: empty status, fabric/PPS approval stages, etc.)
+export const NOT_STARTED_DD_STATUSES = [
+  'Empty status',
+  'Fabric Send To Approval - Post Prod',
+  'PPS Send To Approval - Pre Prod',
+  'PPS Send To Approval - Post Prod',
+  'Fabric At Risk',
+  'Fabric in Process',
+  'PPS At Risk',
+  'Order Fabric',
+  'Ready For Production',
+];
+
+// US suppliers — all others are treated as China for the Supplier Region filter.
+export const US_SUPPLIERS = ['LUCENTING', 'KILAT'];
+
+export function isUsSupplier(supplierName) {
+  if (!supplierName) return false;
+  const s = String(supplierName).toUpperCase();
+  return US_SUPPLIERS.some(us => s.includes(us));
+}
