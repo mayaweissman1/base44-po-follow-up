@@ -200,6 +200,11 @@ function passesFilters(row, filters, role) {
   if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
   if (has(deliveryStatus) && !deliveryStatus.some(s => row.delivery_date_status?.toLowerCase().startsWith(s.toLowerCase()))) return false;
 
+  // late_future filter (LATE / FUTURE / RECEIVED) — used by KPI presets
+  if (has(filters.lateFuture) && !filters.lateFuture.includes(row.late_future)) return false;
+  if (filters.bnoHighLowOtw && !row.bno_high_low_otw) return false;
+  if (filters.sameStatusOver5d && !((row.days_same_status ?? 0) > 5)) return false;
+
   // Urgency Reason — text equality on raw value (or computed priority fallback)
   if (has(urgencyReason) && !urgencyReason.some(p => matchUrgencyReason(row, p))) return false;
 
