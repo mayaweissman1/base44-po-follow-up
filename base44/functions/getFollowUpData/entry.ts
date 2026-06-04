@@ -183,7 +183,6 @@ Deno.serve(async (req) => {
         COALESCE(sbn.us_flag, 0) AS bno_us_flag,
         COALESCE(sbn.uk_flag, 0) AS bno_uk_flag,
         smp.shipping_methods AS shipping_methods,
-        NULL::text AS priority_combo,
         ips.inv_days AS inv_days,
         mps.missing_sizes AS missing_sizes
       FROM po_view pov
@@ -372,7 +371,6 @@ Deno.serve(async (req) => {
         is_best_seller: !!po.is_best_seller,
         bno_high_low_otw: (Number(po.bno_us_flag) || 0) + (Number(po.bno_uk_flag) || 0) > 0,
         shipping_methods: Array.isArray(po.shipping_methods) ? po.shipping_methods : [],
-        priority_combo: po.priority_combo || '',
         inv_days: po.inv_days != null ? Math.round(Number(po.inv_days)) : null,
         missing_sizes: Array.isArray(po.missing_sizes) ? po.missing_sizes : [],
       };

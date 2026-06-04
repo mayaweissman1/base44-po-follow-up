@@ -68,7 +68,6 @@ const CHIP_FORMATTERS = {
   delayDaysMin:   v => `Delay ≥ ${v}d`,
   delayDaysMax:   v => `Delay ≤ ${v}d`,
   missingSizes:   v => `Missing: ${v.join(', ')}`,
-  priorityCombo:  v => `Combo: ${v.length}`,
   shippingMethod: v => `Shipping: ${v.join(', ')}`,
   indMax:         v => `IND ≤ ${v}d`,
 };
@@ -133,7 +132,7 @@ function MinMaxField({ label, minVal, maxVal, onMinChange, onMaxChange, suffix =
 export default function FilterToolbar({
   role, filters, onChange, onReset,
   suppliers, ddManagers, collections = [], orderTypes = [],
-  missingSizesOptions = [], priorityComboOptions = [], shippingMethodOptions = [],
+  missingSizesOptions = [], shippingMethodOptions = [],
   mainOfficeViewMode,
   advancedOpen, onAdvancedToggle,
 }) {
@@ -150,7 +149,7 @@ export default function FilterToolbar({
     dropDateFrom: '', dropDateTo: '',
     finalDdFrom: '', finalDdTo: '',
     delayDaysMin: '', delayDaysMax: '',
-    missingSizes: [], priorityCombo: [], shippingMethod: [],
+    missingSizes: [], shippingMethod: [],
     indMax: '',
   };
 
@@ -330,9 +329,6 @@ export default function FilterToolbar({
               <>
                 <FilterField label="Missing Sizes">
                   <MultiSelect value={filters.missingSizes} onChange={v => set('missingSizes', v)} options={missingSizesOptions} placeholder="All combos" />
-                </FilterField>
-                <FilterField label="Priority Combo">
-                  <MultiSelect value={filters.priorityCombo} onChange={v => set('priorityCombo', v)} options={priorityComboOptions} placeholder="All combos" />
                 </FilterField>
                 <FilterField label="Shipping Method">
                   <MultiSelect value={filters.shippingMethod} onChange={v => set('shippingMethod', v)} options={shippingMethodOptions} placeholder="All methods" />

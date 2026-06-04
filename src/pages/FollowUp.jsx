@@ -59,7 +59,6 @@ const DEFAULT_FILTERS = (role) => ({
   delayDaysMax: '',
   // Rep-view filters
   missingSizes: [],   // array of "XS+S" combo keys
-  priorityCombo: [],  // array of combo strings
   shippingMethod: [], // array of shipping method strings
   // IND filter (main_office)
   indMax: '', // show POs with inv_days <= N
@@ -201,7 +200,6 @@ function passesFilters(row, filters, role) {
     const rowKey = missingSizesKey(row.missing_sizes || []);
     if (!rowKey || !filters.missingSizes.includes(rowKey)) return false;
   }
-  if (has(filters.priorityCombo) && !filters.priorityCombo.includes(row.priority_combo)) return false;
   if (has(filters.shippingMethod)) {
     const methods = row.shipping_methods || [];
     if (!filters.shippingMethod.some(m => methods.includes(m))) return false;
@@ -404,10 +402,9 @@ export default function FollowUp() {
     () => rows.filter(r => passesFilters(r, filters, activeRole)),
     [rows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections, orderTypes, missingSizesOptions, priorityComboOptions, shippingMethodOptions } = useMemo(() => {
+  const { suppliers, ddManagers, collections, orderTypes, missingSizesOptions, shippingMethodOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
     const msMap = new Map(); // key -> count
-    const pcMap = new Map();
     const smSet = new Set();
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
@@ -420,7 +417,6 @@ export default function FollowUp() {
       if (isRep) {
         const msKey = missingSizesKey(r.missing_sizes || []);
         if (msKey) msMap.set(msKey, (msMap.get(msKey) || 0) + 1);
-        if (r.priority_combo) pcMap.set(r.priority_combo, (pcMap.get(r.priority_combo) || 0) + 1);
         for (const m of (r.shipping_methods || [])) smSet.add(m);
       }
     }
@@ -430,7 +426,6 @@ export default function FollowUp() {
       collections: [...col].sort(),
       orderTypes: [...types].sort(),
       missingSizesOptions: [...msMap.entries()].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
-      priorityComboOptions: [...pcMap.entries()].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
       shippingMethodOptions: [...smSet].sort(),
     };
   }, [rows]);
@@ -607,7 +602,6 @@ export default function FollowUp() {
           collections={collections}
           orderTypes={orderTypes}
           missingSizesOptions={missingSizesOptions}
-          priorityComboOptions={priorityComboOptions}
           shippingMethodOptions={shippingMethodOptions}
           mainOfficeViewMode={mainOfficeViewMode}
           advancedOpen={advancedOpen}
