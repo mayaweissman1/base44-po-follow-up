@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useEffect, useState } from 'react';
 import {
   NOT_STARTED_DD_STATUSES,
   FABRIC_PPS_RISK_STATUSES,
@@ -7,6 +7,7 @@ import {
   isUsSupplier,
   isPreviousCollection,
 } from '@/lib/followUpConstants';
+import CompactKpiBar from './CompactKpiBar';
 
 /* ───────── helpers ───────── */
 
@@ -172,6 +173,19 @@ export default function MainOfficeKpiGrid({
   supplierRegion = 'CHINA',
 }) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
+  const sentinelRef = useRef(null);
+  const [collapsed, setCollapsed] = useState(false);
+
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setCollapsed(!entry.isIntersecting),
+      { threshold: 0, rootMargin: '0px 0px 0px 0px' }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   const cards = useMemo(
     () => buildKpisForOrderType(rows, kpis, viewMode, todayStr, supplierRegion),
@@ -188,7 +202,17 @@ export default function MainOfficeKpiGrid({
   }
 
   return (
+    <>
+    <CompactKpiBar
+      cards={cards}
+      activeOpKpi={activeOpKpi}
+      onClick={handleClick}
+      viewMode={viewMode}
+      onViewModeChange={onViewModeChange}
+      visible={collapsed}
+    />
     <div className="mb-4">
+      <div ref={sentinelRef} aria-hidden="true" />
       {/* View mode toggle */}
       <div className="flex items-center justify-between mb-2 px-0.5">
         <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em]">KPIs</div>
@@ -222,5 +246,6 @@ export default function MainOfficeKpiGrid({
         ))}
       </div>
     </div>
+    </>
   );
 }
