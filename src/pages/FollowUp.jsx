@@ -91,10 +91,29 @@ function isCurrentCollectionRow(r) {
 // Helper: is array filter active?
 const has = (arr) => Array.isArray(arr) && arr.length > 0;
 
-// Helper: does row match urgency-reason token? (string equality on raw value or `priority` fallback)
+// Normalize a raw urgency_reason string into a set of canonical categories:
+// - Splits on comma/semicolon/pipe (e.g. "UK-O Order,US-O Order" → ["O Order"])
+// - Strips US-/UK- destination prefixes so US & UK variants collapse to one category
+// - Returns a Set of normalized tokens
+function normalizeUrgencyReasons(raw) {
+  if (!raw) return new Set();
+  const parts = String(raw).split(/[,;|]+/);
+  const out = new Set();
+  for (const p of parts) {
+    const t = p.trim();
+    if (!t) continue;
+    const stripped = t.replace(/^(US|UK)\s*[-–:]\s*/i, '').trim();
+    if (stripped) out.add(stripped);
+  }
+  return out;
+}
+
+// Helper: does row match urgency-reason token? Matches if ANY of the row's
+// normalized urgency categories equals the selected token.
 function matchUrgencyReason(row, p) {
   const raw = row.urgency_reason_raw || row.priority || '';
-  return String(raw) === p;
+  const cats = normalizeUrgencyReasons(raw);
+  return cats.has(p);
 }
 
 // Helper: does row match a collection token (CURRENT, CURRENT_AT_RISK, PREVIOUS, or literal)?
@@ -433,9 +452,15 @@ export default function FollowUp() {
       if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
 
-      // Urgency reason — dynamic list from data (raw value, NOT computed priority)
-      const urg = r.urgency_reason_raw || r.priority;
-      if (urg) urgMap.set(urg, (urgMap.get(urg) || 0) + 1);
+      // Urgency reason — normalize to canonical categories (strip US-/UK- prefixes
+      // and split on comma/semicolon/pipe), then count POs per category. A PO with
+      // multiple categories increments each category once.
+      const urgRaw = r.urgency_reason_raw || r.priority;
+      if (urgRaw) {
+        for (const cat of normalizeUrgencyReasons(urgRaw)) {
+          urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
+        }
+      }
 
       // Rep-view shipping method names
       const isRep = (r.po_type || '').toLowerCase().includes('rep');
