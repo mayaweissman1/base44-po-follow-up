@@ -133,6 +133,14 @@ Deno.serve(async (req) => {
         FROM edktd_history.repeats_sc_united_history
         WHERE "Inv Days" IS NOT NULL
         GROUP BY "Style Color"
+      ),
+      missing_per_style AS (
+        SELECT "Style Color" AS style_color,
+               ARRAY_AGG(DISTINCT trim(s)) FILTER (WHERE trim(s) <> '') AS missing_sizes
+        FROM dbt_marts.mart_repeats__sc_united_with_groups,
+             LATERAL regexp_split_to_table(COALESCE("Missing Sizes",''), '[,;|/]+') AS s
+        WHERE "Missing Sizes" IS NOT NULL AND "Missing Sizes" <> ''
+        GROUP BY "Style Color"
       )
       SELECT
         pov.po_number,
@@ -177,7 +185,7 @@ Deno.serve(async (req) => {
         smp.shipping_methods AS shipping_methods,
         NULL::text AS priority_combo,
         ips.inv_days AS inv_days,
-        NULL::text[] AS missing_sizes
+        mps.missing_sizes AS missing_sizes
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -199,6 +207,7 @@ Deno.serve(async (req) => {
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
       LEFT JOIN shipping_methods_per_po smp ON smp.po_number = pov.po_number
       LEFT JOIN inv_per_style ips ON ips.style_color = pov.style_color
+      LEFT JOIN missing_per_style mps ON mps.style_color = pov.style_color
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
