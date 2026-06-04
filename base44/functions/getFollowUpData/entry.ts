@@ -126,6 +126,13 @@ Deno.serve(async (req) => {
         SELECT po_number, MIN(sub_rank)::int AS po_rank
         FROM sub_po_ranks
         GROUP BY po_number
+      ),
+      inv_per_style AS (
+        SELECT "Style Color" AS style_color,
+               MIN("Inv Days") AS inv_days
+        FROM edktd_history.repeats_sc_united_history
+        WHERE "Inv Days" IS NOT NULL
+        GROUP BY "Style Color"
       )
       SELECT
         pov.po_number,
@@ -167,9 +174,9 @@ Deno.serve(async (req) => {
         urp.urgency_reason AS urgency_reason,
         COALESCE(sbn.us_flag, 0) AS bno_us_flag,
         COALESCE(sbn.uk_flag, 0) AS bno_uk_flag,
-        NULL::text[] AS shipping_methods,
+        smp.shipping_methods AS shipping_methods,
         NULL::text AS priority_combo,
-        NULL::numeric AS inv_days,
+        ips.inv_days AS inv_days,
         NULL::text[] AS missing_sizes
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
@@ -190,6 +197,8 @@ Deno.serve(async (req) => {
       LEFT JOIN bs_flag bs ON bs.po_number = pov.po_number
       LEFT JOIN urgency_reason_per_po urp ON urp.po_number = pov.po_number
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
+      LEFT JOIN shipping_methods_per_po smp ON smp.po_number = pov.po_number
+      LEFT JOIN inv_per_style ips ON ips.style_color = pov.style_color
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
