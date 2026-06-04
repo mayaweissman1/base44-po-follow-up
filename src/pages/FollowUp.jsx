@@ -650,6 +650,7 @@ export default function FollowUp() {
           onGeneralUpdate={po => setGeneralUpdatePo(po)}
           onViewLogs={po => setLogsDrawerPo(po)}
           onInternalNote={po => setInternalNotePo(po)}
+          isRepScopeTable={activeRole === 'main_office' && mainOfficeViewMode === 'Rep'}
         />
       </div>
 

@@ -98,6 +98,15 @@ export default function PoSizeBreakdown({ poNumber, combined = false }) {
             <div key={d.destination} className="border border-[#E5E5E5] rounded-[8px] overflow-hidden flex-shrink-0">
               <div className="px-4 py-2.5 bg-[#FAFAFA] border-b border-[#E5E5E5] flex items-center gap-2">
                 <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[10px] font-bold">{d.destination}</span>
+                {d.priority && d.priority !== 'NORMAL' && (
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
+                    d.priority === 'BEST_SELLER' ? 'bg-amber-50 text-amber-700 border-amber-200' :
+                    d.priority === 'URGENT'      ? 'bg-red-50 text-red-600 border-red-200' :
+                    'bg-[#FAFAFA] text-[#525252] border-[#E5E5E5]'
+                  }`}>
+                    {d.priority === 'BEST_SELLER' ? 'Best Seller' : d.priority === 'URGENT' ? 'Urgent' : d.priority}
+                  </span>
+                )}
                 <span className="text-[11px] text-[#A3A3A3] ml-auto font-mono">{totalReceived}/{totalOrdered}</span>
               </div>
               <div className="overflow-x-auto">
