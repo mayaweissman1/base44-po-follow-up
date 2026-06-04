@@ -10,7 +10,6 @@ import {
   QC_STATUSES,
   isUsSupplier,
   isPreviousCollection,
-  missingSizesKey,
 } from '@/lib/followUpConstants';
 import KpiCards from '@/components/followup/KpiCards';
 import FilterToolbar from '@/components/followup/FilterToolbar';
@@ -34,38 +33,36 @@ const DEFAULT_FILTERS = (role) => ({
   po: '',
   style: '',
   status: 'ALL',
-  priority: [],
-  priorityUS: [],     // Best Seller / Urgent / Normal — for US destination
-  priorityUK: [],     // Best Seller / Urgent / Normal — for UK destination
+  urgencyReason: [],  // raw urgency_reason values from po_urgent_status (e.g. "Best Seller New", "US-SIZES INV DAYS")
+  priorityUS: [],     // BEST_SELLER / URGENT / NORMAL — per US destination
+  priorityUK: [],     // BEST_SELLER / URGENT / NORMAL — per UK destination
   supplier: [],
   ddManager: [],      // multi-select
   ddStatus: [],
-  reason: [],
   urgent: false,
   archive: false,
   collection: [],
   orderType: [],
   nextUpdate: '',
-  lateFuture: [],
-  poRank: [],
   delayResponse: '',
   deliveryStatus: [],
   supplierRegion: 'CHINA', // CHINA | US | ALL — default to China
-  // New
-  shippedOver80: false,
+  // Date ranges
   dropDateFrom: '',
   dropDateTo: '',
   finalDdFrom: '',
   finalDdTo: '',
+  // Numeric ranges
   delayDaysMin: '',
   delayDaysMax: '',
+  shippedPctMin: '',
+  shippedPctMax: '',
+  indMin: '',
+  indMax: '',
   // Rep-view filters
-  missingSizes: [],   // array of "XS+S" combo keys
-  shippingMethod: [], // array of shipping method strings
-  lastUrgentComment: '', // text search on last urgent-screen comment
-  // IND filter (main_office) — operator + value
-  indOperator: 'lte', // lte | gte | eq | lt | gt
-  indValue: '',
+  missingSizes: [],   // array of size codes (XS / S / M / L / XL / XXL)
+  shippingMethod: [], // array of shipping method NAMES (text from shipment_methods table)
+  lastUrgentComment: '',
   // Virtual filters driven by KPIs
   staleStatus: false,
   late7Plus: false,
@@ -94,14 +91,10 @@ function isCurrentCollectionRow(r) {
 // Helper: is array filter active?
 const has = (arr) => Array.isArray(arr) && arr.length > 0;
 
-// Helper: does row match priority token?
-function matchPriority(row, p) {
-  if (p === 'URGENT') return row.priority === 'URGENT';
-  if (p === 'Deadline') return (row.priority || '').includes('Deadline');
-  if (p === 'Normal') return row.priority === 'Normal';
-  if (p === 'MISSING_SIZES') return row.priority === 'MISSING SIZES';
-  if (p === 'Drop') return row.priority === 'Drop';
-  return row.priority === p;
+// Helper: does row match urgency-reason token? (string equality on raw value or `priority` fallback)
+function matchUrgencyReason(row, p) {
+  const raw = row.urgency_reason_raw || row.priority || '';
+  return String(raw) === p;
 }
 
 // Helper: does row match a collection token (CURRENT, CURRENT_AT_RISK, PREVIOUS, or literal)?
@@ -143,11 +136,13 @@ function matchOrderType(row, token) {
 
 function passesFilters(row, filters, role) {
   const {
-    po, style, status, priority, supplier, ddManager, ddStatus, reason,
+    po, style, status, urgencyReason, supplier, ddManager, ddStatus,
     urgent, archive, collection, orderType, nextUpdate,
-    lateFuture, poRank, delayResponse, deliveryStatus,
-    shippedOver80, dropDateFrom, dropDateTo, finalDdFrom, finalDdTo,
+    delayResponse, deliveryStatus,
+    dropDateFrom, dropDateTo, finalDdFrom, finalDdTo,
     delayDaysMin, delayDaysMax,
+    shippedPctMin, shippedPctMax,
+    indMin, indMax,
   } = filters;
 
   if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
@@ -181,75 +176,59 @@ function passesFilters(row, filters, role) {
     if (!(diff >= 0 && diff < 7)) return false;
   }
 
-  if (has(reason)) {
-    const rs = row.ddd_reasons?.length ? row.ddd_reasons : (row.ddd_reason ? [row.ddd_reason] : []);
-    if (!reason.some(r => rs.includes(r))) return false;
-  }
-
   if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
-  if (has(lateFuture) && !lateFuture.includes(row.late_future)) return false;
-  if (has(poRank) && !poRank.includes(String(row.po_rank))) return false;
   if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
   if (has(deliveryStatus) && !deliveryStatus.some(s => row.delivery_date_status?.toLowerCase().startsWith(s.toLowerCase()))) return false;
-  if (has(priority) && !priority.some(p => matchPriority(row, p))) return false;
 
-  // NEW filters
-  if (shippedOver80 && !((row.shipped_percent ?? 0) > 80)) return false;
+  // Urgency Reason — text equality on raw value (or computed priority fallback)
+  if (has(urgencyReason) && !urgencyReason.some(p => matchUrgencyReason(row, p))) return false;
+
+  // Date ranges
   if (dropDateFrom && (!row.drop || row.drop.slice(0, 10) < dropDateFrom)) return false;
   if (dropDateTo   && (!row.drop || row.drop.slice(0, 10) > dropDateTo))   return false;
   if (finalDdFrom  && (!row.final_dd || row.final_dd.slice(0, 10) < finalDdFrom)) return false;
   if (finalDdTo    && (!row.final_dd || row.final_dd.slice(0, 10) > finalDdTo))   return false;
+
+  // Numeric ranges (treat 0 as a meaningful low bound — only skip when empty string)
   if (delayDaysMin !== '' && delayDaysMin != null && (row.days_late_counting ?? 0) < Number(delayDaysMin)) return false;
   if (delayDaysMax !== '' && delayDaysMax != null && (row.days_late_counting ?? 0) > Number(delayDaysMax)) return false;
-
-  // Rep-view filters
-  if (has(filters.missingSizes)) {
-    const rowKey = missingSizesKey(row.missing_sizes || []);
-    if (!rowKey || !filters.missingSizes.includes(rowKey)) return false;
-  }
-  if (has(filters.shippingMethod)) {
-    const methods = row.shipping_methods || [];
-    if (!filters.shippingMethod.some(m => methods.includes(m))) return false;
-  }
-
-  // IND (Inventory Days) filter — operator + value
-  if (filters.indValue !== '' && filters.indValue != null) {
+  if (shippedPctMin !== '' && shippedPctMin != null && (row.shipped_percent ?? 0) < Number(shippedPctMin)) return false;
+  if (shippedPctMax !== '' && shippedPctMax != null && (row.shipped_percent ?? 0) > Number(shippedPctMax)) return false;
+  if (indMin !== '' && indMin != null) {
     if (row.inv_days == null) return false;
-    const v = Number(filters.indValue);
-    const ind = Number(row.inv_days);
-    const op = filters.indOperator || 'lte';
-    if (op === 'lte' && !(ind <= v)) return false;
-    if (op === 'gte' && !(ind >= v)) return false;
-    if (op === 'eq'  && !(ind === v)) return false;
-    if (op === 'lt'  && !(ind <  v)) return false;
-    if (op === 'gt'  && !(ind >  v)) return false;
+    if (Number(row.inv_days) < Number(indMin)) return false;
+  }
+  if (indMax !== '' && indMax != null) {
+    if (row.inv_days == null) return false;
+    if (Number(row.inv_days) > Number(indMax)) return false;
   }
 
-  // Last Urgent Comment — text search on the latest comment from the urgent screen.
-  // Falls back to the most recent general-update comment in dd_comment_log.
+  // Rep-view: Missing sizes — match if any selected size is in the row's missing list
+  if (has(filters.missingSizes)) {
+    const ms = (row.missing_sizes || []).map(s => String(s).toUpperCase());
+    if (!filters.missingSizes.some(s => ms.includes(String(s).toUpperCase()))) return false;
+  }
+  // Shipping method — by NAME (text from shipment_methods table)
+  if (has(filters.shippingMethod)) {
+    const names = row.shipping_method_names || [];
+    if (!filters.shippingMethod.some(m => names.includes(m))) return false;
+  }
+
+  // Last Urgent Comment
   if (filters.lastUrgentComment) {
     const log = row.dd_comment_log || [];
     const latest = log[0]?.text || '';
     if (!latest.toLowerCase().includes(filters.lastUrgentComment.toLowerCase())) return false;
   }
 
-  // Priority by destination (US / UK).
-  // Best Seller = is_best_seller flag, Urgent = urgent flag, Normal = neither.
-  // NOTE: current backend doesn't yet split priority per destination — these filters
-  // match the PO-level flags scoped to whether the PO has a US/UK destination.
+  // Priority by destination — uses dest-specific tag from backend (us_priority / uk_priority)
   if (has(filters.priorityUS)) {
-    const dests = (row.destination || '').toLowerCase();
-    const hasUs = dests.includes('edikted') && !dests.includes('uk');
-    if (!hasUs) return false;
-    const tag = row.is_best_seller ? 'BEST_SELLER' : (row.urgent ? 'URGENT' : 'NORMAL');
-    if (!filters.priorityUS.includes(tag)) return false;
+    if (!row.us_priority) return false;
+    if (!filters.priorityUS.includes(row.us_priority)) return false;
   }
   if (has(filters.priorityUK)) {
-    const dests = (row.destination || '').toLowerCase();
-    const hasUk = dests.includes('uk');
-    if (!hasUk) return false;
-    const tag = row.is_best_seller ? 'BEST_SELLER' : (row.urgent ? 'URGENT' : 'NORMAL');
-    if (!filters.priorityUK.includes(tag)) return false;
+    if (!row.uk_priority) return false;
+    if (!filters.priorityUK.includes(row.uk_priority)) return false;
   }
 
   // Archive toggle: POs that never entered the HOLD workflow (no delay request logged)
@@ -444,22 +423,24 @@ export default function FollowUp() {
     () => rows.filter(r => passesFilters(r, filters, activeRole)),
     [rows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections, orderTypes, missingSizesOptions, shippingMethodOptions } = useMemo(() => {
+  const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, urgencyReasonOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
-    const msMap = new Map(); // key -> count
     const smSet = new Set();
+    const urgMap = new Map(); // urgency_reason raw value -> count
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
       if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
 
-      // Rep-view options — derived from Rep orders only
+      // Urgency reason — dynamic list from data (raw value, NOT computed priority)
+      const urg = r.urgency_reason_raw || r.priority;
+      if (urg) urgMap.set(urg, (urgMap.get(urg) || 0) + 1);
+
+      // Rep-view shipping method names
       const isRep = (r.po_type || '').toLowerCase().includes('rep');
       if (isRep) {
-        const msKey = missingSizesKey(r.missing_sizes || []);
-        if (msKey) msMap.set(msKey, (msMap.get(msKey) || 0) + 1);
-        for (const m of (r.shipping_methods || [])) smSet.add(m);
+        for (const m of (r.shipping_method_names || [])) smSet.add(m);
       }
     }
     return {
@@ -467,8 +448,10 @@ export default function FollowUp() {
       ddManagers: [...mgr].sort(),
       collections: [...col].sort(),
       orderTypes: [...types].sort(),
-      missingSizesOptions: [...msMap.entries()].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
       shippingMethodOptions: [...smSet].sort(),
+      urgencyReasonOptions: [...urgMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
     };
   }, [rows]);
 
@@ -643,8 +626,8 @@ export default function FollowUp() {
           ddManagers={ddManagers}
           collections={collections}
           orderTypes={orderTypes}
-          missingSizesOptions={missingSizesOptions}
           shippingMethodOptions={shippingMethodOptions}
+          urgencyReasonOptions={urgencyReasonOptions}
           mainOfficeViewMode={mainOfficeViewMode}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}

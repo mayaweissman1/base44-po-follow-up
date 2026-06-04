@@ -94,8 +94,26 @@ Deno.serve(async (req) => {
       ),
       shipping_methods_per_po AS (
         SELECT spv.po_number,
-               ARRAY_AGG(DISTINCT NULLIF(spv.shipping_method::text,'')) FILTER (WHERE spv.shipping_method IS NOT NULL) AS shipping_methods
+               ARRAY_AGG(DISTINCT NULLIF(spv.shipping_method::text,'')) FILTER (WHERE spv.shipping_method IS NOT NULL) AS shipping_methods,
+               ARRAY_AGG(DISTINCT sm.method) FILTER (WHERE sm.method IS NOT NULL) AS shipping_method_names
         FROM sub_po_view spv
+        LEFT JOIN shipment_methods sm ON sm.id = spv.shipping_method
+        GROUP BY spv.po_number
+      ),
+      dest_priority_per_po AS (
+        SELECT
+          spv.po_number,
+          MAX(CASE WHEN sd.destination IN ('Edikted')   AND pus.reason ILIKE '%best seller%' THEN 3
+                   WHEN sd.destination IN ('Edikted')   AND (spv.urgent = true OR pus.reason ILIKE '%urgent%') THEN 2
+                   WHEN sd.destination IN ('Edikted')   THEN 1
+                   ELSE 0 END) AS us_priority,
+          MAX(CASE WHEN sd.destination IN ('EdiktedUK') AND pus.reason ILIKE '%best seller%' THEN 3
+                   WHEN sd.destination IN ('EdiktedUK') AND (spv.urgent = true OR pus.reason ILIKE '%urgent%') THEN 2
+                   WHEN sd.destination IN ('EdiktedUK') THEN 1
+                   ELSE 0 END) AS uk_priority
+        FROM sub_po_view spv
+        LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+        LEFT JOIN po_urgent_status pus    ON pus.po_number = spv.po_number
         GROUP BY spv.po_number
       ),
       manual_rw_per_po AS (
@@ -183,8 +201,11 @@ Deno.serve(async (req) => {
         COALESCE(sbn.us_flag, 0) AS bno_us_flag,
         COALESCE(sbn.uk_flag, 0) AS bno_uk_flag,
         smp.shipping_methods AS shipping_methods,
+        smp.shipping_method_names AS shipping_method_names,
         ips.inv_days AS inv_days,
-        mps.missing_sizes AS missing_sizes
+        mps.missing_sizes AS missing_sizes,
+        dpp.us_priority AS us_priority_raw,
+        dpp.uk_priority AS uk_priority_raw
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -205,6 +226,7 @@ Deno.serve(async (req) => {
       LEFT JOIN urgency_reason_per_po urp ON urp.po_number = pov.po_number
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
       LEFT JOIN shipping_methods_per_po smp ON smp.po_number = pov.po_number
+      LEFT JOIN dest_priority_per_po dpp ON dpp.po_number = pov.po_number
       LEFT JOIN inv_per_style ips ON ips.style_color = pov.style_color
       LEFT JOIN missing_per_style mps ON mps.style_color = pov.style_color
       WHERE pov.po_status = ANY($1::int[])
@@ -371,8 +393,15 @@ Deno.serve(async (req) => {
         is_best_seller: !!po.is_best_seller,
         bno_high_low_otw: (Number(po.bno_us_flag) || 0) + (Number(po.bno_uk_flag) || 0) > 0,
         shipping_methods: Array.isArray(po.shipping_methods) ? po.shipping_methods : [],
+        shipping_method_names: Array.isArray(po.shipping_method_names) ? po.shipping_method_names : [],
         inv_days: po.inv_days != null ? Math.round(Number(po.inv_days)) : null,
         missing_sizes: Array.isArray(po.missing_sizes) ? po.missing_sizes : [],
+        // Raw urgency reason from po_urgent_status — the most accurate priority signal.
+        urgency_reason_raw: po.urgency_reason || null,
+        // Per-destination priority (US = Edikted, UK = EdiktedUK).
+        // Maps 0=None / 1=Normal / 2=Urgent / 3=Best Seller
+        us_priority: po.us_priority_raw ? (po.us_priority_raw === 3 ? 'BEST_SELLER' : po.us_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
+        uk_priority: po.uk_priority_raw ? (po.uk_priority_raw === 3 ? 'BEST_SELLER' : po.uk_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
       };
     });
 

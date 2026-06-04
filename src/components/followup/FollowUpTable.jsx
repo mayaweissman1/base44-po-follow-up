@@ -346,6 +346,7 @@ const PAGE_SIZE = 100;
 export default function FollowUpTable({
   rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, loading,
   selectedRows = new Set(), onSelectRow, onSelectAll, onPoDetails,
+  isRepScopeTable = false,
 }) {
   const [expanded, setExpanded] = useState(new Set());
   const [sortCol, setSortCol] = useState(null);
@@ -737,7 +738,8 @@ export default function FollowUpTable({
               {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
-              {colVisible('priority') && <Th {...thProps} col="priority" width={colWidths['priority'] || 85} tooltip={TIPS.priority}>Priority</Th>}
+              {colVisible('priority') && <Th {...thProps} col="priority" width={colWidths['priority'] || 110} tooltip="Urgency reason from po_urgent_status (e.g. Best Seller, US-Sizes Inv Days)">Urgency Reason</Th>}
+              {role === 'main_office' && <Th {...thProps} col="inv_days" width={colWidths['inv_days'] || 70} tooltip="Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)">IND</Th>}
               {colVisible('dd_manager_name') && <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>}
               {colVisible('supplier') && <Th {...thProps} col="supplier" width={colWidths['supplier'] || 90}>Supplier</Th>}
               {colVisible('delivery_date_status') && <Th {...thProps} col="delivery_date_status" width={colWidths['delivery_date_status'] || 140}>Delivery Status</Th>}
@@ -754,7 +756,7 @@ export default function FollowUpTable({
               {role === 'main_office' && <Th {...thProps} col="internal_note" width={colWidths['internal_note'] || 150}>Last Comment (internal)</Th>}
               {colVisible('ddd_count') && <Th {...thProps} col="ddd_count" width={colWidths['ddd_count'] || 70} tooltip={TIPS.ddd_count}>DDD Count</Th>}
               {colVisible('pm_tags') && <Th {...thProps} col="pm_tags" width={colWidths['pm_tags'] || 110} tooltip={TIPS.pm_tags}>PM Tags</Th>}
-              {role === 'main_office' && <Th {...thProps} col="inv_days" width={colWidths['inv_days'] || 70} tooltip="Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)">IND</Th>}
+              {role === 'main_office' && isRepScopeTable && <Th {...thProps} col={null} width={colWidths['missing_sizes'] || 110} tooltip="Sizes missing for repeat orders">Missing Sizes</Th>}
               {additionalCols.map(col => (
                 <Th key={col.key} {...thProps} col={col.key} width={colWidths[col.key] || 110}>{col.label}</Th>
               ))}
@@ -786,7 +788,15 @@ export default function FollowUpTable({
                     {colVisible('po_rank') && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
-                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.priority} /></td>}
+                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgency_reason_raw || po.priority} /></td>}
+                    {role === 'main_office' && (
+                      <td className={tdBase}>
+                        {po.inv_days == null ? <span className="text-[#A3A3A3]">—</span> :
+                          po.inv_days >= 9999 ? <span className="font-mono text-[#A3A3A3]">∞</span> :
+                          <span className={`font-mono font-semibold ${po.inv_days < 5 ? 'text-red-500' : po.inv_days < 14 ? 'text-amber-600' : 'text-[#0A0A0A]'}`}>{po.inv_days}d</span>
+                        }
+                      </td>
+                    )}
                     {colVisible('dd_manager_name') && <td className={tdBase}><span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{po.dd_manager_name || '—'}</span></td>}
                     {colVisible('supplier') && <td className={tdBase}><span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-teal-50 text-teal-600">{po.supplier}</span></td>}
                     {colVisible('delivery_date_status') && <td className={tdBase}><span className="text-[#525252] text-xs max-w-[160px] truncate inline-block" title={po.delivery_date_status ?? po.ddd_comment}>{deliveryDateStatusText(po)}</span></td>}
@@ -811,12 +821,15 @@ export default function FollowUpTable({
                     {role === 'main_office' && <td className={tdBase}><span className="text-[#A3A3A3] text-xs max-w-[180px] truncate inline-block" title={po.internal_note}>{po.internal_note || '—'}</span></td>}
                     {colVisible('ddd_count') && <td className={tdBase}><span className="font-mono">{po.ddd_count ?? 0}</span></td>}
                     {colVisible('pm_tags') && <td className={tdBase}><PmTagsPills label={po.pm_tags_label} /></td>}
-                    {role === 'main_office' && (
+                    {role === 'main_office' && isRepScopeTable && (
                       <td className={tdBase}>
-                        {po.inv_days == null ? <span className="text-[#A3A3A3]">—</span> :
-                          po.inv_days >= 9999 ? <span className="font-mono text-[#A3A3A3]">∞</span> :
-                          <span className={`font-mono font-semibold ${po.inv_days < 5 ? 'text-red-500' : po.inv_days < 14 ? 'text-amber-600' : 'text-[#0A0A0A]'}`}>{po.inv_days}d</span>
-                        }
+                        {Array.isArray(po.missing_sizes) && po.missing_sizes.length > 0 ? (
+                          <div className="flex flex-wrap gap-0.5">
+                            {po.missing_sizes.map(s => (
+                              <span key={s} className="inline-flex items-center px-1.5 py-0.5 rounded-[0.5rem] text-[10px] font-bold uppercase bg-purple-50 text-purple-600 border border-purple-200">{s}</span>
+                            ))}
+                          </div>
+                        ) : <span className="text-[#A3A3A3]">—</span>}
                       </td>
                     )}
                     {renderAdditionalTds(po, rowBg)}

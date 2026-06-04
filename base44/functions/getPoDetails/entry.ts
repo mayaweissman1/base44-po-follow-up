@@ -46,15 +46,37 @@ Deno.serve(async (req) => {
     const subRes = await client.query(`
       SELECT
         spv.sub_po_number,
-        sd.destination AS destination_name
+        sd.destination AS destination_name,
+        spv.urgent     AS sub_urgent
       FROM sub_po_view spv
       LEFT JOIN shipment_destination sd ON sd.id = spv.destination
       WHERE spv.po_number = $1
     `, [po_number]);
 
     const destBySubPo = {};
+    const urgentBySubPo = {};
     for (const r of subRes.rows) {
       destBySubPo[r.sub_po_number] = r.destination_name || '—';
+      urgentBySubPo[r.sub_po_number] = !!r.sub_urgent;
+    }
+
+    // Urgency reason (Best Seller / URGENT) per PO — applies to all destinations
+    const urgRes = await client.query(`
+      SELECT reason FROM po_urgent_status WHERE po_number = $1 LIMIT 1
+    `, [po_number]);
+    const isBestSeller = urgRes.rows[0]?.reason?.toLowerCase().includes('best seller') || false;
+    const isUrgent = urgRes.rows[0]?.reason?.toLowerCase().includes('urgent') || false;
+
+    // Per-destination priority
+    const priorityByDest = {};
+    for (const r of subRes.rows) {
+      const dest = r.destination_name || '—';
+      const p = isBestSeller ? 'BEST_SELLER' : (isUrgent || r.sub_urgent ? 'URGENT' : 'NORMAL');
+      // Worst-case wins (Best Seller > URGENT > NORMAL)
+      const rank = { BEST_SELLER: 3, URGENT: 2, NORMAL: 1 };
+      if (!priorityByDest[dest] || rank[p] > rank[priorityByDest[dest]]) {
+        priorityByDest[dest] = p;
+      }
     }
 
     // Group by destination, with array of size rows
@@ -75,6 +97,7 @@ Deno.serve(async (req) => {
     const destinations = Object.entries(byDest).map(([destination, sizes]) => ({
       destination,
       sizes,
+      priority: priorityByDest[destination] || null,
     }));
 
     return Response.json({ po_number, destinations });
