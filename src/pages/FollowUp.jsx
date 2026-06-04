@@ -35,8 +35,10 @@ const DEFAULT_FILTERS = (role) => ({
   style: '',
   status: 'ALL',
   priority: [],
+  priorityUS: [],     // Best Seller / Urgent / Normal — for US destination
+  priorityUK: [],     // Best Seller / Urgent / Normal — for UK destination
   supplier: [],
-  ddManager: '',
+  ddManager: [],      // multi-select
   ddStatus: [],
   reason: [],
   urgent: false,
@@ -60,8 +62,10 @@ const DEFAULT_FILTERS = (role) => ({
   // Rep-view filters
   missingSizes: [],   // array of "XS+S" combo keys
   shippingMethod: [], // array of shipping method strings
-  // IND filter (main_office)
-  indMax: '', // show POs with inv_days <= N
+  lastUrgentComment: '', // text search on last urgent-screen comment
+  // IND filter (main_office) — operator + value
+  indOperator: 'lte', // lte | gte | eq | lt | gt
+  indValue: '',
   // Virtual filters driven by KPIs
   staleStatus: false,
   late7Plus: false,
@@ -149,7 +153,10 @@ function passesFilters(row, filters, role) {
   if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
   if (style && !row.style_color?.toLowerCase().includes(style.toLowerCase())) return false;
   if (has(supplier) && !supplier.includes(row.supplier)) return false;
-  if (ddManager && row.dd_manager_name !== ddManager) return false;
+  // ddManager is now multi-select (array). Legacy single string still supported.
+  if (Array.isArray(ddManager)) {
+    if (ddManager.length > 0 && !ddManager.includes(row.dd_manager_name)) return false;
+  } else if (ddManager && row.dd_manager_name !== ddManager) return false;
   if (has(collection) && !collection.some(c => matchCollection(row, c))) return false;
   if (has(orderType) && !orderType.some(t => matchOrderType(row, t))) return false;
 
@@ -205,9 +212,44 @@ function passesFilters(row, filters, role) {
     if (!filters.shippingMethod.some(m => methods.includes(m))) return false;
   }
 
-  // IND (Inventory Days) filter — show only POs with low inventory
-  if (filters.indMax !== '' && filters.indMax != null) {
-    if (row.inv_days == null || row.inv_days > Number(filters.indMax)) return false;
+  // IND (Inventory Days) filter — operator + value
+  if (filters.indValue !== '' && filters.indValue != null) {
+    if (row.inv_days == null) return false;
+    const v = Number(filters.indValue);
+    const ind = Number(row.inv_days);
+    const op = filters.indOperator || 'lte';
+    if (op === 'lte' && !(ind <= v)) return false;
+    if (op === 'gte' && !(ind >= v)) return false;
+    if (op === 'eq'  && !(ind === v)) return false;
+    if (op === 'lt'  && !(ind <  v)) return false;
+    if (op === 'gt'  && !(ind >  v)) return false;
+  }
+
+  // Last Urgent Comment — text search on the latest comment from the urgent screen.
+  // Falls back to the most recent general-update comment in dd_comment_log.
+  if (filters.lastUrgentComment) {
+    const log = row.dd_comment_log || [];
+    const latest = log[0]?.text || '';
+    if (!latest.toLowerCase().includes(filters.lastUrgentComment.toLowerCase())) return false;
+  }
+
+  // Priority by destination (US / UK).
+  // Best Seller = is_best_seller flag, Urgent = urgent flag, Normal = neither.
+  // NOTE: current backend doesn't yet split priority per destination — these filters
+  // match the PO-level flags scoped to whether the PO has a US/UK destination.
+  if (has(filters.priorityUS)) {
+    const dests = (row.destination || '').toLowerCase();
+    const hasUs = dests.includes('edikted') && !dests.includes('uk');
+    if (!hasUs) return false;
+    const tag = row.is_best_seller ? 'BEST_SELLER' : (row.urgent ? 'URGENT' : 'NORMAL');
+    if (!filters.priorityUS.includes(tag)) return false;
+  }
+  if (has(filters.priorityUK)) {
+    const dests = (row.destination || '').toLowerCase();
+    const hasUk = dests.includes('uk');
+    if (!hasUk) return false;
+    const tag = row.is_best_seller ? 'BEST_SELLER' : (row.urgent ? 'URGENT' : 'NORMAL');
+    if (!filters.priorityUK.includes(tag)) return false;
   }
 
   // Archive toggle: POs that never entered the HOLD workflow (no delay request logged)
@@ -311,7 +353,7 @@ export default function FollowUp() {
   useEffect(() => {
     const base = DEFAULT_FILTERS(activeRole);
     if (activeRole === 'dd_team_employee' && user?.full_name) {
-      base.ddManager = user.full_name;
+      base.ddManager = [user.full_name];
     }
     if (activeRole === 'main_office') {
       base.orderType = [mainOfficeViewMode];
@@ -325,7 +367,7 @@ export default function FollowUp() {
     if (activeKpiFilter === filterKey) {
       setActiveKpiFilter(null);
       const base = DEFAULT_FILTERS(activeRole);
-      if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = user.full_name;
+      if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = [user.full_name];
       setFilters(base);
       return;
     }
@@ -333,7 +375,7 @@ export default function FollowUp() {
     setActiveKpiFilter(filterKey);
     // For employee KPIs, always scope to logged-in user
     const empScope = activeRole === 'dd_team_employee' && user?.full_name
-      ? { ddManager: user.full_name }
+      ? { ddManager: [user.full_name] }
       : {};
     const overrides = {
       new_pending:        { status: 'HOLD' },
@@ -592,7 +634,7 @@ export default function FollowUp() {
           onChange={setFilters}
           onReset={() => {
             const base = DEFAULT_FILTERS(activeRole);
-            if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = user.full_name;
+            if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = [user.full_name];
             setFilters(base);
             setActiveKpiFilter(null);
             setActiveOpKpi(null);

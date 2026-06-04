@@ -16,7 +16,6 @@ const inputCls = "h-8 px-2.5 border border-[#D4D4D4] rounded-[6px] text-xs font-
 const selectCls = "h-8 pl-2.5 pr-7 border border-[#D4D4D4] rounded-[6px] text-xs font-medium text-[#0A0A0A] bg-white appearance-none cursor-pointer focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 hover:border-[#E31B7F] transition-colors w-full";
 const toggleCls = (active) => `h-8 px-3 rounded-[6px] text-xs font-semibold border transition-colors ${active ? 'bg-[#FFF0F7] text-[#E31B7F] border-[#E31B7F]' : 'border-[#D4D4D4] text-[#525252] hover:border-[#E31B7F] hover:text-[#E31B7F]'}`;
 
-// Reasons grouped for MultiSelect (flat list — group labels become disabled headers).
 function reasonOptions() {
   const opts = [];
   for (const g of DD_REASONS_BY_GROUP) {
@@ -33,6 +32,12 @@ const PRIORITY_OPTIONS = [
   { value: 'Drop',          label: 'Drop' },
 ];
 
+const PRIORITY_DEST_OPTIONS = [
+  { value: 'BEST_SELLER', label: 'Best Seller' },
+  { value: 'URGENT',      label: 'Urgent' },
+  { value: 'NORMAL',      label: 'Normal' },
+];
+
 const LATE_FUTURE_OPTIONS = [
   { value: 'LATE',   label: 'Late' },
   { value: 'FUTURE', label: 'Future' },
@@ -40,36 +45,46 @@ const LATE_FUTURE_OPTIONS = [
 
 const PO_RANK_OPTIONS = ['1', '2', '3', '4', '5'].map(v => ({ value: v, label: v }));
 
-// Format a chip label for active filters
+const IND_OPERATORS = [
+  { value: 'lte', label: '≤' },
+  { value: 'gte', label: '≥' },
+  { value: 'eq',  label: '=' },
+  { value: 'lt',  label: '<' },
+  { value: 'gt',  label: '>' },
+];
+
 const CHIP_FORMATTERS = {
-  po:             v => `PO: ${v}`,
-  style:          v => `Style: ${v}`,
-  status:         v => ({ HOLD: 'DDD: Pending', HANDLED: 'DDD: Handled', APPROVED: 'DDD: Approved', REJECTED: 'DDD: Rejected', ACKNOWLEDGED: 'DDD: Acknowledged', ACK_APPROVED: 'DDD: Acknowledged', AUTOMATICALLY: 'DDD: Auto' }[v] || `DDD: ${v}`),
-  priority:       v => `Priority: ${v.length}`,
-  supplier:       v => `Supplier: ${v.length}`,
-  ddManager:      v => `Mgr: ${v}`,
-  ddStatus:       v => `Production: ${v.length}`,
-  reason:         v => `Reason: ${v.length}`,
-  urgent:         _ => 'Urgent only',
-  archive:        _ => 'Archive',
-  collection:     v => `Collection: ${v.length}`,
-  orderType:      v => `Type: ${v.join(', ')}`,
-  nextUpdate:     v => `Next Upd: ${v}`,
-  lateFuture:     v => `DD: ${v.join(', ')}`,
-  poRank:         v => `Rank: ${v.join(', ')}`,
-  delayResponse:  v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
-  deliveryStatus: v => `Delivery: ${v.length}`,
-  supplierRegion: v => ({ US: 'Region: US', CHINA: 'Region: China', ALL: 'Region: All' }[v] || `Region: ${v}`),
-  shippedOver80:  _ => 'Shipped > 80%',
-  dropDateFrom:   v => `Drop ≥ ${v}`,
-  dropDateTo:     v => `Drop ≤ ${v}`,
-  finalDdFrom:    v => `Final DD ≥ ${v}`,
-  finalDdTo:      v => `Final DD ≤ ${v}`,
-  delayDaysMin:   v => `Delay ≥ ${v}d`,
-  delayDaysMax:   v => `Delay ≤ ${v}d`,
-  missingSizes:   v => `Missing: ${v.join(', ')}`,
-  shippingMethod: v => `Shipping: ${v.join(', ')}`,
-  indMax:         v => `IND ≤ ${v}d`,
+  po:                v => `PO: ${v}`,
+  style:             v => `Style: ${v}`,
+  status:            v => ({ HOLD: 'DDD: Pending', HANDLED: 'DDD: Handled', APPROVED: 'DDD: Approved', REJECTED: 'DDD: Rejected', ACKNOWLEDGED: 'DDD: Acknowledged', ACK_APPROVED: 'DDD: Acknowledged', AUTOMATICALLY: 'DDD: Auto' }[v] || `DDD: ${v}`),
+  priority:          v => `Priority: ${v.length}`,
+  priorityUS:        v => `US Priority: ${v.length}`,
+  priorityUK:        v => `UK Priority: ${v.length}`,
+  supplier:          v => `Supplier: ${v.length}`,
+  ddManager:         v => Array.isArray(v) ? `Mgr: ${v.length}` : `Mgr: ${v}`,
+  ddStatus:          v => `Production: ${v.length}`,
+  reason:            v => `Reason: ${v.length}`,
+  urgent:            _ => 'Urgent only',
+  archive:           _ => 'Archive',
+  collection:        v => `Collection: ${v.length}`,
+  orderType:         v => `Type: ${v.join(', ')}`,
+  nextUpdate:        v => `Next Upd: ${v}`,
+  lateFuture:        v => `DD: ${v.join(', ')}`,
+  poRank:            v => `Rank: ${v.join(', ')}`,
+  delayResponse:     v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
+  deliveryStatus:    v => `Delivery: ${v.length}`,
+  supplierRegion:    v => ({ US: 'Region: US', CHINA: 'Region: China', ALL: 'Region: All' }[v] || `Region: ${v}`),
+  shippedOver80:     _ => 'Shipped > 80%',
+  dropDateFrom:      v => `Drop ≥ ${v}`,
+  dropDateTo:        v => `Drop ≤ ${v}`,
+  finalDdFrom:       v => `Final DD ≥ ${v}`,
+  finalDdTo:         v => `Final DD ≤ ${v}`,
+  delayDaysMin:      v => `Delay ≥ ${v}d`,
+  delayDaysMax:      v => `Delay ≤ ${v}d`,
+  missingSizes:      v => `Missing: ${v.join(', ')}`,
+  shippingMethod:    v => `Shipping: ${v.join(', ')}`,
+  indValue:          v => `IND value: ${v}`,
+  lastUrgentComment: v => `Comment: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
 };
 
 function isFilterActive(val, def) {
@@ -103,7 +118,6 @@ function ActiveChips({ filters, defaultFilters, onChange }) {
   );
 }
 
-// Compact dual date-range field
 function DateRangeField({ label, fromVal, toVal, onFromChange, onToChange }) {
   return (
     <FilterField label={label}>
@@ -116,7 +130,6 @@ function DateRangeField({ label, fromVal, toVal, onFromChange, onToChange }) {
   );
 }
 
-// Min/max numeric pair
 function MinMaxField({ label, minVal, maxVal, onMinChange, onMaxChange, suffix = '' }) {
   return (
     <FilterField label={label}>
@@ -124,6 +137,30 @@ function MinMaxField({ label, minVal, maxVal, onMinChange, onMaxChange, suffix =
         <input type="number" min="0" placeholder="Min" className={inputCls} value={minVal} onChange={e => onMinChange(e.target.value)} />
         <span className="text-[#A3A3A3] text-xs">→</span>
         <input type="number" min="0" placeholder={`Max${suffix ? ' ' + suffix : ''}`} className={inputCls} value={maxVal} onChange={e => onMaxChange(e.target.value)} />
+      </div>
+    </FilterField>
+  );
+}
+
+function IndOperatorField({ operator, value, onOperatorChange, onValueChange }) {
+  return (
+    <FilterField label="IND (days)">
+      <div className="flex items-center gap-1">
+        <select
+          className={selectCls + ' !w-[60px] !pl-2 !pr-5'}
+          value={operator || 'lte'}
+          onChange={e => onOperatorChange(e.target.value)}
+        >
+          {IND_OPERATORS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+        </select>
+        <input
+          type="number"
+          min="0"
+          placeholder="e.g. 7"
+          className={inputCls}
+          value={value}
+          onChange={e => onValueChange(e.target.value)}
+        />
       </div>
     </FilterField>
   );
@@ -140,7 +177,8 @@ export default function FilterToolbar({
   const defaultFilters = {
     po: '', style: '',
     status: 'ALL',
-    priority: [], supplier: [], ddManager: '', ddStatus: [], reason: [],
+    priority: [], priorityUS: [], priorityUK: [],
+    supplier: [], ddManager: [], ddStatus: [], reason: [],
     urgent: false, archive: false, collection: [], orderType: [],
     nextUpdate: '', lateFuture: [], poRank: [],
     delayResponse: '', deliveryStatus: [],
@@ -150,19 +188,21 @@ export default function FilterToolbar({
     finalDdFrom: '', finalDdTo: '',
     delayDaysMin: '', delayDaysMax: '',
     missingSizes: [], shippingMethod: [],
-    indMax: '',
+    indOperator: 'lte', indValue: '',
+    lastUrgentComment: '',
   };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
 
   const orderTypeOptions = orderTypes.length > 0 ? orderTypes : ['New', 'Rep'];
-  // Active scope: this section only renders if exactly "New" is the active orderType.
   const isNewOnly = Array.isArray(filters.orderType) && filters.orderType.length === 1 && filters.orderType[0] === 'New';
-  // Rep scope (for Rep-only filters: Missing Sizes, Priority Combo, Shipping Method)
   const isRepScope = mainOfficeViewMode === 'Rep' ||
     (Array.isArray(filters.orderType) && filters.orderType.length === 1 && filters.orderType[0] === 'Rep');
 
-  // ── DD Team Employee: simplified inline strip ──
+  const ddManagerValue = Array.isArray(filters.ddManager)
+    ? filters.ddManager
+    : (filters.ddManager ? [filters.ddManager] : []);
+
   if (role === 'dd_team_employee') {
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 grid gap-2 items-end shadow-[0_1px_3px_rgba(0,0,0,.04)]"
@@ -213,12 +253,10 @@ export default function FilterToolbar({
     );
   }
 
-  // ── Main office / DD team manager ──
   return (
     <>
-      {/* Compact bar */}
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-2 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(5, minmax(140px,1fr)) auto auto' }}>
+        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(4, minmax(140px,1fr)) minmax(140px,180px) auto auto' }}>
           <FilterField label="PO Number">
             <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
           </FilterField>
@@ -258,32 +296,23 @@ export default function FilterToolbar({
         </div>
       </div>
 
-      {/* Always-visible row: Final DD range + Delay days range (new) */}
-      <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-2 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(220px,1fr))' }}>
-          <DateRangeField label="Final DD" fromVal={filters.finalDdFrom} toVal={filters.finalDdTo} onFromChange={v => set('finalDdFrom', v)} onToChange={v => set('finalDdTo', v)} />
-          <MinMaxField label="Delay Request (days)" minVal={filters.delayDaysMin} maxVal={filters.delayDaysMax} onMinChange={v => set('delayDaysMin', v)} onMaxChange={v => set('delayDaysMax', v)} />
-          {isNewOnly && (
-            <>
-              <DateRangeField label="Drop Date" fromVal={filters.dropDateFrom} toVal={filters.dropDateTo} onFromChange={v => set('dropDateFrom', v)} onToChange={v => set('dropDateTo', v)} />
-              <FilterField label="Shipped > 80%">
-                <button onClick={() => set('shippedOver80', !filters.shippedOver80)} className={toggleCls(filters.shippedOver80)}>
-                  {filters.shippedOver80 ? 'Shipped > 80% ✓' : 'Shipped > 80%'}
-                </button>
-              </FilterField>
-            </>
-          )}
-        </div>
-      </div>
-
       {advancedOpen && (
         <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px,1fr))' }}>
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(200px,1fr))' }}>
+            <DateRangeField label="Final DD" fromVal={filters.finalDdFrom} toVal={filters.finalDdTo} onFromChange={v => set('finalDdFrom', v)} onToChange={v => set('finalDdTo', v)} />
+            <MinMaxField label="Delay Request (days)" minVal={filters.delayDaysMin} maxVal={filters.delayDaysMax} onMinChange={v => set('delayDaysMin', v)} onMaxChange={v => set('delayDaysMax', v)} />
+            {isNewOnly && (
+              <>
+                <DateRangeField label="Drop Date" fromVal={filters.dropDateFrom} toVal={filters.dropDateTo} onFromChange={v => set('dropDateFrom', v)} onToChange={v => set('dropDateTo', v)} />
+                <FilterField label="Shipped > 80%">
+                  <button onClick={() => set('shippedOver80', !filters.shippedOver80)} className={toggleCls(filters.shippedOver80)}>
+                    {filters.shippedOver80 ? 'Shipped > 80% ✓' : 'Shipped > 80%'}
+                  </button>
+                </FilterField>
+              </>
+            )}
             <FilterField label="DD Manager">
-              <select className={selectCls} value={filters.ddManager} onChange={e => set('ddManager', e.target.value)}>
-                <option value="">All</option>
-                {ddManagers.map(m => <option key={m} value={m}>{m}</option>)}
-              </select>
+              <MultiSelect value={ddManagerValue} onChange={v => set('ddManager', v)} options={ddManagers} placeholder="All managers" />
             </FilterField>
             <FilterField label="Supplier">
               <MultiSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} placeholder="All suppliers" />
@@ -306,8 +335,17 @@ export default function FilterToolbar({
             <FilterField label="Collection">
               <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
             </FilterField>
+            <FilterField label="Next Update">
+              <input type="date" className={inputCls} value={filters.nextUpdate || ''} onChange={e => set('nextUpdate', e.target.value)} />
+            </FilterField>
             <FilterField label="Delay Response">
               <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />
+            </FilterField>
+            <FilterField label="US Priority">
+              <MultiSelect value={filters.priorityUS || []} onChange={v => set('priorityUS', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
+            </FilterField>
+            <FilterField label="UK Priority">
+              <MultiSelect value={filters.priorityUK || []} onChange={v => set('priorityUK', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
             </FilterField>
             <FilterField label="Urgent">
               <button onClick={() => set('urgent', !filters.urgent)} className={toggleCls(filters.urgent)}>
@@ -319,7 +357,7 @@ export default function FilterToolbar({
                 <button
                   onClick={() => set('archive', !filters.archive)}
                   className={toggleCls(filters.archive)}
-                  title="Show POs with no delay request history (never entered the HOLD workflow)"
+                  title="Show POs with no delay request history"
                 >
                   {filters.archive ? 'Archive ✓' : 'Archive'}
                 </button>
@@ -333,20 +371,23 @@ export default function FilterToolbar({
                 <FilterField label="Shipping Method">
                   <MultiSelect value={filters.shippingMethod} onChange={v => set('shippingMethod', v)} options={shippingMethodOptions} placeholder="All methods" />
                 </FilterField>
+                <FilterField label="Last Urgent Comment">
+                  <input
+                    className={inputCls}
+                    placeholder="Search comment…"
+                    value={filters.lastUrgentComment || ''}
+                    onChange={e => set('lastUrgentComment', e.target.value)}
+                  />
+                </FilterField>
               </>
             )}
             {role === 'main_office' && (
-              <FilterField label="IND (max days)">
-                <input
-                  type="number"
-                  min="0"
-                  placeholder="e.g. 7"
-                  className={inputCls}
-                  value={filters.indMax}
-                  onChange={e => set('indMax', e.target.value)}
-                  title="Show POs with inventory days ≤ N"
-                />
-              </FilterField>
+              <IndOperatorField
+                operator={filters.indOperator}
+                value={filters.indValue}
+                onOperatorChange={v => set('indOperator', v)}
+                onValueChange={v => set('indValue', v)}
+              />
             )}
           </div>
           <ActiveChips filters={filters} defaultFilters={defaultFilters} onChange={onChange} />
