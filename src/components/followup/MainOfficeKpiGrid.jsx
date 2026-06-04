@@ -7,7 +7,6 @@ import {
   isUsSupplier,
   isPreviousCollection,
 } from '@/lib/followUpConstants';
-import CompactKpiBar from './CompactKpiBar';
 
 /* ───────── helpers ───────── */
 
@@ -36,13 +35,33 @@ function isNotStarted(r) {
 
 /* ───────── card ───────── */
 
-function KpiCard({ kpi, active, onClick }) {
+function KpiCard({ kpi, active, onClick, collapsed }) {
   const { label, value, meta, accent, alwaysRed } = kpi;
   const colorClass =
     accent === 'red' ? 'text-red-600'
     : accent === 'amber' ? 'text-amber-600'
     : accent === 'green' ? 'text-green-600'
     : 'text-[#0A0A0A]';
+
+  if (collapsed) {
+    return (
+      <button
+        onClick={onClick}
+        title={`${label} — ${meta}`}
+        className={[
+          'flex items-center gap-1.5 px-2 h-7 rounded-[6px] border whitespace-nowrap transition-all flex-shrink-0 min-w-0',
+          active
+            ? 'border-[#E31B7F] bg-[#FFF0F7]'
+            : alwaysRed
+              ? 'border-red-200 bg-red-50 hover:border-red-400'
+              : 'border-[#E5E5E5] bg-white hover:border-[#FFE5F2] hover:bg-[#FFF0F7]',
+        ].join(' ')}
+      >
+        <span className={`font-mono font-bold text-[12px] leading-none ${colorClass}`}>{value}</span>
+        <span className="text-[10px] font-semibold text-[#525252] uppercase tracking-[.03em] leading-none truncate">{label}</span>
+      </button>
+    );
+  }
 
   return (
     <button
@@ -181,7 +200,7 @@ export default function MainOfficeKpiGrid({
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => setCollapsed(!entry.isIntersecting),
-      { threshold: 0, rootMargin: '0px 0px 0px 0px' }
+      { threshold: 0 }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -203,49 +222,58 @@ export default function MainOfficeKpiGrid({
 
   return (
     <>
-    <CompactKpiBar
-      cards={cards}
-      activeOpKpi={activeOpKpi}
-      onClick={handleClick}
-      viewMode={viewMode}
-      onViewModeChange={onViewModeChange}
-      visible={collapsed}
-    />
-    <div className="mb-4">
+      {/* Sentinel — observed to know when to switch into compact mode */}
       <div ref={sentinelRef} aria-hidden="true" />
-      {/* View mode toggle */}
-      <div className="flex items-center justify-between mb-2 px-0.5">
-        <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em]">KPIs</div>
-        <div className="inline-flex bg-white border border-[#E5E5E5] rounded-[8px] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-          {['New', 'Rep'].map(mode => (
-            <button
-              key={mode}
-              onClick={() => onViewModeChange(mode)}
-              className={[
-                'px-4 h-7 rounded-[6px] text-[11px] font-semibold transition-all',
-                viewMode === mode
-                  ? 'bg-[#E31B7F] text-white shadow-[0_1px_3px_rgba(227,27,127,.25)]'
-                  : 'text-[#525252] hover:text-[#0A0A0A]',
-              ].join(' ')}
-            >
-              {mode === 'New' ? 'New Orders' : 'Rep Orders'}
-            </button>
+
+      <div
+        className={[
+          'mb-4 transition-all',
+          collapsed
+            ? 'sticky top-0 z-40 bg-[#F8F8F8] -mx-7 px-7 py-2 border-b border-[#E5E5E5] shadow-[0_2px_8px_rgba(0,0,0,.06)] mb-2'
+            : '',
+        ].join(' ')}
+      >
+        {/* View mode toggle */}
+        <div className={`flex items-center justify-between px-0.5 ${collapsed ? 'mb-1.5' : 'mb-2'}`}>
+          <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em]">KPIs</div>
+          <div className="inline-flex bg-white border border-[#E5E5E5] rounded-[8px] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+            {['New', 'Rep'].map(mode => (
+              <button
+                key={mode}
+                onClick={() => onViewModeChange(mode)}
+                className={[
+                  collapsed ? 'px-2.5 h-6 text-[10px]' : 'px-4 h-7 text-[11px]',
+                  'rounded-[6px] font-semibold transition-all',
+                  viewMode === mode
+                    ? 'bg-[#E31B7F] text-white shadow-[0_1px_3px_rgba(227,27,127,.25)]'
+                    : 'text-[#525252] hover:text-[#0A0A0A]',
+                ].join(' ')}
+              >
+                {collapsed ? mode : (mode === 'New' ? 'New Orders' : 'Rep Orders')}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* KPI grid — full 6×2 grid expanded, single-row flex when collapsed */}
+        <div
+          className={
+            collapsed
+              ? 'flex items-center gap-1.5 overflow-x-auto'
+              : 'grid grid-cols-6 gap-2'
+          }
+        >
+          {cards.map(card => (
+            <KpiCard
+              key={card.id}
+              kpi={card}
+              active={isActive(card)}
+              onClick={() => handleClick(card)}
+              collapsed={collapsed}
+            />
           ))}
         </div>
       </div>
-
-      {/* KPI grid — adapts to card count (11 cards either way). 6 cols × 2 rows */}
-      <div className="grid grid-cols-6 gap-2">
-        {cards.map(card => (
-          <KpiCard
-            key={card.id}
-            kpi={card}
-            active={isActive(card)}
-            onClick={() => handleClick(card)}
-          />
-        ))}
-      </div>
-    </div>
     </>
   );
 }
