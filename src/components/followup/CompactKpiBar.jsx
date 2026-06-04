@@ -12,7 +12,7 @@ export default function CompactKpiBar({ cards, activeOpKpi, onClick, viewMode, o
   }
 
   return (
-    <div className="sticky top-0 z-40 bg-[#F8F8F8]/95 backdrop-blur border-b border-[#E5E5E5] -mx-7 px-7 py-2 mb-2 shadow-[0_2px_8px_rgba(0,0,0,.04)]">
+    <div className="sticky top-0 z-40 bg-[#F8F8F8] border-b border-[#E5E5E5] -mx-7 px-7 py-2 mb-2 shadow-[0_2px_8px_rgba(0,0,0,.06)]">
       <div className="flex items-center gap-2">
         <div className="inline-flex bg-white border border-[#E5E5E5] rounded-[6px] p-0.5 shadow-[0_1px_2px_rgba(0,0,0,.04)] flex-shrink-0">
           {['New', 'Rep'].map(mode => (
