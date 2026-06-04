@@ -63,13 +63,25 @@ export default function DateRangePicker({ fromVal, toVal, onChange, placeholder 
         )}
       </button>
       {open && (
-        <div className="absolute z-[999] top-full left-0 mt-1 bg-white border border-[#D4D4D4] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.12)] p-2">
+        <div className="absolute z-[999] top-full left-0 mt-1 bg-white border border-[#D4D4D4] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.12)] p-2 date-range-popover">
           <Calendar
             mode="range"
             selected={range}
             onSelect={handleSelect}
             numberOfMonths={1}
           />
+          <style>{`
+            .date-range-popover .rdp-day_range_middle {
+              background-color: #FFE5F2 !important;
+              color: #0A0A0A !important;
+              border-radius: 0 !important;
+            }
+            .date-range-popover .rdp-day_range_start,
+            .date-range-popover .rdp-day_range_end {
+              background-color: #E31B7F !important;
+              color: white !important;
+            }
+          `}</style>
         </div>
       )}
     </div>

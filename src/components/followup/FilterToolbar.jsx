@@ -38,7 +38,8 @@ const CHIP_FORMATTERS = {
   archive:           _ => 'Archive',
   collection:        v => `Collection: ${v.length}`,
   orderType:         v => `Type: ${v.join(', ')}`,
-  nextUpdate:        v => `Next Upd: ${v}`,
+  nextUpdateFrom:    v => `Next Upd ≥ ${v}`,
+  nextUpdateTo:      v => `Next Upd ≤ ${v}`,
   delayResponse:     v => `Delay: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
   deliveryStatus:    v => `Delivery: ${v.length}`,
   supplierRegion:    v => ({ US: 'Region: US', CHINA: 'Region: China', ALL: 'Region: All' }[v] || `Region: ${v}`),
@@ -102,8 +103,8 @@ export default function FilterToolbar({
     status: 'ALL',
     urgencyReason: [], priorityUS: [], priorityUK: [],
     supplier: [], ddManager: [], ddStatus: [],
-    urgent: false, archive: false, collection: [], orderType: [],
-    nextUpdate: '',
+    archive: false, collection: [], orderType: [],
+    nextUpdateFrom: '', nextUpdateTo: '',
     delayResponse: '', deliveryStatus: [],
     supplierRegion: 'CHINA',
     dropDateFrom: '', dropDateTo: '',
@@ -175,7 +176,7 @@ export default function FilterToolbar({
           <MultiSelect value={filters.ddStatus} onChange={v => set('ddStatus', v)} options={productionStageOptions} placeholder="All stages" />
         </FilterField>
         <FilterField label="Next Update">
-          <input type="date" className={inputCls} value={filters.nextUpdate || ''} onChange={e => set('nextUpdate', e.target.value)} />
+          <DateRangePicker fromVal={filters.nextUpdateFrom} toVal={filters.nextUpdateTo} onChange={({ from, to }) => onChange({ ...filters, nextUpdateFrom: from, nextUpdateTo: to })} />
         </FilterField>
         <FilterField label="Final DD">
           <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo} onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
@@ -243,41 +244,8 @@ export default function FilterToolbar({
 
       {advancedOpen && (
         <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-          <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(210px,1fr))' }}>
-            {/* DATE RANGES */}
-            <FilterField label="Final DD">
-              <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo}
-                onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
-            </FilterField>
-            {isNewScope && (
-              <FilterField label="Drop Date">
-                <DateRangePicker fromVal={filters.dropDateFrom} toVal={filters.dropDateTo}
-                  onChange={({ from, to }) => onChange({ ...filters, dropDateFrom: from, dropDateTo: to })} />
-              </FilterField>
-            )}
-            <FilterField label="Next Update">
-              <input type="date" className={inputCls} value={filters.nextUpdate || ''} onChange={e => set('nextUpdate', e.target.value)} />
-            </FilterField>
-
-            {/* NUMERIC RANGES */}
-            <FilterField label="Delay Request (days)">
-              <RangeSlider min={0} max={120} valueMin={filters.delayDaysMin} valueMax={filters.delayDaysMax}
-                onChange={r => setRange('delayDaysMin', 'delayDaysMax', r)} suffix="d" />
-            </FilterField>
-            {isNewScope && (
-              <FilterField label="Shipped %">
-                <RangeSlider min={0} max={100} valueMin={filters.shippedPctMin} valueMax={filters.shippedPctMax}
-                  onChange={r => setRange('shippedPctMin', 'shippedPctMax', r)} suffix="%" />
-              </FilterField>
-            )}
-            {role === 'main_office' && (
-              <FilterField label="IND (days)">
-                <RangeSlider min={0} max={60} valueMin={filters.indMin} valueMax={filters.indMax}
-                  onChange={r => setRange('indMin', 'indMax', r)} suffix="d" />
-              </FilterField>
-            )}
-
-            {/* CATEGORY MULTI-SELECTS */}
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px,1fr))' }}>
+            {/* ── CATEGORIES (row 1) ── */}
             <FilterField label="DD Manager">
               <MultiSelect value={ddManagerValue} onChange={v => set('ddManager', v)} options={ddManagers} placeholder="All managers" />
             </FilterField>
@@ -293,19 +261,17 @@ export default function FilterToolbar({
             <FilterField label="Collection">
               <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
             </FilterField>
-            <FilterField label="Delay Response">
-              <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />
-            </FilterField>
-
-            {/* PRIORITY PER DESTINATION */}
             <FilterField label="US Priority">
               <MultiSelect value={filters.priorityUS || []} onChange={v => set('priorityUS', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
             </FilterField>
             <FilterField label="UK Priority">
               <MultiSelect value={filters.priorityUK || []} onChange={v => set('priorityUK', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
             </FilterField>
+            <FilterField label="Delay Response">
+              <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />
+            </FilterField>
 
-            {/* REP-ONLY FILTERS */}
+            {/* REP-ONLY CATEGORY FILTERS */}
             {isRepScope && (
               <>
                 <FilterField label="Missing Sizes">
@@ -334,16 +300,47 @@ export default function FilterToolbar({
                 </FilterField>
               </>
             )}
-          </div>
 
-          {/* TOGGLES STRIP — all toggles in one place */}
-          <div className="flex flex-wrap items-center gap-5 pt-3 mt-3 border-t border-[#E5E5E5]">
-            <span className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em]">Toggles</span>
-            <ToggleSwitch label="Urgent only" checked={filters.urgent} onChange={v => set('urgent', v)} />
-            {role === 'dd_team_manager' && (
-              <ToggleSwitch label="Archive" checked={filters.archive} onChange={v => set('archive', v)} />
+            {/* ── RANGES (row 2 — date + numeric) ── */}
+            <FilterField label="Final DD">
+              <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo}
+                onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
+            </FilterField>
+            {isNewScope && (
+              <FilterField label="Drop Date">
+                <DateRangePicker fromVal={filters.dropDateFrom} toVal={filters.dropDateTo}
+                  onChange={({ from, to }) => onChange({ ...filters, dropDateFrom: from, dropDateTo: to })} />
+              </FilterField>
+            )}
+            <FilterField label="Next Update">
+              <DateRangePicker fromVal={filters.nextUpdateFrom} toVal={filters.nextUpdateTo}
+                onChange={({ from, to }) => onChange({ ...filters, nextUpdateFrom: from, nextUpdateTo: to })} />
+            </FilterField>
+            <FilterField label="Delay Request (days)">
+              <RangeSlider min={0} max={120} valueMin={filters.delayDaysMin} valueMax={filters.delayDaysMax}
+                onChange={r => setRange('delayDaysMin', 'delayDaysMax', r)} suffix="d" />
+            </FilterField>
+            {isNewScope && (
+              <FilterField label="Shipped %">
+                <RangeSlider min={0} max={100} valueMin={filters.shippedPctMin} valueMax={filters.shippedPctMax}
+                  onChange={r => setRange('shippedPctMin', 'shippedPctMax', r)} suffix="%" />
+              </FilterField>
+            )}
+            {role === 'main_office' && (
+              <FilterField label="IND (days)">
+                <RangeSlider min={0} max={60} valueMin={filters.indMin} valueMax={filters.indMax}
+                  onChange={r => setRange('indMin', 'indMax', r)} suffix="d" />
+              </FilterField>
             )}
           </div>
+
+          {/* TOGGLES STRIP — manager-only (urgent toggle removed) */}
+          {role === 'dd_team_manager' && (
+            <div className="flex flex-wrap items-center gap-5 pt-3 mt-3 border-t border-[#E5E5E5]">
+              <span className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em]">Toggles</span>
+              <ToggleSwitch label="Archive" checked={filters.archive} onChange={v => set('archive', v)} />
+            </div>
+          )}
 
           <ActiveChips filters={filters} defaultFilters={defaultFilters} onChange={onChange} />
         </div>

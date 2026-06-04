@@ -117,7 +117,7 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
     { id: 'pending',     label: 'Pending',                  value: pending,               meta: 'HOLD requests',                accent: '',      filters: { ...baseFilter, status: 'HOLD' } },
     { id: 'late',        label: 'Late',                     value: late,                  meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: ['LATE'] } },
     { id: 'not_updated', label: 'Not Updated',              value: notUpdated,            meta: 'Due today — not touched',      accent: 'red',   filters: { ...baseFilter, nextUpdate: todayStr }, alwaysRed: true },
-    { id: 'urgents',     label: 'Urgents',                  value: scoped.filter(r => r.urgent).length, meta: 'Urgent-flagged POs', accent: 'red',   filters: { ...baseFilter, urgent: true } },
+    { id: 'urgents',     label: 'Urgents',                  value: scoped.filter(r => r.urgent).length, meta: 'Urgent-flagged POs', accent: 'red',   filters: { ...baseFilter, urgencyReason: ['Urgent'] } },
     { id: 'current_col', label: 'Current Collection',       value: currentColLate.length, meta: 'Late · this month',            accent: 'amber', filters: { ...baseFilter, collection: ['CURRENT'], lateFuture: ['LATE'] } },
     { id: 'will_miss',   label: 'Will miss collection',     value: willMiss,              meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: ['CURRENT_AT_RISK'], lateFuture: ['LATE'] } },
     { id: 'not_started', label: 'Manufactured Not Started', value: notStarted,            meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: ['NOT_STARTED'] } },

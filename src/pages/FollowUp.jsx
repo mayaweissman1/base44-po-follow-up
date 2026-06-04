@@ -39,11 +39,11 @@ const DEFAULT_FILTERS = (role) => ({
   supplier: [],
   ddManager: [],      // multi-select
   ddStatus: [],
-  urgent: false,
   archive: false,
   collection: [],
   orderType: [],
-  nextUpdate: '',
+  nextUpdateFrom: '',
+  nextUpdateTo: '',
   delayResponse: '',
   deliveryStatus: [],
   supplierRegion: 'CHINA', // CHINA | US | ALL — default to China
@@ -156,7 +156,8 @@ function matchOrderType(row, token) {
 function passesFilters(row, filters, role) {
   const {
     po, style, status, urgencyReason, supplier, ddManager, ddStatus,
-    urgent, archive, collection, orderType, nextUpdate,
+    archive, collection, orderType,
+    nextUpdateFrom, nextUpdateTo,
     delayResponse, deliveryStatus,
     dropDateFrom, dropDateTo, finalDdFrom, finalDdTo,
     delayDaysMin, delayDaysMax,
@@ -185,7 +186,6 @@ function passesFilters(row, filters, role) {
   if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
   if (filters.bestSeller && !row.is_best_seller) return false;
   if (filters.highBno && !row.bno_high_low_otw) return false;
-  if (urgent && !row.urgent) return false;
 
   if (has(ddStatus) && !ddStatus.some(s => matchDdStatus(row, s))) return false;
 
@@ -195,7 +195,8 @@ function passesFilters(row, filters, role) {
     if (!(diff >= 0 && diff < 7)) return false;
   }
 
-  if (nextUpdate && row.effective_next_update?.slice(0, 10) !== nextUpdate) return false;
+  if (nextUpdateFrom && (!row.effective_next_update || row.effective_next_update.slice(0, 10) < nextUpdateFrom)) return false;
+  if (nextUpdateTo   && (!row.effective_next_update || row.effective_next_update.slice(0, 10) > nextUpdateTo))   return false;
   if (delayResponse && !row.delay_response_comment?.toLowerCase().includes(delayResponse.toLowerCase())) return false;
   if (has(deliveryStatus) && !deliveryStatus.some(s => row.delivery_date_status?.toLowerCase().startsWith(s.toLowerCase()))) return false;
 
@@ -375,14 +376,15 @@ export default function FollowUp() {
     const empScope = activeRole === 'dd_team_employee' && user?.full_name
       ? { ddManager: [user.full_name] }
       : {};
+    const todayIso = new Date().toISOString().slice(0, 10);
     const overrides = {
       new_pending:        { status: 'HOLD' },
       total_pending:      { status: 'HOLD' },
-      urgent_pending:     { status: 'HOLD', urgent: true },
+      urgent_pending:     { status: 'HOLD' },
       approved_today:     { status: 'APPROVED' },
       rejected_today:     { status: 'REJECTED' },
       acknowledged_today: { status: 'ACK_APPROVED' },
-      not_updated:        { status: 'ALL', nextUpdate: new Date().toISOString().slice(0, 10) },
+      not_updated:        { status: 'ALL', nextUpdateFrom: todayIso, nextUpdateTo: todayIso },
       emp_pending:        { status: 'HOLD' },
       emp_acknowledged:   { status: 'ACK_APPROVED' },
       emp_rejected:       { status: 'REJECTED' },
