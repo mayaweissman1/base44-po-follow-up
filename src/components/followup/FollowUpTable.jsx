@@ -754,6 +754,7 @@ export default function FollowUpTable({
               {role === 'main_office' && <Th {...thProps} col="internal_note" width={colWidths['internal_note'] || 150}>Last Comment (internal)</Th>}
               {colVisible('ddd_count') && <Th {...thProps} col="ddd_count" width={colWidths['ddd_count'] || 70} tooltip={TIPS.ddd_count}>DDD Count</Th>}
               {colVisible('pm_tags') && <Th {...thProps} col="pm_tags" width={colWidths['pm_tags'] || 110} tooltip={TIPS.pm_tags}>PM Tags</Th>}
+              {role === 'main_office' && <Th {...thProps} col="inv_days" width={colWidths['inv_days'] || 70} tooltip="Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)">IND</Th>}
               {additionalCols.map(col => (
                 <Th key={col.key} {...thProps} col={col.key} width={colWidths[col.key] || 110}>{col.label}</Th>
               ))}
@@ -810,6 +811,14 @@ export default function FollowUpTable({
                     {role === 'main_office' && <td className={tdBase}><span className="text-[#A3A3A3] text-xs max-w-[180px] truncate inline-block" title={po.internal_note}>{po.internal_note || '—'}</span></td>}
                     {colVisible('ddd_count') && <td className={tdBase}><span className="font-mono">{po.ddd_count ?? 0}</span></td>}
                     {colVisible('pm_tags') && <td className={tdBase}><PmTagsPills label={po.pm_tags_label} /></td>}
+                    {role === 'main_office' && (
+                      <td className={tdBase}>
+                        {po.inv_days == null ? <span className="text-[#A3A3A3]">—</span> :
+                          po.inv_days >= 9999 ? <span className="font-mono text-[#A3A3A3]">∞</span> :
+                          <span className={`font-mono font-semibold ${po.inv_days < 5 ? 'text-red-500' : po.inv_days < 14 ? 'text-amber-600' : 'text-[#0A0A0A]'}`}>{po.inv_days}d</span>
+                        }
+                      </td>
+                    )}
                     {renderAdditionalTds(po, rowBg)}
                     <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionCellBase}`} onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-0.5">

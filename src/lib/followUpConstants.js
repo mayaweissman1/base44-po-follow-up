@@ -187,6 +187,23 @@ export function isPreviousCollection(collection) {
   return false;
 }
 
+// Standard size order for Missing Sizes display
+export const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
+
+export function sortSizes(sizes) {
+  if (!Array.isArray(sizes)) return [];
+  return [...sizes].sort((a, b) => {
+    const ia = SIZE_ORDER.indexOf(String(a).toUpperCase());
+    const ib = SIZE_ORDER.indexOf(String(b).toUpperCase());
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+  });
+}
+
+// Build a stable key string for a missing-sizes combination (e.g. ["XS","S"] -> "XS+S")
+export function missingSizesKey(sizes) {
+  return sortSizes(sizes).join('+');
+}
+
 // US suppliers — all others are treated as China for the Supplier Region filter.
 export const US_SUPPLIERS = ['LUCENTING', 'LUCENTINC', 'KILAT'];
 

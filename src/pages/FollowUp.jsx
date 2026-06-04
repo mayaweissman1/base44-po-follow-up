@@ -10,6 +10,7 @@ import {
   QC_STATUSES,
   isUsSupplier,
   isPreviousCollection,
+  missingSizesKey,
 } from '@/lib/followUpConstants';
 import KpiCards from '@/components/followup/KpiCards';
 import FilterToolbar from '@/components/followup/FilterToolbar';
@@ -56,6 +57,12 @@ const DEFAULT_FILTERS = (role) => ({
   finalDdTo: '',
   delayDaysMin: '',
   delayDaysMax: '',
+  // Rep-view filters
+  missingSizes: [],   // array of "XS+S" combo keys
+  priorityCombo: [],  // array of combo strings
+  shippingMethod: [], // array of shipping method strings
+  // IND filter (main_office)
+  indMax: '', // show POs with inv_days <= N
   // Virtual filters driven by KPIs
   staleStatus: false,
   late7Plus: false,
@@ -188,6 +195,22 @@ function passesFilters(row, filters, role) {
   if (finalDdTo    && (!row.final_dd || row.final_dd.slice(0, 10) > finalDdTo))   return false;
   if (delayDaysMin !== '' && delayDaysMin != null && (row.days_late_counting ?? 0) < Number(delayDaysMin)) return false;
   if (delayDaysMax !== '' && delayDaysMax != null && (row.days_late_counting ?? 0) > Number(delayDaysMax)) return false;
+
+  // Rep-view filters
+  if (has(filters.missingSizes)) {
+    const rowKey = missingSizesKey(row.missing_sizes || []);
+    if (!rowKey || !filters.missingSizes.includes(rowKey)) return false;
+  }
+  if (has(filters.priorityCombo) && !filters.priorityCombo.includes(row.priority_combo)) return false;
+  if (has(filters.shippingMethod)) {
+    const methods = row.shipping_methods || [];
+    if (!filters.shippingMethod.some(m => methods.includes(m))) return false;
+  }
+
+  // IND (Inventory Days) filter — show only POs with low inventory
+  if (filters.indMax !== '' && filters.indMax != null) {
+    if (row.inv_days == null || row.inv_days > Number(filters.indMax)) return false;
+  }
 
   // Archive toggle: POs that never entered the HOLD workflow (no delay request logged)
   if (archive) return !row.current_status;
@@ -381,20 +404,34 @@ export default function FollowUp() {
     () => rows.filter(r => passesFilters(r, filters, activeRole)),
     [rows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections, orderTypes } = useMemo(() => {
+  const { suppliers, ddManagers, collections, orderTypes, missingSizesOptions, priorityComboOptions, shippingMethodOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
+    const msMap = new Map(); // key -> count
+    const pcMap = new Map();
+    const smSet = new Set();
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
-      // Collections only from open New orders
       if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
+
+      // Rep-view options — derived from Rep orders only
+      const isRep = (r.po_type || '').toLowerCase().includes('rep');
+      if (isRep) {
+        const msKey = missingSizesKey(r.missing_sizes || []);
+        if (msKey) msMap.set(msKey, (msMap.get(msKey) || 0) + 1);
+        if (r.priority_combo) pcMap.set(r.priority_combo, (pcMap.get(r.priority_combo) || 0) + 1);
+        for (const m of (r.shipping_methods || [])) smSet.add(m);
+      }
     }
     return {
       suppliers: [...sup].sort(),
       ddManagers: [...mgr].sort(),
       collections: [...col].sort(),
       orderTypes: [...types].sort(),
+      missingSizesOptions: [...msMap.entries()].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
+      priorityComboOptions: [...pcMap.entries()].sort((a, b) => b[1] - a[1]).map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
+      shippingMethodOptions: [...smSet].sort(),
     };
   }, [rows]);
 
@@ -569,6 +606,10 @@ export default function FollowUp() {
           ddManagers={ddManagers}
           collections={collections}
           orderTypes={orderTypes}
+          missingSizesOptions={missingSizesOptions}
+          priorityComboOptions={priorityComboOptions}
+          shippingMethodOptions={shippingMethodOptions}
+          mainOfficeViewMode={mainOfficeViewMode}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}
         />

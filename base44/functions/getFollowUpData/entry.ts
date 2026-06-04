@@ -92,6 +92,38 @@ Deno.serve(async (req) => {
         LEFT JOIN shipment_destination sd ON sd.id = spv.destination
         GROUP BY spv.po_number
       ),
+      shipping_methods_per_po AS (
+        SELECT spv.po_number,
+               ARRAY_AGG(DISTINCT spv.shipping_method) FILTER (WHERE spv.shipping_method IS NOT NULL AND spv.shipping_method <> '') AS shipping_methods
+        FROM sub_po_view spv
+        GROUP BY spv.po_number
+      ),
+      priority_combo_per_po AS (
+        SELECT spv.po_number,
+               STRING_AGG(DISTINCT sd.destination || ' ' || COALESCE(NULLIF(pus.reason,''), CASE WHEN spv.urgent THEN 'URGENT' ELSE 'NORMAL' END), ', ' ORDER BY sd.destination || ' ' || COALESCE(NULLIF(pus.reason,''), CASE WHEN spv.urgent THEN 'URGENT' ELSE 'NORMAL' END)) AS priority_combo
+        FROM sub_po_view spv
+        LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+        LEFT JOIN po_urgent_status pus ON pus.po_number = spv.po_number
+        WHERE sd.destination IS NOT NULL
+        GROUP BY spv.po_number
+      ),
+      ind_per_po AS (
+        SELECT spv.po_number,
+               COALESCE((COALESCE(r."Inv total", 0::numeric) + COALESCE(o.qty_otw_air_only, 0::numeric)) / NULLIF(r.virtual7d / 7::numeric, 0::numeric), 9999::numeric) AS inv_days
+        FROM sub_po_view spv
+        LEFT JOIN reorder_view r ON r.style_color = spv.style_color
+        LEFT JOIN po_view o ON o.po_number = spv.po_number
+        GROUP BY spv.po_number, r."Inv total", o.qty_otw_air_only, r.virtual7d
+      ),
+      missing_sizes_per_po AS (
+        SELECT spv.po_number,
+               ARRAY_AGG(DISTINCT spv.size) FILTER (
+                 WHERE COALESCE((COALESCE(r2."Inv total", 0::numeric) + COALESCE(spv.qty_otw, 0::numeric)) / NULLIF(r2.virtual7d / 7::numeric, 0::numeric), 9999::numeric) < 5
+               ) AS missing_sizes
+        FROM sub_po_view spv
+        LEFT JOIN reorder_view r2 ON r2.style_color = spv.style_color AND r2.size = spv.size
+        GROUP BY spv.po_number
+      ),
       manual_rw_per_po AS (
         SELECT spv.po_number, SUM(COALESCE(bl.rw, 0)) AS manual_rw
         FROM batch_lines bl
@@ -160,7 +192,11 @@ Deno.serve(async (req) => {
         CASE WHEN bs.po_number IS NOT NULL THEN true ELSE false END AS is_best_seller,
         urp.urgency_reason AS urgency_reason,
         COALESCE(sbn.us_flag, 0) AS bno_us_flag,
-        COALESCE(sbn.uk_flag, 0) AS bno_uk_flag
+        COALESCE(sbn.uk_flag, 0) AS bno_uk_flag,
+        smp.shipping_methods AS shipping_methods,
+        pcp.priority_combo AS priority_combo,
+        idp.inv_days AS inv_days,
+        msp.missing_sizes AS missing_sizes
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -180,6 +216,10 @@ Deno.serve(async (req) => {
       LEFT JOIN bs_flag bs ON bs.po_number = pov.po_number
       LEFT JOIN urgency_reason_per_po urp ON urp.po_number = pov.po_number
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
+      LEFT JOIN shipping_methods_per_po smp ON smp.po_number = pov.po_number
+      LEFT JOIN priority_combo_per_po pcp ON pcp.po_number = pov.po_number
+      LEFT JOIN ind_per_po idp ON idp.po_number = pov.po_number
+      LEFT JOIN missing_sizes_per_po msp ON msp.po_number = pov.po_number
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
@@ -343,6 +383,10 @@ Deno.serve(async (req) => {
           : null,
         is_best_seller: !!po.is_best_seller,
         bno_high_low_otw: (Number(po.bno_us_flag) || 0) + (Number(po.bno_uk_flag) || 0) > 0,
+        shipping_methods: Array.isArray(po.shipping_methods) ? po.shipping_methods : [],
+        priority_combo: po.priority_combo || '',
+        inv_days: po.inv_days != null ? Math.round(Number(po.inv_days)) : null,
+        missing_sizes: Array.isArray(po.missing_sizes) ? po.missing_sizes : [],
       };
     });
 
