@@ -193,14 +193,26 @@ export default function MainOfficeKpiGrid({
 }) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const sentinelRef = useRef(null);
+  const gridRef = useRef(null);
   const [collapsed, setCollapsed] = useState(false);
+  const [expandedHeight, setExpandedHeight] = useState(0);
+
+  // Measure the expanded grid height once it renders, so we can reserve a
+  // placeholder of the same size when the bar becomes sticky. Without this,
+  // making the grid `position: sticky` removes it from the layout flow,
+  // the document shortens, the page scrolls up, the sentinel re-enters the
+  // viewport, and we flip back to expanded — causing a flicker loop.
+  useEffect(() => {
+    if (!gridRef.current || collapsed) return;
+    setExpandedHeight(gridRef.current.offsetHeight);
+  }, [collapsed, viewMode, rows.length]);
 
   useEffect(() => {
     const el = sentinelRef.current;
     if (!el) return;
     const observer = new IntersectionObserver(
       ([entry]) => setCollapsed(!entry.isIntersecting),
-      { threshold: 0 }
+      { threshold: 0, rootMargin: '0px' }
     );
     observer.observe(el);
     return () => observer.disconnect();
@@ -222,15 +234,21 @@ export default function MainOfficeKpiGrid({
 
   return (
     <>
-      {/* Sentinel — observed to know when to switch into compact mode */}
-      <div ref={sentinelRef} aria-hidden="true" />
+      {/* Sentinel sits above the grid. When it leaves the viewport we collapse. */}
+      <div ref={sentinelRef} aria-hidden="true" style={{ height: 1 }} />
+
+      {/* Placeholder preserves the original grid height when the real grid
+          becomes sticky — prevents layout shift / scroll flicker loops. */}
+      {collapsed && expandedHeight > 0 && (
+        <div aria-hidden="true" style={{ height: expandedHeight }} className="mb-4" />
+      )}
 
       <div
+        ref={gridRef}
         className={[
-          'mb-4 transition-all',
           collapsed
             ? 'sticky top-0 z-40 bg-[#F8F8F8] -mx-7 px-7 py-2 border-b border-[#E5E5E5] shadow-[0_2px_8px_rgba(0,0,0,.06)] mb-2'
-            : '',
+            : 'mb-4',
         ].join(' ')}
       >
         {/* View mode toggle */}
