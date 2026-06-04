@@ -327,7 +327,7 @@ export default function FilterToolbar({
               </FilterField>
             )}
             {role === 'main_office' && (
-              <FilterField label="IND (days)">
+              <FilterField label="IND">
                 <RangeSlider min={0} max={60} valueMin={filters.indMin} valueMax={filters.indMax}
                   onChange={r => setRange('indMin', 'indMax', r)} suffix="d" />
               </FilterField>
