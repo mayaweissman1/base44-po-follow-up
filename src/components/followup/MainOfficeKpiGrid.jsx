@@ -49,7 +49,7 @@ function KpiCard({ kpi, active, onClick, collapsed }) {
         onClick={onClick}
         title={`${label} — ${meta}`}
         className={[
-          'flex items-center gap-1.5 px-2 h-7 rounded-[6px] border whitespace-nowrap transition-all flex-shrink-0 min-w-0',
+          'flex items-center gap-2 px-2.5 h-9 rounded-[7px] border whitespace-nowrap transition-all',
           active
             ? 'border-[#E31B7F] bg-[#FFF0F7]'
             : alwaysRed
@@ -57,8 +57,8 @@ function KpiCard({ kpi, active, onClick, collapsed }) {
               : 'border-[#E5E5E5] bg-white hover:border-[#FFE5F2] hover:bg-[#FFF0F7]',
         ].join(' ')}
       >
-        <span className={`font-mono font-bold text-[12px] leading-none ${colorClass}`}>{value}</span>
-        <span className="text-[10px] font-semibold text-[#525252] uppercase tracking-[.03em] leading-none truncate">{label}</span>
+        <span className={`font-mono font-bold text-[14px] leading-none ${colorClass}`}>{value}</span>
+        <span className="text-[11px] font-semibold text-[#525252] uppercase tracking-[.03em] leading-none truncate">{label}</span>
       </button>
     );
   }
@@ -273,11 +273,11 @@ export default function MainOfficeKpiGrid({
           </div>
         </div>
 
-        {/* KPI grid — full 6×2 grid expanded, single-row flex when collapsed */}
+        {/* KPI grid — full 6×2 grid expanded, flex-wrap when collapsed (wraps to a second row if needed, no horizontal scroll) */}
         <div
           className={
             collapsed
-              ? 'flex items-center gap-1.5 overflow-x-auto'
+              ? 'flex flex-wrap items-center gap-1.5'
               : 'grid grid-cols-6 gap-2'
           }
         >
