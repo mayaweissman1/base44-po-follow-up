@@ -1,6 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 
+// Map raw destination names to short display labels (Edikted → US, EdiktedUK → UK)
+function destLabel(name) {
+  const n = String(name || '').trim().toLowerCase().replace(/[\s_-]/g, '');
+  if (n === 'edikteduk' || n === 'uk') return 'UK';
+  if (n === 'edikted' || n === 'us')   return 'US';
+  return name;
+}
+
 export default function PoSizeBreakdown({ poNumber, combined = false }) {
   const [destinations, setDestinations] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -97,7 +105,7 @@ export default function PoSizeBreakdown({ poNumber, combined = false }) {
           return (
             <div key={d.destination} className="border border-[#E5E5E5] rounded-[8px] overflow-hidden flex-shrink-0">
               <div className="px-4 py-2.5 bg-[#FAFAFA] border-b border-[#E5E5E5] flex items-center gap-2">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[10px] font-bold">{d.destination}</span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-[#FFF0F7] text-[#E31B7F] text-[10px] font-bold">{destLabel(d.destination)}</span>
                 {d.priority && d.priority !== 'NORMAL' && (
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${
                     d.priority === 'BEST_SELLER' ? 'bg-amber-50 text-amber-700 border-amber-200' :
