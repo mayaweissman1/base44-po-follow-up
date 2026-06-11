@@ -29,9 +29,24 @@ export default function GeneralUpdateModal({ po, posBulk, onClose, onSaved }) {
   const templates = ddStatus ? (STATUS_COMMENT_TEMPLATES[ddStatus] || []) : [];
   const hasTemplates = templates.length > 0;
 
+  // Next-update cap: 5 days if any selected PO is urgent, else 7 days.
+  // For bulk: if ANY PO is urgent, apply the stricter 5-day cap.
+  const targets = isBulk ? posBulk : (po ? [po] : []);
+  const anyUrgent = targets.some(t => t?.urgent);
+  const maxDays = anyUrgent ? 5 : 7;
+  const today = new Date();
+  const maxDate = new Date(today);
+  maxDate.setDate(today.getDate() + maxDays);
+  const maxDateStr = maxDate.toISOString().slice(0, 10);
+  const todayStr = today.toISOString().slice(0, 10);
+
   async function handleSave() {
     if (!ddStatus && !commentText.trim() && !nextUpdate) {
       setError('Change at least one field.');
+      return;
+    }
+    if (nextUpdate && nextUpdate > maxDateStr) {
+      setError(`Next Update date can't be more than ${maxDays} days from today${anyUrgent ? ' (urgent PO)' : ''}.`);
       return;
     }
     setSaving(true);
@@ -133,10 +148,15 @@ export default function GeneralUpdateModal({ po, posBulk, onClose, onSaved }) {
             <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">Next Update date</label>
             <input
               type="date"
+              min={todayStr}
+              max={maxDateStr}
               className="w-full h-9 px-3 border border-[#D4D4D4] rounded-[6px] text-sm focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
               value={nextUpdate}
               onChange={e => setNextUpdate(e.target.value)}
             />
+            <div className="text-[11px] text-[#A3A3A3] mt-1">
+              Max {maxDays} days from today{anyUrgent ? ' (urgent PO)' : ''} · up to {fmtDate(maxDateStr)}
+            </div>
           </div>
 
           {error && <div className="text-sm text-red-500 font-medium mb-2">{error}</div>}
