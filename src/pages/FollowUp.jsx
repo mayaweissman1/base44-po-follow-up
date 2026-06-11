@@ -353,10 +353,10 @@ export default function FollowUp() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  // When switching to DD employee role, pre-fill the DD Manager filter with the current user's name
+  // When switching to DD employee / manager role, pre-fill the DD Manager filter with the current user's name
   useEffect(() => {
     const base = DEFAULT_FILTERS(activeRole);
-    if (activeRole === 'dd_team_employee' && user?.full_name) {
+    if ((activeRole === 'dd_team_employee' || activeRole === 'dd_team_manager') && user?.full_name) {
       base.ddManager = [user.full_name];
     }
     if (activeRole === 'main_office') {
@@ -371,7 +371,7 @@ export default function FollowUp() {
     if (activeKpiFilter === filterKey) {
       setActiveKpiFilter(null);
       const base = DEFAULT_FILTERS(activeRole);
-      if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = [user.full_name];
+      if ((activeRole === 'dd_team_employee' || activeRole === 'dd_team_manager') && user?.full_name) base.ddManager = [user.full_name];
       setFilters(base);
       return;
     }
@@ -649,7 +649,7 @@ export default function FollowUp() {
           onChange={setFilters}
           onReset={() => {
             const base = DEFAULT_FILTERS(activeRole);
-            if (activeRole === 'dd_team_employee' && user?.full_name) base.ddManager = [user.full_name];
+            if ((activeRole === 'dd_team_employee' || activeRole === 'dd_team_manager') && user?.full_name) base.ddManager = [user.full_name];
             setFilters(base);
             setActiveKpiFilter(null);
             setActiveOpKpi(null);

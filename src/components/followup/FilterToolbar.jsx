@@ -136,13 +136,30 @@ export default function FilterToolbar({
     ...DD_STATUS_OPTIONS.filter(s => s !== 'Empty status').map(s => ({ value: s, label: s })),
   ];
 
-  // ── DD Team Employee: simplified inline strip ──
-  if (role === 'dd_team_employee') {
+  // ── DD Team Employee + DD Team Manager: simplified inline strip ──
+  // Exactly 8 filters: PO, Supplier, Style Color, DD Manager, Next Update (range),
+  // Production Stage, Supplier Region (default China), Collection.
+  if (role === 'dd_team_employee' || role === 'dd_team_manager') {
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 grid gap-2 items-end shadow-[0_1px_3px_rgba(0,0,0,.04)]"
            style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px,1fr))' }}>
         <FilterField label="PO Number">
           <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
+        </FilterField>
+        <FilterField label="Supplier">
+          <MultiSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} placeholder="All suppliers" />
+        </FilterField>
+        <FilterField label="Style Color">
+          <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
+        </FilterField>
+        <FilterField label="DD Manager">
+          <MultiSelect value={ddManagerValue} onChange={v => set('ddManager', v)} options={ddManagers} placeholder="All managers" />
+        </FilterField>
+        <FilterField label="Next Update">
+          <DateRangePicker fromVal={filters.nextUpdateFrom} toVal={filters.nextUpdateTo} onChange={({ from, to }) => onChange({ ...filters, nextUpdateFrom: from, nextUpdateTo: to })} />
+        </FilterField>
+        <FilterField label="Production Stage">
+          <MultiSelect value={filters.ddStatus} onChange={v => set('ddStatus', v)} options={productionStageOptions} placeholder="All stages" />
         </FilterField>
         <FilterField label="Supplier Region">
           <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
@@ -151,39 +168,8 @@ export default function FilterToolbar({
             <option value="ALL">All</option>
           </select>
         </FilterField>
-        <FilterField label="Supplier">
-          <MultiSelect value={filters.supplier} onChange={v => set('supplier', v)} options={suppliers} placeholder="All suppliers" />
-        </FilterField>
-        <FilterField label="Style Color">
-          <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
-        </FilterField>
         <FilterField label="Collection">
           <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
-        </FilterField>
-        <FilterField label="Order Type">
-          <MultiSelect value={filters.orderType} onChange={v => set('orderType', v)} options={orderTypeOptions} placeholder="All types" />
-        </FilterField>
-        <FilterField label="DDD Status">
-          <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
-            <option value="ALL">All</option>
-            <option value="HOLD">Pending</option>
-            <option value="APPROVED">Approved</option>
-            <option value="REJECTED">Rejected</option>
-            <option value="ACKNOWLEDGED">Acknowledged</option>
-          </select>
-        </FilterField>
-        <FilterField label="Production Stage">
-          <MultiSelect value={filters.ddStatus} onChange={v => set('ddStatus', v)} options={productionStageOptions} placeholder="All stages" />
-        </FilterField>
-        <FilterField label="Next Update">
-          <DateRangePicker fromVal={filters.nextUpdateFrom} toVal={filters.nextUpdateTo} onChange={({ from, to }) => onChange({ ...filters, nextUpdateFrom: from, nextUpdateTo: to })} />
-        </FilterField>
-        <FilterField label="Final DD">
-          <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo} onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
-        </FilterField>
-        <FilterField label="Delay Request (days)">
-          <RangeSlider min={0} max={120} valueMin={filters.delayDaysMin} valueMax={filters.delayDaysMax}
-            onChange={r => setRange('delayDaysMin', 'delayDaysMax', r)} suffix="d" />
         </FilterField>
         <button onClick={onReset} className="h-8 px-3 text-xs font-semibold text-[#525252] hover:text-[#0A0A0A] hover:bg-[#F8F8F8] rounded-[6px] flex items-center gap-1.5 transition-colors self-end justify-center">
           <RotateCcw size={12} /> Reset
