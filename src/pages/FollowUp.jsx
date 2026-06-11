@@ -63,6 +63,7 @@ const DEFAULT_FILTERS = (role) => ({
   missingSizes: [],   // array of size codes (XS / S / M / L / XL / XXL)
   shippingMethod: [], // array of shipping method NAMES (text from shipment_methods table)
   lastUrgentComment: '',
+  pmTags: [],         // array of PM tag strings (matches tokens in pm_tags_label)
   // Virtual filters driven by KPIs
   staleStatus: false,
   late7Plus: false,
@@ -237,6 +238,15 @@ function passesFilters(row, filters, role) {
   if (has(filters.shippingMethod)) {
     const names = row.shipping_method_names || [];
     if (!filters.shippingMethod.some(m => names.includes(m))) return false;
+  }
+
+  // PM Tags — match if any selected tag is present in the row's pm_tags_label
+  if (has(filters.pmTags)) {
+    const tags = String(row.pm_tags_label || '')
+      .split(',')
+      .map(t => t.trim())
+      .filter(Boolean);
+    if (!filters.pmTags.some(t => tags.includes(t))) return false;
   }
 
   // Last Urgent Comment
@@ -449,10 +459,11 @@ export default function FollowUp() {
     () => rows.filter(r => passesFilters(r, filters, activeRole)),
     [rows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, urgencyReasonOptions } = useMemo(() => {
+  const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, urgencyReasonOptions, pmTagsOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
     const smSet = new Set();
     const urgMap = new Map(); // urgency_reason raw value -> count
+    const pmTagsMap = new Map(); // pm tag -> count
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
@@ -474,6 +485,13 @@ export default function FollowUp() {
       if (isRep) {
         for (const m of (r.shipping_method_names || [])) smSet.add(m);
       }
+
+      // PM tags — split label on commas, count per tag
+      if (r.pm_tags_label) {
+        for (const t of String(r.pm_tags_label).split(',').map(s => s.trim()).filter(Boolean)) {
+          pmTagsMap.set(t, (pmTagsMap.get(t) || 0) + 1);
+        }
+      }
     }
     return {
       suppliers: [...sup].sort(),
@@ -482,6 +500,9 @@ export default function FollowUp() {
       orderTypes: [...types].sort(),
       shippingMethodOptions: [...smSet].sort(),
       urgencyReasonOptions: [...urgMap.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
+      pmTagsOptions: [...pmTagsMap.entries()]
         .sort((a, b) => b[1] - a[1])
         .map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
     };
@@ -660,6 +681,7 @@ export default function FollowUp() {
           orderTypes={orderTypes}
           shippingMethodOptions={shippingMethodOptions}
           urgencyReasonOptions={urgencyReasonOptions}
+          pmTagsOptions={pmTagsOptions}
           mainOfficeViewMode={mainOfficeViewMode}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}

@@ -56,6 +56,7 @@ const CHIP_FORMATTERS = {
   missingSizes:      v => `Missing: ${v.join(', ')}`,
   shippingMethod:    v => `Shipping: ${v.length}`,
   lastUrgentComment: v => `Comment: ${v.length > 20 ? v.slice(0, 20) + '…' : v}`,
+  pmTags:            v => `PM Tags: ${v.length}`,
 };
 
 function isFilterActive(val, def) {
@@ -94,6 +95,7 @@ export default function FilterToolbar({
   suppliers, ddManagers, collections = [], orderTypes = [],
   shippingMethodOptions = [],
   urgencyReasonOptions = [],
+  pmTagsOptions = [],
   mainOfficeViewMode,
   advancedOpen, onAdvancedToggle,
 }) {
@@ -114,6 +116,7 @@ export default function FilterToolbar({
     indMin: '', indMax: '',
     missingSizes: [], shippingMethod: [],
     lastUrgentComment: '',
+    pmTags: [],
   };
 
   const set = (key, val) => onChange({ ...filters, [key]: val });
@@ -170,6 +173,9 @@ export default function FilterToolbar({
         </FilterField>
         <FilterField label="Collection">
           <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
+        </FilterField>
+        <FilterField label="PM Tags">
+          <MultiSelect value={filters.pmTags} onChange={v => set('pmTags', v)} options={pmTagsOptions} placeholder="All tags" />
         </FilterField>
         <button onClick={onReset} className="h-8 px-3 text-xs font-semibold text-[#525252] hover:text-[#0A0A0A] hover:bg-[#F8F8F8] rounded-[6px] flex items-center gap-1.5 transition-colors self-end justify-center">
           <RotateCcw size={12} /> Reset
