@@ -433,6 +433,8 @@ export default function FollowUpTable({
 
   // ─── DD Team Employee view ─────────────────────────────────────────────────
   if (role === 'dd_team_employee') {
+    // 1 checkbox + 1 expand + 1 thumb + 1 PO + 31 data cols + 1 actions = 36
+    const empColSpan = 36;
     return (
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] shadow-[0_1px_3px_rgba(0,0,0,.04)] overflow-hidden">
         <div className="overflow-auto max-h-[calc(100vh-280px)]">
@@ -442,8 +444,9 @@ export default function FollowUpTable({
                 <th className={thCls} style={{ width: 36, position: 'sticky', left: 0, zIndex: 30 }}>
                   <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
                 </th>
-                <th className={thCls} style={{ width: 56, position: 'sticky', left: 36, zIndex: 30 }}></th>
-                <Th {...thProps} col="po_number" width={colWidths['po_number'] || 140} style={{ position: 'sticky', left: 92, zIndex: 30 }}>PO Number</Th>
+                <th className={thCls} style={{ width: 36, position: 'sticky', left: 36, zIndex: 30 }}></th>
+                <th className={thCls} style={{ width: 56, position: 'sticky', left: 72, zIndex: 30 }}></th>
+                <Th {...thProps} col="po_number" width={colWidths['po_number'] || 140} style={{ position: 'sticky', left: 128, zIndex: 30 }}>PO Number</Th>
                 <Th {...thProps} col="style_color" width={colWidths['style_color'] || 110}>Style Color</Th>
                 <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>
                 <Th {...thProps} col={null} width={colWidths['dd_comment_log'] || 170}>DD Comment</Th>
@@ -480,18 +483,25 @@ export default function FollowUpTable({
             </thead>
             <tbody>
               {visibleRows.map(po => {
+                const isExpanded = expanded.has(po.po_number);
                 const isRejected = po.current_status === 'REJECTED';
                 const rowBg = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
                 const actionBg = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
                 const countdown = po.countdown;
 
                 return (
-                  <tr key={po.po_number} className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
+                  <React.Fragment key={po.po_number}>
+                  <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
                     <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 0, zIndex: 20 }} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
-                    <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 36, zIndex: 20 }}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>
-                    <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 92, zIndex: 20 }}><PoCell po={po} onLogsClick={onViewLogs} /></td>
+                    <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 36, zIndex: 20 }} onClick={e => e.stopPropagation()}>
+                      <button onClick={() => toggleExpand(po.po_number)} className={`w-[18px] h-[18px] flex items-center justify-center text-[#525252] transition-transform ${isExpanded ? 'rotate-90 text-[#E31B7F]' : ''}`}>
+                        <ChevronRight size={14} />
+                      </button>
+                    </td>
+                    <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 72, zIndex: 20 }}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>
+                    <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 128, zIndex: 20 }}><PoCell po={po} onLogsClick={onViewLogs} /></td>
                     <td className={`${tdCls} ${rowBg}`}><span className="font-mono text-[12px]">{po.style_color}</span></td>
                     <td className={`${tdCls} ${rowBg}`}><DdStatusBadge status={po.effective_dd_status} /></td>
                     <td className={`${tdCls} ${rowBg}`}><DdCommentLog log={po.dd_comment_log} /></td>
@@ -543,6 +553,16 @@ export default function FollowUpTable({
                       </div>
                     </td>
                   </tr>
+                  {isExpanded && (
+                    <tr>
+                      <td colSpan={empColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
+                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 900 }}>
+                          <PoSizeBreakdown poNumber={po.po_number} />
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
