@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns } from 'lucide-react';
+import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns, Filter } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
@@ -8,6 +8,117 @@ import { fmtDate, ddmm } from '@/lib/followUpConstants';
 import PoSizeBreakdown from './PoSizeBreakdown';
 import StyleThumbnail from './StyleThumbnail';
 import PmTagsPills from './PmTagsPills';
+import CustomFilterModal, { evaluateCustomFilters } from './CustomFilterModal';
+
+// ─── Custom-filter column schemas per role ─────────────────────────────────
+// Maps the visible table columns to the (key, label, type) shape needed by
+// CustomFilterModal. Keep keys aligned with row fields so evaluateCustomFilters
+// can read them directly.
+const CUSTOM_FILTER_COLUMNS = {
+  main_office: [
+    { key: 'po_number',                  label: 'PO Number',         type: 'text' },
+    { key: 'style_color',                label: 'Style Color',       type: 'text' },
+    { key: 'effective_dd_status',        label: 'Production Stage',  type: 'text' },
+    { key: 'current_status',             label: 'DDD Status',        type: 'text' },
+    { key: 'priority',                   label: 'Urgency Reason',    type: 'text' },
+    { key: 'inv_days',                   label: 'IND',               type: 'number' },
+    { key: 'dd_manager_name',            label: 'DD Manager',        type: 'text' },
+    { key: 'supplier',                   label: 'Supplier',          type: 'text' },
+    { key: 'delivery_date_status',       label: 'Delivery Status',   type: 'text' },
+    { key: 'due_date',                   label: 'Due Date',          type: 'date' },
+    { key: 'effective_delayed_due_date', label: 'Delayed DD',        type: 'date' },
+    { key: 'final_dd',                   label: 'Final DD',          type: 'date' },
+    { key: 'effective_next_update',      label: 'Next Update',       type: 'date' },
+    { key: 'days_late_counting',         label: 'Days Late',         type: 'number' },
+    { key: 'ddd_reason',                 label: 'DD Reason',         type: 'text' },
+    { key: 'ddd_comment',                label: 'DDD Comment',       type: 'text' },
+    { key: 'hold_age_days',              label: 'HOLD Age',          type: 'number' },
+    { key: 'delay_response_comment',     label: 'Delay Response',    type: 'text' },
+    { key: 'internal_note',              label: 'Last Comment (internal)', type: 'text' },
+    { key: 'ddd_count',                  label: 'DDD Count',         type: 'number' },
+    { key: 'pm_tags_label',              label: 'PM Tags',           type: 'text' },
+    { key: 'collection',                 label: 'Collection',        type: 'text' },
+    { key: 'po_type',                    label: 'Order Type',        type: 'text' },
+  ],
+  dd_team_manager: [
+    { key: 'po_number',                  label: 'PO Number',         type: 'text' },
+    { key: 'style_color',                label: 'Style Color',       type: 'text' },
+    { key: 'effective_dd_status',        label: 'Production Stage',  type: 'text' },
+    { key: 'current_status',             label: 'DDD Status',        type: 'text' },
+    { key: 'delay_response_comment',     label: 'PO Response',       type: 'text' },
+    { key: 'ddd_reason',                 label: 'DDD Reason',        type: 'text' },
+    { key: 'ddd_comment',                label: 'DDD Comment',       type: 'text' },
+    { key: 'due_date',                   label: 'Original DD',       type: 'date' },
+    { key: 'effective_delayed_due_date', label: 'Delayed DD',        type: 'date' },
+    { key: 'delivery_date',              label: 'DD Date',           type: 'date' },
+    { key: 'countdown',                  label: 'CountDown',         type: 'number' },
+    { key: 'dd_manager_name',            label: 'DD Manager',        type: 'text' },
+    { key: 'supplier',                   label: 'Supplier',          type: 'text' },
+    { key: 'delivery_date_status',       label: 'Delivery Status',   type: 'text' },
+    { key: 'ddd_count',                  label: 'DDD Count',         type: 'number' },
+    { key: 'ordered_qty',                label: 'Ordered QTY',       type: 'number' },
+    { key: 'qty_received',               label: 'QTY Received',      type: 'number' },
+    { key: 'manual_rw',                  label: 'Manual RW',         type: 'number' },
+    { key: 'auto_rw',                    label: 'Auto RW',           type: 'number' },
+    { key: 'goods_received',             label: 'Goods Received',    type: 'date' },
+    { key: 'order_date',                 label: 'Order Date',        type: 'date' },
+    { key: 'days_same_status',           label: 'Days Same Status',  type: 'number' },
+    { key: 'effective_next_update',      label: 'Next Update',       type: 'date' },
+    { key: 'drop',                       label: 'Drop',              type: 'date' },
+    { key: 'collection',                 label: 'Collection',        type: 'text' },
+    { key: 'pm_tags_label',              label: 'PM Tags',           type: 'text' },
+    { key: 'bulk_fabric_approval',       label: 'Bulk Fabric',       type: 'boolean' },
+    { key: 'pps_receipt_date',           label: 'PPS Receipt Date',  type: 'date' },
+    { key: 'po_type',                    label: 'Order Type',        type: 'text' },
+  ],
+  dd_team_employee: [
+    { key: 'po_number',                  label: 'PO Number',         type: 'text' },
+    { key: 'style_color',                label: 'Style Color',       type: 'text' },
+    { key: 'effective_dd_status',        label: 'Production Stage',  type: 'text' },
+    { key: 'current_status',             label: 'DDD Status',        type: 'text' },
+    { key: 'delay_response_comment',     label: 'PO Response',       type: 'text' },
+    { key: 'ddd_reason',                 label: 'DDD Reason',        type: 'text' },
+    { key: 'ddd_comment',                label: 'DDD Comment',       type: 'text' },
+    { key: 'due_date',                   label: 'Original DD',       type: 'date' },
+    { key: 'effective_delayed_due_date', label: 'Delayed DD',        type: 'date' },
+    { key: 'delivery_date',              label: 'DD Date',           type: 'date' },
+    { key: 'countdown',                  label: 'CountDown',         type: 'number' },
+    { key: 'supplier',                   label: 'Supplier',          type: 'text' },
+    { key: 'delivery_date_status',       label: 'Delivery Status',   type: 'text' },
+    { key: 'dd_manager_name',            label: 'DD Manager',        type: 'text' },
+    { key: 'ddd_count',                  label: 'DDD Count',         type: 'number' },
+    { key: 'ordered_qty',                label: 'Ordered QTY',       type: 'number' },
+    { key: 'qty_received',               label: 'QTY Received',      type: 'number' },
+    { key: 'manual_rw',                  label: 'Manual RW',         type: 'number' },
+    { key: 'auto_rw',                    label: 'Auto RW',           type: 'number' },
+    { key: 'goods_received',             label: 'Goods Received',    type: 'date' },
+    { key: 'order_date',                 label: 'Order Date',        type: 'date' },
+    { key: 'days_same_status',           label: 'Days Same Status',  type: 'number' },
+    { key: 'effective_next_update',      label: 'Next Update',       type: 'date' },
+    { key: 'drop',                       label: 'Drop',              type: 'date' },
+    { key: 'collection',                 label: 'Collection',        type: 'text' },
+    { key: 'pm_tags_label',              label: 'PM Tags',           type: 'text' },
+    { key: 'bulk_fabric_approval',       label: 'Bulk Fabric',       type: 'boolean' },
+    { key: 'pps_receipt_date',           label: 'PPS Receipt Date',  type: 'date' },
+    { key: 'po_type',                    label: 'Order Type',        type: 'text' },
+  ],
+};
+
+// ─── Footer with Load more + Custom Filter button ──────────────────────────
+function FilterButton({ activeCount, onClick }) {
+  const btnRef = useRef(null);
+  return (
+    <button
+      ref={btnRef}
+      onClick={(e) => onClick(e.currentTarget.getBoundingClientRect())}
+      title="Custom filter"
+      className={`h-7 px-2.5 flex items-center gap-1.5 text-[11px] font-semibold rounded-[6px] border transition-colors ${activeCount > 0 ? 'bg-[#FFF0F7] text-[#E31B7F] border-[#E31B7F]' : 'bg-white text-[#525252] border-[#D4D4D4] hover:border-[#E31B7F] hover:text-[#E31B7F]'}`}
+    >
+      <Filter size={12} />
+      {activeCount > 0 ? `Filter (${activeCount})` : 'Filter'}
+    </button>
+  );
+}
 
 function DaysCell({ value }) {
   if (value === null || value === undefined) return <span className="font-mono text-[#A3A3A3]">0</span>;
@@ -48,22 +159,24 @@ function PoCell({ po, onLogsClick }) {
   );
 }
 
-function LoadMoreFooter({ visible, total, onLoadMore, onShowAll }) {
-  if (visible >= total) {
-    return (
-      <div className="px-4 py-2.5 text-[11px] text-[#A3A3A3] bg-[#FAFAFA] border-t border-[#E5E5E5] text-center">
-        Showing all {total} row{total === 1 ? '' : 's'}
-      </div>
-    );
-  }
+function LoadMoreFooter({ visible, total, onLoadMore, onShowAll, leftSlot, rightSlot }) {
+  const hasMore = visible < total;
   return (
-    <div className="px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E5E5] flex items-center justify-between text-[11px]">
-      <span className="text-[#525252]">
-        Showing <strong className="text-[#0A0A0A]">{visible}</strong> of <strong className="text-[#0A0A0A]">{total}</strong>
-      </span>
+    <div className="px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E5E5] flex items-center justify-between text-[11px] gap-2">
+      <div className="flex items-center gap-2">{leftSlot}</div>
       <div className="flex items-center gap-2">
-        <button onClick={onLoadMore} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white text-[#E31B7F] border border-[#E5E5E5] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">Load more</button>
-        <button onClick={onShowAll} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] text-[#525252] hover:text-[#0A0A0A] hover:bg-white transition-colors">Show all ({total})</button>
+        {hasMore ? (
+          <>
+            <span className="text-[#525252]">
+              Showing <strong className="text-[#0A0A0A]">{visible}</strong> of <strong className="text-[#0A0A0A]">{total}</strong>
+            </span>
+            <button onClick={onLoadMore} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white text-[#E31B7F] border border-[#E5E5E5] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">Load more</button>
+            <button onClick={onShowAll} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] text-[#525252] hover:text-[#0A0A0A] hover:bg-white transition-colors">Show all ({total})</button>
+          </>
+        ) : (
+          <span className="text-[#A3A3A3]">Showing all {total} row{total === 1 ? '' : 's'}</span>
+        )}
+        {rightSlot}
       </div>
     </div>
   );
@@ -353,6 +466,14 @@ export default function FollowUpTable({
   const [sortDir, setSortDir] = useState('asc');
   const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const [ddmOptCols, setDdmOptCols] = useState(loadDdmCols);
+  const [customFilters, setCustomFilters] = useState([]);
+  const [filterModalOpen, setFilterModalOpen] = useState(false);
+  const [filterAnchor, setFilterAnchor] = useState(null);
+
+  const customFilterColumns = CUSTOM_FILTER_COLUMNS[role] || CUSTOM_FILTER_COLUMNS.main_office;
+
+  // Reset custom filters when role changes (column schema differs)
+  useEffect(() => { setCustomFilters([]); }, [role]);
 
   useEffect(() => {
     setSortCol(null);
@@ -388,10 +509,15 @@ export default function FollowUpTable({
     }
   }
 
+  const filteredRows = useMemo(() => {
+    if (!customFilters.length) return rows;
+    return rows.filter(r => evaluateCustomFilters(r, customFilters, customFilterColumns));
+  }, [rows, customFilters, customFilterColumns]);
+
   const sortedRows = useMemo(() => {
-    if (!sortCol) return rows;
-    return [...rows].sort((a, b) => compareRows(a, b, sortCol, sortDir));
-  }, [rows, sortCol, sortDir]);
+    if (!sortCol) return filteredRows;
+    return [...filteredRows].sort((a, b) => compareRows(a, b, sortCol, sortDir));
+  }, [filteredRows, sortCol, sortDir]);
 
   const visibleRows = useMemo(() => sortedRows.slice(0, visibleCount), [sortedRows, visibleCount]);
 
@@ -573,7 +699,17 @@ export default function FollowUpTable({
           total={sortedRows.length}
           onLoadMore={() => setVisibleCount(c => c + PAGE_SIZE)}
           onShowAll={() => setVisibleCount(sortedRows.length)}
+          rightSlot={<FilterButton activeCount={customFilters.length} onClick={(rect) => { setFilterAnchor(rect); setFilterModalOpen(true); }} />}
         />
+        {filterModalOpen && (
+          <CustomFilterModal
+            columns={customFilterColumns}
+            rules={customFilters}
+            onChange={setCustomFilters}
+            onClose={() => setFilterModalOpen(false)}
+            anchorRect={filterAnchor}
+          />
+        )}
       </div>
     );
   }
@@ -656,18 +792,30 @@ export default function FollowUpTable({
         </div>
         <div className="px-4 py-2.5 bg-[#FAFAFA] border-t border-[#E5E5E5] flex items-center justify-between text-[11px]">
           <ColumnPicker visibleCols={ddmOptCols} onChange={handleDdmColChange} />
-          {visibleRows.length < sortedRows.length ? (
-            <div className="flex items-center gap-2">
-              <span className="text-[#525252]">
-                Showing <strong className="text-[#0A0A0A]">{visibleRows.length}</strong> of <strong className="text-[#0A0A0A]">{sortedRows.length}</strong>
-              </span>
-              <button onClick={() => setVisibleCount(c => c + PAGE_SIZE)} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white text-[#E31B7F] border border-[#E5E5E5] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">Load more</button>
-              <button onClick={() => setVisibleCount(sortedRows.length)} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] text-[#525252] hover:text-[#0A0A0A] hover:bg-white transition-colors">Show all ({sortedRows.length})</button>
-            </div>
-          ) : (
-            <span className="text-[#A3A3A3]">Showing all {sortedRows.length} row{sortedRows.length === 1 ? '' : 's'}</span>
-          )}
+          <div className="flex items-center gap-2">
+            {visibleRows.length < sortedRows.length ? (
+              <>
+                <span className="text-[#525252]">
+                  Showing <strong className="text-[#0A0A0A]">{visibleRows.length}</strong> of <strong className="text-[#0A0A0A]">{sortedRows.length}</strong>
+                </span>
+                <button onClick={() => setVisibleCount(c => c + PAGE_SIZE)} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white text-[#E31B7F] border border-[#E5E5E5] hover:border-[#E31B7F] hover:bg-[#FFF0F7] transition-colors">Load more</button>
+                <button onClick={() => setVisibleCount(sortedRows.length)} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] text-[#525252] hover:text-[#0A0A0A] hover:bg-white transition-colors">Show all ({sortedRows.length})</button>
+              </>
+            ) : (
+              <span className="text-[#A3A3A3]">Showing all {sortedRows.length} row{sortedRows.length === 1 ? '' : 's'}</span>
+            )}
+            <FilterButton activeCount={customFilters.length} onClick={(rect) => { setFilterAnchor(rect); setFilterModalOpen(true); }} />
+          </div>
         </div>
+        {filterModalOpen && (
+          <CustomFilterModal
+            columns={customFilterColumns}
+            rules={customFilters}
+            onChange={setCustomFilters}
+            onClose={() => setFilterModalOpen(false)}
+            anchorRect={filterAnchor}
+          />
+        )}
       </div>
     );
   }
@@ -894,7 +1042,17 @@ export default function FollowUpTable({
         total={sortedRows.length}
         onLoadMore={() => setVisibleCount(c => c + PAGE_SIZE)}
         onShowAll={() => setVisibleCount(sortedRows.length)}
+        rightSlot={<FilterButton activeCount={customFilters.length} onClick={(rect) => { setFilterAnchor(rect); setFilterModalOpen(true); }} />}
       />
+      {filterModalOpen && (
+        <CustomFilterModal
+          columns={customFilterColumns}
+          rules={customFilters}
+          onChange={setCustomFilters}
+          onClose={() => setFilterModalOpen(false)}
+          anchorRect={filterAnchor}
+        />
+      )}
     </div>
   );
 }
