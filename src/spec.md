@@ -1,50 +1,107 @@
 # Edikted Follow-Up — Product Specification
 
 **Version:** Current (June 2026)
-**Stack:** React + Vite + Tailwind + shadcn/ui · Base44 BaaS · External Postgres (Edikted DB)
-**Brand:** Edikted Pink (#E31B7F) · Inter / JetBrains Mono · Pink-forward fashion-tech aesthetic
+**Stack:** React 18 + Vite + Tailwind + shadcn/ui · Base44 BaaS · External Postgres (Edikted DB via `EDIKTED_DB_URL`)
+**Brand:** Edikted Pink (`#E31B7F`) · Inter (body/UI) · JetBrains Mono (numbers, codes, dates) · Pink-forward fashion-tech aesthetic
 
 ---
 
 ## 1. Purpose
 
-A unified operations console for tracking purchase-order (PO) delivery health across the supply chain.
-Three personas — **Main Office**, **DD Team Manager**, **DD Team Employee** — share one underlying dataset but each gets a tailored KPI grid, filter set, table layout, and action surface.
+A unified operations console for tracking purchase-order (PO) delivery health across Edikted's supply chain. The app answers three questions at a glance:
 
-The goal is to make late / at-risk POs **immediately visible**, give the DD team a fast way to log delays and updates, and give the Main Office a one-click way to approve / acknowledge / reject those delay requests.
+1. **What is late, urgent, or stuck?** → KPI grids surface problems immediately.
+2. **What did the DD team say about it?** → Tables show the latest status, comment, delay request, and history.
+3. **What should Main Office decide?** → HOLD requests sit in an actionable queue with Approve / Acknowledge / Reject buttons.
+
+The same dataset feeds **three personas**, each with a tailored KPI grid, filter set, table layout, and action surface.
 
 ---
 
-## 2. Roles
+## 2. Roles & Permissions
 
-| Role | Sees | Primary actions |
+### 2.1 Role list
+| Role key | Display name | Granted to |
 |---|---|---|
-| **Main Office** | All POs; KPI grid split by New / Rep orders; full filter set; insights strip; HOLDs responsibility breakdown | Approve / Acknowledge / Reject delay requests; write internal notes; respond to suppliers |
-| **DD Team Manager** | All POs; column picker (29 toggleable columns, standard + additional); manager KPIs | Report / edit delay; post general updates; view full activity log |
-| **DD Team Employee** | All POs but auto-scoped to their own name (DD Manager filter pre-fills); employee-specific KPI strip | Report / edit delay; post general updates; view activity log |
+| `main_office` | Main Office | Decision-makers reviewing DD team requests |
+| `dd_team_manager` | DD Team Manager | Manages the whole DD team — sees every PO |
+| `dd_team_employee` | DD Team Employee | Owns a subset of POs — sees all but auto-filtered to own name |
 
-Admins can switch role from the header dropdown. Non-admins see only their assigned roles.
+Admins (User.role = `admin`) can switch role from the header dropdown (every role available). Non-admins see only the roles listed in their `User.roles[]` array (falls back to legacy single `User.role`).
+
+### 2.2 Per-role differences (summary table)
+
+| Capability | Main Office | DD Manager | DD Employee |
+|---|---|---|---|
+| KPI grid | `MainOfficeKpiGrid` (6×2 + New/Rep toggle + sticky-on-scroll) | `KpiCards` — 7 cards | `KpiCards` — 4 cards (scoped to user) |
+| Insights strip | ✅ (suppliers + managers) | ❌ | ❌ |
+| HOLDs Responsibility card | ✅ (in KPI grid) | ❌ | ❌ |
+| Filter toolbar | Primary + Advanced (full set) | Simplified inline 9-field strip | Simplified inline 9-field strip |
+| DD Manager filter default | empty | empty | pre-filled to logged-in user |
+| Table layout | Main Office (26-ish cols, +1 missing-sizes in Rep) | Manager (4 fixed + 29 toggleable, picker persisted in localStorage) | Employee (4 fixed + 31 always-visible) |
+| Row click → PO Details drawer | ✅ | ❌ (drawer disabled — `onPoDetails` not passed) | ❌ |
+| Expandable sub-PO row | ❌ | ✅ | ✅ |
+| Row actions | Approve / Acknowledge / Reject / Internal note / Logs | Report/Edit Delay / General Update / Logs | Report/Edit Delay / General Update / Logs |
+| Bulk Action Bar | Approve All / Acknowledge All / Reject All / Export | Report Delay (bulk) / General Update (bulk) / Export | Report Delay (bulk) / General Update (bulk) / Export |
+| Archive toggle | ❌ | ✅ (advanced filter panel) | ❌ |
+| Last Comment (internal) column | ✅ | ❌ | ❌ |
+| HOLD Age column | ✅ | ❌ | ❌ |
+| IND (Inventory Days) column | ✅ | ❌ | ❌ |
+| PO Rank column | ✅ | ❌ | ❌ |
 
 ---
 
 ## 3. Data Model
 
-### 3.1 Source of truth — external Postgres
-Most PO data (style, supplier, quantities, dates, urgency, production stage, etc.) lives in the **Edikted DB** (accessed via `EDIKTED_DB_URL` secret). The backend reads it through SQL in `functions/getFollowUpData.js`.
+### 3.1 External source — Edikted DB (Postgres)
+Most read-only PO data (style, supplier, quantities, dates, urgency, production stage, destinations, sizes, OTW, GFS, shipments) lives in Edikted's production Postgres. The backend joins ~10 tables in `getFollowUpData`:
+`purchase_orders` · `po_urgent_status` · `po_types` · `suppliers` · `dd_managers` · `collections` · `shipment_methods` · `pm_tags` · `destinations`.
 
-### 3.2 App entities (Base44)
+### 3.2 Base44 entities
 
 **`dd_updates`** — append-only event log. Two types:
-- `DDD_UPDATE` — a delay request. Fields: `previous_due_date`, `new_due_date`, `reason[]` (multi-select), `reason_other_text`, `responsibility` (derived: SUPPLIER > EDIKTED > OTHER), `ddd_comment`, `status` (HOLD / AUTOMATICALLY / APPROVED / ACKNOWLEDGED / REJECTED), `cumulative_delay_days`, `decision_at`, `decision_by_email`, `delay_response_comment`, `internal_note`.
-- `GENERAL_UPDATE` — a status check-in. Fields: `dd_status`, `general_comment` (closed list + Other), `general_comment_other_text`, `next_update_date`.
 
-**`po_overrides`** — one row per PO, holds the latest effective state derived from updates: `delayed_due_date`, `dd_status`, `next_update_date`, `dd_status_changed_at`, `last_ddd_update_id`, `last_general_update_id`. Used as a fast read cache so the table doesn't need to scan `dd_updates` on every load.
+- **`DDD_UPDATE`** — a delay request:
+  `previous_due_date`, `new_due_date`, `reason[]` (multi-select from `DD_REASONS_BY_GROUP`), `reason_other_text`, `responsibility` (derived), `ddd_comment`, `status` (HOLD / AUTOMATICALLY / APPROVED / ACKNOWLEDGED / REJECTED), `cumulative_delay_days`, `decision_at`, `decision_by_email`, `delay_response_comment`, `internal_note`.
 
-### 3.3 Auto-approval rule
-Non-urgent delay requests with ≤ 3 days delay are auto-approved (`status = AUTOMATICALLY`) at submission. Everything else lands in HOLD for Main Office decision.
+- **`GENERAL_UPDATE`** — a status check-in:
+  `dd_status`, `general_comment` (closed list `DD_COMMENT_OPTIONS` + Other), `general_comment_other_text`, `next_update_date`.
 
-### 3.4 Responsibility derivation
-Each delay reason maps to OTHER / EDIKTED / SUPPLIER. When a request has multiple reasons, the worst-case wins: **SUPPLIER > EDIKTED > OTHER**.
+Common fields: `po_number`, `actor_email`, `type`.
+
+**`po_overrides`** — one row per PO, read-cache of the latest effective state:
+`delayed_due_date`, `dd_status`, `next_update_date`, `dd_status_changed_at`, `last_ddd_update_id`, `last_general_update_id`.
+
+### 3.3 Status enum
+Defined in `lib/followUpConstants.js → STATUS_ENUM`:
+- `HOLD` — Awaiting main office decision (amber badge)
+- `AUTOMATICALLY` — Auto-approved (non-urgent, ≤ 3 days delay; gray badge)
+- `APPROVED` — Approved — delay justified (green badge)
+- `ACKNOWLEDGED` — Accepted — no other choice (teal badge)
+- `REJECTED` — Delay not acceptable (red badge)
+
+### 3.4 Auto-approval rule
+At delay-request submission:
+- If PO is non-urgent **AND** new_due_date is ≤ 3 days past previous due_date → status = `AUTOMATICALLY` (no Main Office decision needed).
+- Otherwise → status = `HOLD` and lands in Main Office queue.
+
+### 3.5 Responsibility derivation
+Each delay reason maps to `OTHER` / `EDIKTED` / `SUPPLIER` (via `REASON_TO_RESPONSIBILITY`):
+- **OTHER**: Force Majeure, DD Temporary
+- **EDIKTED**: PPS Approval Late, Fabric Approval Late, QC Approval Late, Wrong Packing Materials, Labels Arrive Late
+- **SUPPLIER**: QC Reproduction, QC ReWork, PPS Submission Late, Fabric Issue, Production Capacity Issue, Technical problem – washing / printing / sewing-handmade, Packing Issue, Special details late
+
+When multiple reasons are selected, **worst-case wins: SUPPLIER > EDIKTED > OTHER**.
+
+### 3.6 Production stages (DD Status)
+Closed list of 20 stages (`DD_STATUS_OPTIONS`):
+Empty status · Order Fabric · PPS At Risk · PPS Send To Approval – Pre Prod · PPS Send To Approval – Post Prod · Ready For Production · In Production – Cutting · In Production – Knitting · In Production – Sewing · In Production – Washing · In Production – ACC · Reproduction · Supplier Self Inspection · QC in factory · QC in Office · Under Packing in Factory · Rework · OTW to Office · Partially Received · Goods Received.
+
+Grouped buckets used by KPIs and filters:
+- **NOT_STARTED_DD_STATUSES** — production hasn't truly begun (empty/PPS/Fabric/Order Fabric/Ready For Production stages)
+- **FABRIC_PPS_RISK_STATUSES** — Fabric/PPS approval risk stages
+- **REWORK_REPRO_STATUSES** — Rework, Reproduction
+- **QC_STATUSES** — QC in factory, QC in Office (used with > 3 days threshold)
 
 ---
 
@@ -52,12 +109,12 @@ Each delay reason maps to OTHER / EDIKTED / SUPPLIER. When a request has multipl
 
 | Function | Purpose |
 |---|---|
-| `getFollowUpData` | Returns `{ rows, kpis }`. Joins purchase_orders + po_urgent_status + po_types + suppliers + dd_managers + collections + shipment_methods + pm_tags with `po_overrides` and the latest `dd_updates`. Computes virtual fields (see §5). |
-| `getPoDetails` | Per-PO drawer data: full style/quantity/destination breakdown, OTW, GFS, replenishment numbers. |
-| `getPoActivityLog` | Full update history for one PO (used by Activity drawer). |
-| `saveFollowUpAction` | Single write endpoint for: log delay (single + bulk), general update (single + bulk), Main Office decision (approve / acknowledge / reject, single + bulk), internal note. Updates `dd_updates` + `po_overrides` atomically. |
+| `getFollowUpData` | Returns `{ rows, kpis }`. Joins Edikted DB + `po_overrides` + latest `dd_updates`. Computes ~25 virtual fields per row (see §5). Server-side KPI aggregation. |
+| `getPoDetails` | Per-PO drawer data: full style/quantity/destination breakdown, OTW, GFS, replenishment, shipment methods. |
+| `getPoActivityLog` | Full chronological update history for one PO (used by Activity drawer). |
+| `saveFollowUpAction` | **Single write endpoint** for all mutations: `DDD_UPDATE`, `GENERAL_UPDATE`, `DECISION`, `INTERNAL_NOTE`. Supports single + bulk (frontend loops on the same endpoint). Updates `dd_updates` + `po_overrides` atomically. Records `actor_email`. |
 
-All functions are user-scoped (`createClientFromRequest`); writes record `actor_email`.
+All functions are user-scoped (`createClientFromRequest`). Frontend never touches Edikted DB directly.
 
 ---
 
@@ -65,192 +122,340 @@ All functions are user-scoped (`createClientFromRequest`); writes record `actor_
 
 The backend hydrates each row with derived fields that drive KPIs, filters, and table cells:
 
-- `effective_dd_status`, `effective_delayed_due_date`, `effective_next_update` — overrides ▸ falls back to base PO data
-- `current_status` — latest DDD_UPDATE.status (null if PO never entered the delay workflow)
-- `final_dd` — effective delayed DD or original due date, whichever is later
-- `days_late_counting` — final_dd vs. original due_date
-- `late_future` — `LATE` / `FUTURE` / `RECEIVED`
-- `countdown` — days from today to final_dd (negative = past due)
-- `days_same_status` — days since `dd_status_changed_at`
-- `hold_age_days` — days a HOLD request has been awaiting decision (Main Office column)
-- `urgency_reason_raw` — raw text from `po_urgent_status` (split & normalized for filtering)
-- `us_priority` / `uk_priority` — per-destination priority tag (BEST_SELLER / URGENT / NORMAL)
-- `inv_days` — Inventory Days = (stock + air OTW) ÷ (virtual7d / 7) — Main Office only
-- `bno_high_low_otw` — boolean: demand high vs. OTW low
-- `is_best_seller`, `urgent` — flag booleans
-- `po_rank` — sub-PO order within the same destination + style_color group, by delayed DD
-- `dd_comment_log` — recent general updates as `[{date, text}]`
-- `pm_tags_label` — comma-joined PM tag tokens
-- `missing_sizes` — array of size codes still owed (Rep view)
-- `shipping_method_names` — array of method names from `shipment_methods` (Rep view)
-- `shipped_percent` — qty_received ÷ ordered_qty
+| Field | Description |
+|---|---|
+| `effective_dd_status` | overrides ▸ falls back to base PO data |
+| `effective_delayed_due_date` | overrides ▸ falls back |
+| `effective_next_update` | overrides ▸ falls back |
+| `current_status` | latest DDD_UPDATE.status (null if PO never entered delay workflow) |
+| `final_dd` | effective delayed DD or original due date, whichever is later |
+| `days_late_counting` | final_dd vs. original due_date |
+| `late_future` | `LATE` / `FUTURE` / `RECEIVED` |
+| `countdown` | days from today to final_dd (negative = past due) |
+| `days_same_status` | days since `dd_status_changed_at` |
+| `hold_age_days` | days a HOLD has been awaiting decision (Main Office) |
+| `urgency_reason_raw` | raw text from `po_urgent_status` table |
+| `us_priority` / `uk_priority` | per-destination tag: BEST_SELLER / URGENT / NORMAL |
+| `inv_days` | Inventory Days = (stock + air OTW) ÷ (virtual7d / 7) — Main Office only |
+| `bno_high_low_otw` | boolean: demand high vs. OTW low |
+| `is_best_seller`, `urgent` | flag booleans |
+| `po_rank` | sub-PO order within same destination + style_color group, ranked by delayed/original DD |
+| `dd_comment_log` | recent general updates as `[{date, text}]` |
+| `pm_tags_label` | comma-joined PM tag tokens |
+| `missing_sizes` | array of size codes still owed (Rep view) |
+| `shipping_method_names` | array of method names from `shipment_methods` (Rep view) |
+| `shipped_percent` | qty_received ÷ ordered_qty |
+| `ddd_count` | how many times the delivery date has been changed |
+| `delivery_date_status` | text from base PO data |
 
 ---
 
-## 6. UI Layout
+## 6. Page Layout
 
 ```
-┌────────────────────────────────────────────────────────────────┐
-│ Mockup banner (preview-only warning)                          │
-├────────────────────────────────────────────────────────────────┤
-│ Title  "Follow Up"        [Role ▾] [Export] [Refresh] [User ▾]│
-│ "Working as <Role>"                                           │
-├────────────────────────────────────────────────────────────────┤
-│ KPI ZONE — varies per role                                    │
-├────────────────────────────────────────────────────────────────┤
-│ Insights strip (Main Office only)                             │
-├────────────────────────────────────────────────────────────────┤
-│ Filter toolbar — primary bar + collapsible Advanced panel     │
-├────────────────────────────────────────────────────────────────┤
-│ Data table — role-specific columns, sticky header + actions   │
-│ Footer: row count · Load more · Show all · Custom Filter      │
-└────────────────────────────────────────────────────────────────┘
-[BulkActionBar] appears when rows are selected
+┌────────────────────────────────────────────────────────────────────┐
+│ Mockup banner — ⚠️ This is a mockup …                             │
+├────────────────────────────────────────────────────────────────────┤
+│ Title  "Follow Up"           [Role ▾] [Export] [Refresh] [User ▾] │
+│ "Working as <Role>"                                               │
+├────────────────────────────────────────────────────────────────────┤
+│ ZONE 1 — KPIs (varies per role)                                   │
+├────────────────────────────────────────────────────────────────────┤
+│ ZONE 2 — Insights strip (Main Office only, collapsible)           │
+├────────────────────────────────────────────────────────────────────┤
+│ ZONE 3 — Filter toolbar (primary + advanced)                      │
+├────────────────────────────────────────────────────────────────────┤
+│ ZONE 4 — Data table (role-specific columns)                       │
+│   Sticky header · Sticky left cluster · Sticky right Actions      │
+│   Footer: row count · Load more · Show all · Custom Filter button │
+└────────────────────────────────────────────────────────────────────┘
+[BulkActionBar] — floating bottom bar when rows are selected
 ```
 
 ---
 
-## 7. KPI Zones
+## 7. KPIs
 
 ### 7.1 Main Office — `MainOfficeKpiGrid`
-- **View mode toggle: New / Rep** (changes table scope automatically via `orderType` filter).
-- **6 × 2 KPI grid** scoped to selected view + supplier region (default China).
-- **Collapsible**: scroll past it and the grid sticks to the top in a compact one-row flex layout.
-- Cards (varies by view):
-  - Shared: Pending · Late · Not Updated · Urgents · Current Collection · Will Miss Collection · Manufactured Not Started
-  - **New only**: Fabric/PPS at Risk · Rework/Reproduction · QC > 3 days · Old Collection · Drop Risk (< 7d)
-  - **Rep only**: Late Best Sellers · High BNO – Low OTW · Empty Status · Same Status > 5d
-- Clicking a card applies its preset filter; clicking again clears it.
 
-### 7.2 DD Team Manager / Employee — `KpiCards`
-- Manager: Pending HOLDs · Total Pending · Urgent Pending · Approved/Rejected/Acknowledged today · Not Updated · Received Updates
-- Employee: scoped to the logged-in user — Pending · Acknowledged · Rejected · Received Updates
+**View mode toggle** at the top of the grid: **New** / **Rep**.
+Switching modes auto-applies an `orderType` filter to the table — i.e. the KPIs and the table always stay in sync.
 
-### 7.3 HOLDs Responsibility (Main Office only)
-A side card on top of the KPI strip breaks down current HOLDs by Edikted / Supplier / Other.
+**Sticky behaviour**: when the user scrolls past the grid, it sticks to the top in a compact one-row flex layout (the placeholder div preserves the original height to prevent scroll-flicker loops).
+
+All cards are **scoped to: (a) the selected view (New/Rep) AND (b) the active Supplier Region** (defaults to China). Click toggles the card's preset filter on/off.
+
+**Cards shared by both views** (always present, 7 cards):
+1. **Pending** — POs in HOLD status. *Filter: `status=HOLD`*
+2. **Late** — POs with `late_future = 'LATE'`. *Filter: `lateFuture=[LATE]`*
+3. **Not Updated** (always-red border) — Next Update = today AND no log entry written today. *Filter: `nextUpdate=today`*
+4. **Urgents** — Urgent-flagged POs (hidden in New view by request)
+5. **Current Collection** — Late POs in this month's collection
+6. **Will Miss Collection** — Current collection at risk: `final_dd > EOM - 5`
+7. **Manufactured Not Started** — `NOT_STARTED_DD_STATUSES`
+
+**New view — extra 5 cards** (replaces Urgents):
+- Fabric/PPS at Risk · Rework/Reproduction · QC > 3 days · Old Collection · Drop Risk (< 7d to drop date)
+
+**Rep view — extra 4 cards** (on top of shared):
+- Late Best Sellers · High BNO – Low OTW · Empty Status · Same Status > 5D
+
+### 7.2 DD Team Manager — `KpiCards`
+Seven cards spread evenly:
+1. **New pending (today)** — HOLDs created today
+2. **Total pending** — all HOLDs system-wide
+3. **Urgent pending** (red) — urgent HOLDs
+4. **Acknowledged** (green) — approved + acknowledged
+5. **Rejected today** (red)
+6. **Not Updated** (always-red border)
+7. **Receiving Notice** (amber) — POs with delivery status update
+
+Card click toggles its preset filter.
+
+### 7.3 DD Team Employee — `KpiCards`
+Four cards, **all scoped to the logged-in user's name** (regardless of the active DD Manager filter):
+1. **Pending** (red) — my HOLDs awaiting decision
+2. **Acknowledged** (green) — my approved + acknowledged
+3. **Rejected** (red) — rejected by main office
+4. **Receiving Notice** (amber) — delivery status updated
+
+### 7.4 HOLDs by Responsibility card
+Renders inside the Main Office KPI grid (`HoldsResponsibilityCard`). Computes responsibility split (OTHER / EDIKTED / SUPPLIER) for all currently-HOLDing POs and shows a stacked-bar mini-chart with counts and percentages.
 
 ---
 
-## 8. Filters — `FilterToolbar`
+## 8. Insights Strip (Main Office only)
 
-### 8.1 Main Office / DD Manager — primary + advanced
+`InsightsStrip` — a collapsible card between KPIs and filters. Aggregates non-US-supplier rows into supplier and manager stats:
 
-**Primary bar (always visible):** PO Number · Status · Style Color · Urgency Reason · Supplier Region · [+ Advanced] · Reset
+**Supplier insights:**
+- Top late supplier (by late%, min 5 POs)
+- Most on-time supplier (by ontime%, min 5 POs)
+- Biggest workload (by total POs)
+- Count of suppliers above 30% late (badge shown even when collapsed)
 
-**Advanced panel (collapsible) — categories:**
-DD Manager · Supplier · Production Stage · Order Type · Collection · US Priority · UK Priority · Delay Response
+**DD Manager insights:**
+- Top late (by absolute late count)
+- Top on-time (by ontime%)
+- Most urgent load (by urgent count)
 
-**Rep-only categories:** Missing Sizes · Shipping Method · Last Urgent Comment
-
-**Ranges:** Final DD · Drop Date (New only) · Next Update · Delay Request (days) · Shipped % (New only) · IND (Main Office only)
-
-**Toggles (DD Manager only):** Archive
-
-Active filters render as **dismissable chips** under the panel.
-
-### 8.2 DD Employee / DD Manager — simplified strip
-Inline single-row strip with: PO · Supplier · Style Color · DD Manager · Next Update · Production Stage · Supplier Region · Collection · PM Tags · Reset
-
-### 8.3 Supplier Region
-Three-way switch — **CHINA (default)** / US / All. Filters via the `US_SUPPLIERS` list (`LUCENTING`, `LUCENTINC`, `KILAT` + substring match).
-
-### 8.4 KPI-driven virtual filters
-Toggled by clicking KPI cards: `staleStatus`, `late7Plus`, `bestSeller`, `highBno`, `dropRisk`, `lateFuture`, `bnoHighLowOtw`, `sameStatusOver5d`.
+Clicking any insight opens `LeaderboardDrawer` with the full ranked list.
 
 ---
 
-## 9. Tables — `FollowUpTable`
+## 9. Filter Toolbar
 
-Three column layouts share the same shell (sticky header, sticky-left thumbnail/PO/checkbox cluster, sticky-right Actions column, sortable resizable columns, expandable row for sub-PO breakdown).
+`FilterToolbar` exists in two modes depending on role.
 
-### 9.1 Main Office view
-Columns: ☐ · ▸ · img · **PO Number** · Style Color · Rank · Production Stage · DDD Status · Urgency Reason · IND · DD Manager · Supplier · Delivery Status · Due Date · Delayed DD · Final DD · Next Update · Days Late · DD Reason · DDD Comment · DD Comment · HOLD Age · Delay Response · Last Comment (internal) · DDD Count · PM Tags · *Missing Sizes* (Rep scope) · **Actions** (Approve / Acknowledge / Reject / Internal note / Logs)
+### 9.1 Main Office / DD Manager — primary + advanced
 
-### 9.2 DD Team Manager view
-Same shell + a **Column Picker** (29 toggleable columns split Standard / Additional, persisted in `localStorage`).
-- Standard ON by default: Style Color · Production Stage · DD Comment · DDD Status · PO Response · DDD Reason · DDD Comment · Delayed DD · CountDown · DD Manager · Days Same Status · Next Update
-- Additional OFF by default: Original DD · DD Date · Flags · Supplier · Delivery Status · DDD Count · Set With · Ordered/Received QTY · Manual/Auto RW · Goods Received · Order Date · Drop · Collection · PM Tags · Bulk Fabric · PPS Receipt Date · Order Type
-- Actions: Report/Edit Delay · Update · Logs
+**Primary bar (always visible, single row):**
+PO Number · Status · Style Color · Urgency Reason (multi) · Supplier Region · `+ Advanced` toggle · Reset
 
-### 9.3 DD Team Employee view
-Fixed 31-column layout (no picker) matching Manager's full set. Auto-filtered by the logged-in user's name. Same actions as Manager.
+**Status options:** All · Pending (HOLD) · Handled · Approved · Rejected · Acknowledged · Auto-approved.
 
-### 9.4 Sub-PO expansion (▸ row)
-Both Manager and Employee rows can expand to show **`PoSizeBreakdown`** — size-by-size table per destination (US / UK). Loads from `getPoDetails`.
+**Supplier Region (always primary):** **China (default)** / US / All. Uses `US_SUPPLIERS = ['LUCENTING', 'LUCENTINC', 'KILAT']` substring match.
 
-### 9.5 Custom Filter
-Footer button "Filter" opens a **`CustomFilterModal`** anchored above the button. Build rules:
-- Pick column → operator (varies by type: text / number / date / boolean) → value
-- Multi-rule (Where / And…)
-- "Clear filters" · Cancel · Apply
-- Active count shown on the button. Filters auto-reset when role changes (column schemas differ).
+**Advanced panel (collapsible):**
+- **Categories**: DD Manager (multi) · Supplier (multi) · Production Stage (multi, incl. "Empty status" sentinel) · Order Type · Collection · US Priority · UK Priority · Delay Response (text)
+- **Rep-only categories**: Missing Sizes · Shipping Method · Last Urgent Comment (text)
+- **Date ranges**: Final DD · Drop Date *(New only)* · Next Update
+- **Numeric ranges**: Delay Request days · Shipped % *(New only)* · IND *(Main Office only)*
+- **Toggles** (DD Manager only): Archive (POs that never entered HOLD workflow)
+- **Active filter chips** render under the panel — click to dismiss.
+
+### 9.2 DD Employee / DD Manager — simplified inline strip
+A single-row grid of 9 filters with no advanced panel:
+PO Number · Supplier · Style Color · DD Manager · Next Update (range) · Production Stage · Supplier Region (default China) · Collection · PM Tags · Reset
+
+### 9.3 KPI-driven virtual filters
+KPI clicks set hidden flags on the filter state: `staleStatus`, `late7Plus`, `bestSeller`, `highBno`, `dropRisk`, `lateFuture`, `bnoHighLowOtw`, `sameStatusOver5d`. These filter the rows but don't render as chips (the KPI card itself is the visual indicator).
+
+### 9.4 Urgency Reason normalization
+Raw values from `po_urgent_status` (e.g. `"UK-O Order,US-O Order"`) get split on `,;|` and stripped of `US-` / `UK-` prefixes so US+UK variants collapse into one category. Options are sorted by frequency and shown as `"Category (count)"`.
+
+---
+
+## 10. Tables — `FollowUpTable`
+
+All three layouts share one shell:
+- Sticky header (sortable, resizable per-column)
+- Sticky-left cluster: ☐ checkbox · ▸ expand · img thumbnail · PO Number
+- Sticky-right Actions column with shadow
+- Rejected rows have a red row background
+- Pagination: PAGE_SIZE = 100 with **Load more** / **Show all** buttons in the footer
+- Per-row click → opens PO Details drawer (Main Office only)
+- Footer **Custom Filter** button (see §11)
+
+### 10.1 Main Office view
+
+**Columns** (left to right):
+☐ · ▸ · img · **PO Number** · Style Color · Rank · Production Stage · DDD Status · Urgency Reason · IND · DD Manager · Supplier · Delivery Status · Due Date · Delayed DD · Final DD · Next Update · Days Late · DD Reason · DDD Comment · DD Comment · HOLD Age · Delay Response · **Last Comment (internal)** · DDD Count · PM Tags · *Missing Sizes (Rep scope only)* · Actions
+
+**Actions per row:**
+- ✅ Approve (`onDecide(po, 'APPROVED')`)
+- ℹ️ Acknowledge (`onDecide(po, 'ACKNOWLEDGED')`)
+- ❌ Reject (`onDecide(po, 'REJECTED')`)
+- 💬 Internal note (`onInternalNote(po)`)
+- 🕐 View Logs (`onViewLogs(po)`)
+
+No expandable row.
+
+### 10.2 DD Team Manager view
+
+**Fixed columns (always visible):** ☐ · ▸ · img · **PO Number**
+
+**Toggleable columns** (29 total, via `ColumnPicker` persisted in localStorage `ddmgr-opt-cols`):
+
+*Standard — ON by default (12):*
+Style Color · Production Stage · DD Comment · DDD Status · PO Response · DDD Reason · DDD Comment · Delayed DD · CountDown · DD Manager · Days Same Status · Next Update
+
+*Additional — OFF by default (17):*
+Original DD · DD Date · Flags · Supplier · Delivery Status · DDD Count · Set With · Ordered QTY · QTY Received · Manual RW · Auto RW · Goods Received · Order Date · Drop · Collection · PM Tags · Bulk Fabric · PPS Receipt Date · Order Type
+
+**Column picker UI:** Standard / Additional grouped checkboxes, "Reset to defaults" button. Shows hidden count in the trigger button.
+
+**Actions per row:**
+- 🩷 Report delay / Edit delay (button label flips based on whether `effective_delayed_due_date` already exists)
+- Update (general update)
+- 🕐 View Logs
+
+**Expandable row** → renders `PoSizeBreakdown` (size-by-size breakdown per destination).
+
+### 10.3 DD Team Employee view
+
+**Fixed columns (always visible):** ☐ · ▸ · img · **PO Number**
+
+**Always-visible columns (31, no picker):**
+Style Color · Production Stage · DD Comment · DDD Status · PO Response · DDD Reason · DDD Comment · Original DD · Delayed DD · DD Date · CountDown · Flags · Supplier · Delivery Status · DD Manager · DDD Count · Set With · Ordered QTY · QTY Received · Manual RW · Auto RW · Goods Received · Order Date · Days Same Status · Next Update · Drop · Collection · PM Tags · Bulk Fabric · PPS Receipt Date · Order Type
+
+**Auto-scoping**: when the role is selected, the DD Manager filter pre-fills with the logged-in user's `full_name`. The user can clear it to see other people's POs (read-only — no permission gating in UI).
+
+**Actions per row:** identical to Manager view (Report delay / Update / Logs).
+
+**Expandable row** → renders `PoSizeBreakdown`.
+
+### 10.4 Sorting & resizing
+- Click any column header to sort asc → desc → none. Numeric sort for number fields, locale-numeric string sort otherwise.
+- Drag the right edge of a column header to resize. Widths kept in component state (not persisted).
+
+### 10.5 Tooltips
+Each column header has a one-line tooltip on hover (`TIPS` map) — e.g. `IND`: *Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)*; `HOLD Age`: *Days the delay request has been awaiting Main Office decision*.
+
+---
+
+## 11. Custom Filter Modal
+
+Footer button **"Filter"** opens `CustomFilterModal`, anchored above the button (positions `bottom: viewport - anchor.top + 8px` and `right` to match the anchor):
+
+- Build multiple rules: each rule is **(Column, Operator, Value)**. Combined with implicit AND.
+- Operators per column type:
+  - **text** — includes / does not include / is / is not / is empty / is not empty
+  - **number** — = / ≠ / > / ≥ / < / ≤ / is empty / is not empty
+  - **date** — is / before / after / is empty / is not empty
+  - **boolean** — is true / is false
 - Dropdowns auto-flip up when there's no room below.
+- Footer: **Clear filters** (left) · Cancel · **Apply** (right).
+- Active rule count shown on the trigger button.
+- **Filters reset when role changes** (the column schemas differ per role — see `CUSTOM_FILTER_COLUMNS`).
+
+Per-role column schemas in `CUSTOM_FILTER_COLUMNS`:
+- **main_office**: 23 fields (PO/style/stage/DDD status/urgency/IND/manager/supplier/dates/days late/reason/comments/HOLD age/response/internal note/DDD count/PM tags/collection/order type)
+- **dd_team_manager**: 29 fields (all manager columns above)
+- **dd_team_employee**: same 29 fields as manager
 
 ---
 
-## 10. Modals
+## 12. Modals & Drawers
 
-| Modal | Purpose | Key behaviour |
+| Component | Trigger | Behaviour |
 |---|---|---|
-| **`LogDelayModal`** | Report or edit a delay (DDD_UPDATE) | Multi-select reasons grouped by Other/Edikted/Supplier; new DD date picker; comment with `[date]` placeholder support; bulk mode for many POs at once |
-| **`GeneralUpdateModal`** | Post a status check-in (GENERAL_UPDATE) | Production stage + status-aware comment templates (see `STATUS_COMMENT_TEMPLATES`); next-update date constrained to ≤5d (urgent) or ≤7d (normal); bulk-capable |
-| **`DecisionModal`** | Main Office Approve / Acknowledge / Reject | Optional or required delay-response preset (`DELAY_RESPONSE_OPTIONS`) + free-text comment; bulk-capable |
-| **`InternalNoteModal`** | Main Office private note | Hidden from DD team |
-| **`ActivityLogDrawer`** | Right-side drawer | Chronological history of all updates for a PO; role-aware (DD team can't see internal notes) |
-| **`PoDetailsDrawer`** | Right-side drawer | Hero + Progress + Delay + Meta + Timeline + Readiness blocks; loads from `getPoDetails` |
-| **`LeaderboardDrawer`** | Right-side drawer | Top suppliers / managers by late%, on-time%, workload, urgents (triggered from Insights strip) |
-| **`BulkActionBar`** | Floating bottom bar | Appears on row selection; role-specific bulk actions (Approve all / Acknowledge all / Reject all for Main Office; Report Delay / Update for DD; Export for everyone) |
+| **`LogDelayModal`** | DD Manager/Employee "Report delay" / "Edit delay" buttons; Bulk Action Bar "Report Delay" | Multi-select reasons grouped by Other/Edikted/Supplier, "Other (custom)" with free text. Required: delayed DD (must be after original Due Date — single mode), at least one reason, comment. Bulk: same form applied to all selected POs (loops one save per PO). |
+| **`GeneralUpdateModal`** | DD Manager/Employee "Update" button; Bulk Action Bar "General Update" | Production stage (or "No change") + template-driven comment (`STATUS_COMMENT_TEMPLATES` by chosen stage; templates contain `[date]` / `[X/Y]` placeholders to fill) + Next Update date. Next Update capped at **5 days from today if any selected PO is urgent, else 7 days**. Warns if `[` placeholder remains in comment. |
+| **`DecisionModal`** | Main Office row Approve / Acknowledge / Reject buttons; Bulk Action Bar Approve/Acknowledge/Reject All | Single decision (`APPROVED` / `ACKNOWLEDGED` / `REJECTED`) + optional preset (`DELAY_RESPONSE_OPTIONS`: Please send via email · Push to send XS earlier · Push to send S earlier · Push to advance DD for UK / US qty · Shorten DD · Send partial qty · Send on [date] · Other). **Comment is required for REJECTED**. Detects status override (changing from APPROVED to REJECTED, etc.) and shows a confirmation message. |
+| **`InternalNoteModal`** | Main Office row 💬 button | Edit/save private note attached to the latest DDD_UPDATE. **Not visible to DD team** in logs or columns. |
+| **`ActivityLogDrawer`** | Row 🕐 Logs button; PO Number click in any table | Right-side drawer (`PoActivityLog`). Chronological history of all updates: DDD_UPDATEs (with reason, comment, decision badge), GENERAL_UPDATEs (stage, comment, next update). Internal notes shown only to `main_office` role. |
+| **`PoDetailsDrawer`** | Row click (Main Office only) | Right-side drawer with sub-blocks: Hero (PO info + thumb) · Progress (qty bars per destination) · Delay (history of DDD_UPDATEs) · Meta (collection/order type/drop/dates) · Timeline (all events) · Readiness (production stage timeline). Loads from `getPoDetails`. |
+| **`LeaderboardDrawer`** | Click any row in Insights strip | Right-side drawer with full ranked list of suppliers or managers by the chosen metric (late% / ontime% / workload / urgent count). |
+| **`BulkActionBar`** | Appears when ≥ 1 row selected | Floating bottom bar showing selection count, Clear button, role-specific bulk action buttons, and Export Selected. |
 
 ---
 
-## 11. Insights Strip (Main Office only)
+## 13. Header & User Menu
 
-A collapsible card above the filter toolbar surfacing performance trends:
-- **Supplier insights**: top late suppliers · top on-time · highest workload · urgent concentration
-- **Manager insights**: same axes for DD managers
-- Each insight opens a `LeaderboardDrawer` for the full ranked list.
-- US suppliers are excluded from supplier insights (different operating model).
+- **Title**: "Follow Up" with "Working as <Role>" subtitle.
+- **Role switcher**: dropdown showing roles available to the user. Admins see all three.
+- **Export button**: downloads CSV of current filtered rows.
+- **Refresh button**: re-runs `getFollowUpData`.
+- **User menu**: avatar with first letter + name → dropdown shows full name, email, role, and Log out.
 
----
-
-## 12. Auth
-
-Uses Base44's built-in auth pages (Login / Register / ForgotPassword / ResetPassword) without customization. After login users land on `/follow-up` (also reachable as `/`).
-
-Auth context (`AuthContext`) loads the current user + public settings before rendering the app. Unauthenticated users redirect to `/login`. User entity carries `role` (admin / user) plus an optional `roles[]` array for role-set assignments.
+CSV columns: PO Number · Style Color · Supplier · DD Manager · Status · Priority · Due Date · Delayed DD · Final DD · Days Late · DD Reason · DDD Comment · DD Status · Delivery Status · Response · Collection · Next Update · DDD Count.
 
 ---
 
-## 13. Design System
+## 14. Authentication
 
-- **Colors**: Edikted Pink (`#E31B7F`) primary; success green, warning amber, error red, accent purple/teal for tags. Page background `#F8F8F8`.
-- **Typography**: Inter (body / UI), JetBrains Mono (numbers, PO codes, dates).
-- **Spacing**: 4-px multiples; rounded corners `6 / 8 / 10 / 12 px`.
-- **Shadows**: `edikted-card` (subtle) · `edikted-hover` (pink-tinted on interactive) · `edikted-elevated` (modals).
-- **Status badges**: HOLD (amber) · APPROVED (green) · REJECTED (red) · ACKNOWLEDGED (teal) · AUTOMATICALLY (gray).
-- **Density**: 13px base font for tables; compact 7-8px vertical padding to maximize rows per screen.
+Uses Base44's built-in auth pages **without customization**:
+- `/login` · `/register` · `/forgot-password` · `/reset-password`
+- After login users land on `/follow-up` (also reachable as `/`).
+- `AuthContext` provides `user`, `isAuthenticated`, `isLoadingAuth`, `logout`. Auth pages render before the loading spinner clears.
+- `ProtectedRoute` guards `/` and `/follow-up`; unauthenticated visits redirect to `/login`.
+- `UserNotRegisteredError` screen renders when `authError.type === 'user_not_registered'`.
 
----
-
-## 14. Export
-
-CSV export (Export button + Bulk Export). Columns: PO · Style · Supplier · DD Manager · Status · Priority · Due Date · Delayed DD · Final DD · Days Late · DD Reason · DDD Comment · DD Status · Delivery Status · Response · Collection · Next Update · DDD Count.
+User entity carries built-in fields (`id`, `email`, `full_name`, `role`) and an optional custom `roles[]` array.
 
 ---
 
-## 15. Mockup Banner
+## 15. Design System
+
+### 15.1 Colors
+- **Primary**: Edikted Pink `#E31B7F`, hover `#C21571`, active `#A80D61`, light `#FFF0F7`, lighter `#FFE5F2`
+- **Success**: `#22C55E` (bg `#F0FDF4`, border `#86EFAC`)
+- **Warning**: `#F59E0B` (bg `#FFFBEB`, border `#FCD34D`)
+- **Error**: `#EF4444` (bg `#FEF2F2`, border `#FCA5A5`)
+- **Accent**: Purple `#8B5CF6` (bg `#F5F3FF`) · Teal `#14B8A6` (bg `#F0FDFA`)
+- **Page bg**: `#F8F8F8` · **Card bg**: white · **Subtle bg**: `#FAFAFA`
+- **Borders**: `#E5E5E5` (default) · `#D4D4D4` (input)
+- **Text**: primary `#0A0A0A` · secondary `#525252` · tertiary `#A3A3A3`
+
+### 15.2 Typography
+- Inter — body & UI (400/500/600/700)
+- JetBrains Mono — numbers, PO codes, dates (400/500/600)
+- Base body size 13px; KPI numbers 20-24px monospace bold.
+
+### 15.3 Shape
+- Border radius scale: 6 / 8 / 10 / 12 / 14px
+- Shadows: `edikted-card` (subtle), `edikted-hover` (pink-tinted on interactive), `edikted-elevated` (modals), `edikted-drawer` (drawers).
+
+### 15.4 Density
+- Compact table rows: 7-8px vertical padding to maximize rows per screen.
+- Inline form fields: 32px (h-8) height standard.
+- Sticky header is `bg-[#F8F8F8]`.
+
+### 15.5 Badges & tags
+- **Status badges** with semantic colors (HOLD amber, APPROVED green, REJECTED red, ACKNOWLEDGED teal, AUTOMATICALLY gray).
+- **Priority badges** — URGENT (amber), Best Seller (purple), Normal (gray).
+- **DD Status badge** — pill with status-specific color.
+- **Supplier / Manager / Collection pills** — colored bg, white text, rounded.
+
+---
+
+## 16. Conventions & Constraints
+
+- **Tailwind classes are literal strings only** — no template-string class names (build purges anything dynamic). Color helpers come from `tailwind.config.js`.
+- **Entity field writes never store base64 / blobs** — files go through `UploadFile` integration.
+- **Frontend never calls Edikted SQL directly** — always via the four backend functions.
+- **Bulk writes loop client-side** — `saveFollowUpAction` is called once per PO; if any call fails, the modal halts and shows the failing PO.
+- **`User` entity** is built-in; create/import disallowed — invites only.
+- **Date formatting** — `fmtDate` returns `"14 Jun"` (en-GB), `ddmm` returns `"14/06"`.
+- **Real-time** — entity subscriptions available but not currently wired (refresh button is the manual trigger).
+- **CSV export** uses a manual blob (no library).
+
+---
+
+## 17. Mockup Banner
 
 A pink banner across the top reads:
 > ⚠️ This is a mockup — data and actions are for preview purposes only.
 
 To be removed when the app moves to production data.
-
----
-
-## 16. Known Constraints / Conventions
-
-- `User` entity is built-in; never creates/imports records — invites only.
-- Entity field writes never store base64 / blobs — files go through `UploadFile` integration.
-- Real-time updates use `base44.entities.X.subscribe()` where needed.
-- Frontend never calls SQL directly — always through backend functions.
-- Tailwind classes are literal strings only (no template-string class names) per build purge rules.
