@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns, Filter, Zap, Calendar } from 'lucide-react';
+import { Check, Info, X, Clock, MessageSquare, StickyNote, ChevronRight, ChevronUp, ChevronDown, Columns, Filter, Zap, Calendar } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
@@ -1003,7 +1003,7 @@ export default function FollowUpTable({
                     )}
                     {renderAdditionalTds(po, rowBg)}
                     <td className={`${tdCls} sticky right-0 z-10 shadow-[-4px_0_8px_rgba(0,0,0,.04)] ${actionCellBase}`} onClick={e => e.stopPropagation()}>
-                      <div className="flex items-center gap-0.5">
+                      <div className="flex items-center justify-end gap-0.5">
                         {role === 'main_office' ? (
                           <>
                             {po.last_ddd_update_id && (
@@ -1022,8 +1022,8 @@ export default function FollowUpTable({
                             >
                               <Calendar size={14} />
                             </button>
-                            <button onClick={() => onInternalNote(po)} title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><MessageSquare size={14} /></button>
-                            {!po.marked_urgent && (
+                            <button onClick={() => onInternalNote(po)} title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><StickyNote size={14} /></button>
+                            {!po.marked_urgent && !po.urgent && (
                               <button
                                 onClick={() => onMarkUrgent?.(po)}
                                 title="Mark as urgent"
