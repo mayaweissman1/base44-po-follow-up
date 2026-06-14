@@ -434,7 +434,12 @@ Deno.serve(async (req) => {
         uk_priority: po.uk_priority_raw ? (po.uk_priority_raw === 3 ? 'BEST_SELLER' : po.uk_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
         // Computed urgent priority (per spec §3.3.2). Main Office "Mark as Urgent"
         // override forces this to 'MANUAL' regardless of the SQL computation.
-        urgent_priority: ov.marked_urgent ? 'MANUAL' : (po.urgent_priority || null),
+        // Strip US-/UK- destination prefixes — the column is a PO-level priority.
+        urgent_priority: ov.marked_urgent
+          ? 'MANUAL'
+          : (po.urgent_priority
+              ? String(po.urgent_priority).replace(/^(US|UK)\s*[-–:]\s*/i, '').trim()
+              : null),
         marked_urgent: !!ov.marked_urgent,
         marked_urgent_reason: ov.marked_urgent_reason || null,
       };

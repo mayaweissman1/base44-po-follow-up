@@ -1,7 +1,12 @@
 import React from 'react';
-import { Check, Info, X, FileDown } from 'lucide-react';
+import { MessageSquare, Calendar, X, FileDown } from 'lucide-react';
 
-export default function BulkActionBar({ count, role, onApproveAll, onAcknowledgeAll, onRejectAll, onBulkLogDelay, onBulkGeneralUpdate, onExport, onClear }) {
+export default function BulkActionBar({
+  count, role,
+  onRespond, onFollowUp,
+  onBulkLogDelay, onBulkGeneralUpdate,
+  onExport, onClear,
+}) {
   if (count === 0) return null;
 
   return (
@@ -12,14 +17,11 @@ export default function BulkActionBar({ count, role, onApproveAll, onAcknowledge
 
         {role === 'main_office' && (
           <>
-            <button onClick={onApproveAll} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center gap-1.5">
-              <Check size={12} /> Approve all
+            <button onClick={onRespond} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center gap-1.5">
+              <MessageSquare size={12} /> Respond
             </button>
-            <button onClick={onAcknowledgeAll} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center gap-1.5">
-              <Info size={12} /> Acknowledge all
-            </button>
-            <button onClick={onRejectAll} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center gap-1.5">
-              <X size={12} /> Reject all
+            <button onClick={onFollowUp} className="h-7 px-3 text-[11px] font-semibold rounded-[6px] bg-white/20 text-white hover:bg-white/30 transition-colors flex items-center gap-1.5">
+              <Calendar size={12} /> Follow up
             </button>
           </>
         )}

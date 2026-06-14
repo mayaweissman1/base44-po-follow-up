@@ -1,11 +1,37 @@
 import React, { useState } from 'react';
-import { X } from 'lucide-react';
+import { X, Check, Info } from 'lucide-react';
 import { STATUS_ENUM, DELAY_RESPONSE_OPTIONS } from '@/lib/followUpConstants';
 import { base44 } from '@/api/base44Client';
 
-export default function DecisionModal({ po, posBulk, decision, onClose, onSaved }) {
-  const isBulk = !po && !!posBulk?.length;
+// Three status options shown as icon-buttons at the top of the modal.
+const STATUS_OPTIONS = [
+  { key: 'APPROVED',     label: 'Approve',     Icon: Check, color: 'green' },
+  { key: 'ACKNOWLEDGED', label: 'Acknowledge', Icon: Info,  color: 'teal' },
+  { key: 'REJECTED',     label: 'Reject',      Icon: X,     color: 'red' },
+];
 
+function StatusButton({ option, selected, onClick }) {
+  const { Icon, color, label, key } = option;
+  const palette = {
+    green: { sel: 'bg-green-50 border-green-500 text-green-700', idle: 'border-[#E5E5E5] text-[#525252] hover:border-green-300 hover:bg-green-50/50' },
+    teal:  { sel: 'bg-teal-50 border-teal-500 text-teal-700',    idle: 'border-[#E5E5E5] text-[#525252] hover:border-teal-300 hover:bg-teal-50/50' },
+    red:   { sel: 'bg-red-50 border-red-500 text-red-600',       idle: 'border-[#E5E5E5] text-[#525252] hover:border-red-300 hover:bg-red-50/50' },
+  }[color];
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(key)}
+      className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-[10px] border-2 transition-all ${selected ? palette.sel : palette.idle}`}
+    >
+      <Icon size={18} strokeWidth={2.5} />
+      <span className="text-[11px] font-bold uppercase tracking-wide">{label}</span>
+    </button>
+  );
+}
+
+export default function DecisionModal({ po, posBulk, decision: initialDecision, onClose, onSaved }) {
+  const isBulk = !po && !!posBulk?.length;
+  const [decision, setDecision] = useState(initialDecision || null);
   const [preset, setPreset] = useState('');
   const [sendOnDate, setSendOnDate] = useState('');
   const [otherText, setOtherText] = useState('');
@@ -13,13 +39,11 @@ export default function DecisionModal({ po, posBulk, decision, onClose, onSaved 
   const [error, setError] = useState('');
 
   if (!po && !posBulk?.length) return null;
-  if (!decision) return null;
 
-  const newLabel = STATUS_ENUM[decision]?.name || decision;
-  const isOverride = !isBulk && po.current_status && po.current_status !== 'HOLD';
+  const newLabel = decision ? (STATUS_ENUM[decision]?.name || decision) : null;
+  const isOverride = !isBulk && decision && po.current_status && po.current_status !== 'HOLD' && po.current_status !== decision;
   const currentLabel = !isBulk && po.current_status ? STATUS_ENUM[po.current_status]?.name : null;
   const commentRequired = decision === 'REJECTED';
-
   const decisionColor = decision === 'APPROVED' ? 'text-green-600'
     : decision === 'REJECTED' ? 'text-red-500' : 'text-teal-600';
 
@@ -31,19 +55,17 @@ export default function DecisionModal({ po, posBulk, decision, onClose, onSaved 
   }
 
   async function handleConfirm() {
+    if (!decision) {
+      setError('Please select a status.');
+      return;
+    }
     const comment = buildComment();
     if (commentRequired && !comment) {
       setError('A comment is required when rejecting.');
       return;
     }
-    if (preset === 'SEND_ON_DATE' && !sendOnDate) {
-      setError('Please select a date.');
-      return;
-    }
-    if (preset === 'OTHER' && !otherText.trim()) {
-      setError('Please enter the comment text.');
-      return;
-    }
+    if (preset === 'SEND_ON_DATE' && !sendOnDate) { setError('Please select a date.'); return; }
+    if (preset === 'OTHER' && !otherText.trim()) { setError('Please enter the comment text.'); return; }
     setError('');
     setSaving(true);
     try {
@@ -76,31 +98,38 @@ export default function DecisionModal({ po, posBulk, decision, onClose, onSaved 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative bg-white rounded-[14px] w-[480px] max-w-[calc(100vw-32px)] max-h-[90vh] flex flex-col shadow-[0_8px_24px_rgba(227,27,127,.10),0_4px_8px_rgba(0,0,0,.04)] animate-scale-in">
+      <div className="relative bg-white rounded-[14px] w-[520px] max-w-[calc(100vw-32px)] max-h-[90vh] flex flex-col shadow-[0_8px_24px_rgba(227,27,127,.10),0_4px_8px_rgba(0,0,0,.04)] animate-scale-in">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E5E5]">
-          <h2 className="text-base font-semibold text-[#0A0A0A]">
-            {isBulk
-              ? `Mark ${posBulk.length} PO${posBulk.length > 1 ? 's' : ''} as ${newLabel}`
-              : isOverride ? 'Change decision?' : `Mark as ${newLabel}?`}
-          </h2>
+          <div>
+            <h2 className="text-base font-semibold text-[#0A0A0A]">Respond to DD delay</h2>
+            {isBulk ? (
+              <div className="text-[11px] text-[#A3A3A3] mt-0.5">{posBulk.length} PO{posBulk.length > 1 ? 's' : ''} selected</div>
+            ) : (
+              <div className="text-[11px] text-[#A3A3A3] mt-0.5 font-mono">{po.po_number} · {po.style_color}</div>
+            )}
+          </div>
           <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#F8F8F8] transition-colors">
             <X size={16} />
           </button>
         </div>
 
         <div className="px-5 py-5 overflow-y-auto flex-1">
-          {isBulk ? (
-            <div className="mb-4 bg-[#FFF0F7] border border-[#FFE5F2] rounded-[8px] px-3 py-2.5 text-xs font-semibold text-[#E31B7F]">
-              {posBulk.length} POs selected · same decision &amp; comment will apply to all
+          {/* Status selector — 3 icon buttons */}
+          <div className="mb-5">
+            <label className="block text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] mb-2">Decision</label>
+            <div className="flex gap-2">
+              {STATUS_OPTIONS.map(opt => (
+                <StatusButton key={opt.key} option={opt} selected={decision === opt.key} onClick={k => { setDecision(k); setError(''); }} />
+              ))}
             </div>
-          ) : (
-            <p className="text-sm text-[#525252] leading-relaxed mb-4">
-              {isOverride
-                ? <><strong className="text-[#0A0A0A]">{po.po_number}</strong> is currently <strong className={decisionColor}>{currentLabel}</strong>. Change to <strong className={decisionColor}>{newLabel}</strong>?</>
-                : <>Mark <strong className="text-[#0A0A0A]">{po.po_number}</strong> as <strong className={decisionColor}>{newLabel}</strong>.</>}
-            </p>
-          )}
+            {isOverride && (
+              <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[6px] px-2.5 py-1.5">
+                Currently <strong>{currentLabel}</strong>. Changing to <strong className={decisionColor}>{newLabel}</strong>.
+              </div>
+            )}
+          </div>
 
+          {/* Comment */}
           <div>
             <label className="block text-[13px] font-semibold text-[#0A0A0A] mb-1.5">
               Delay Response Comment{' '}
@@ -109,7 +138,7 @@ export default function DecisionModal({ po, posBulk, decision, onClose, onSaved 
                 : <span className="text-[#A3A3A3] font-normal">(optional)</span>}
             </label>
             <select
-              className={`w-full h-9 px-3 border rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 ${error && !preset ? 'border-red-400' : 'border-[#D4D4D4]'}`}
+              className={`w-full h-9 px-3 border rounded-[6px] text-sm bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 ${error && commentRequired && !preset ? 'border-red-400' : 'border-[#D4D4D4]'}`}
               value={preset}
               onChange={e => { setPreset(e.target.value); setError(''); }}
             >
@@ -159,7 +188,7 @@ export default function DecisionModal({ po, posBulk, decision, onClose, onSaved 
           </button>
           <button
             onClick={handleConfirm}
-            disabled={saving}
+            disabled={saving || !decision}
             className="h-8 px-4 text-xs font-semibold text-white bg-[#E31B7F] rounded-[6px] hover:bg-[#C21571] disabled:opacity-50 transition-colors"
           >
             {saving ? 'Saving…' : isBulk ? `Confirm ${posBulk.length} POs` : 'Confirm'}

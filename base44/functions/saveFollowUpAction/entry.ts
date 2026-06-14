@@ -170,6 +170,29 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
+    // ── FOLLOW_UP_NEXT_UPDATE (Main Office only) ─────────────────
+    // Sets po_overrides.next_update_date — no DDD decision involved.
+    // Optional internal_note is appended to the latest DDD update if present.
+    if (action_type === 'FOLLOW_UP_NEXT_UPDATE') {
+      const { next_update_date, internal_note } = payload || {};
+      if (!next_update_date) {
+        return Response.json({ error: 'next_update_date is required' }, { status: 400 });
+      }
+      const existing = await base44.entities.po_overrides.filter({ po_number });
+      if (existing.length > 0) {
+        await base44.entities.po_overrides.update(existing[0].id, { next_update_date });
+      } else {
+        await base44.entities.po_overrides.create({ po_number, next_update_date });
+      }
+      if (internal_note) {
+        const ov = existing[0];
+        if (ov?.last_ddd_update_id) {
+          await base44.entities.dd_updates.update(ov.last_ddd_update_id, { internal_note });
+        }
+      }
+      return Response.json({ success: true });
+    }
+
     // ── MARK_URGENT (Main Office only) ──────────────────────────
     // Manually toggle po_overrides.marked_urgent on a PO. Forces urgent_priority
     // to 'MANUAL' in getFollowUpData; unmarking restores the computed value.

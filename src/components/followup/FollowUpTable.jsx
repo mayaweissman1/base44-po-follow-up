@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns, Filter, Zap } from 'lucide-react';
+import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns, Filter, Zap, Calendar } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
@@ -457,7 +457,7 @@ function renderManagerCell(po, key) {
 const PAGE_SIZE = 100;
 
 export default function FollowUpTable({
-  rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, onMarkUrgent, loading,
+  rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, onMarkUrgent, onFollowUp, loading,
   selectedRows = new Set(), onSelectRow, onSelectAll, onPoDetails,
   isRepScopeTable = false,
 }) {
@@ -829,10 +829,11 @@ export default function FollowUpTable({
     ? DDM_ALL_COLS.filter(c => !c.defaultOn && !!ddmOptCols[c.key])
     : [];
 
-  // 3 fixed (checkbox+expand+thumb) + all visible DDM cols + 1 action
+  // colSpan for the expand row.
+  // Main Office (no thumb): 2 fixed (checkbox+expand) + 20 standard + hold_age + internal_note + 1 actions = 25 (+1 missing-sizes in Rep)
   const expandColSpan = role === 'dd_team_manager'
     ? 4 + DDM_ALL_COLS.filter(c => !!ddmOptCols[c.key]).length
-    : 26; // main_office: 3 fixed + 20 standard + hold_age + internal_note + 1 action
+    : (24 + (isRepScopeTable ? 1 : 0));
 
   function renderAdditionalTds(po, bg) {
     return additionalCols.map(col => {
@@ -900,7 +901,7 @@ export default function FollowUpTable({
                 <Checkbox checked={allVisibleSelected} onChange={() => onSelectAll?.(rows.map(r => r.po_number))} />
               </th>
               <th className={thCls} style={{ width: 36 }}></th>
-              <th className={thCls} style={{ width: 56 }}></th>
+              {role !== 'main_office' && <th className={thCls} style={{ width: 56 }}></th>}
               {colVisible('po_number') && <Th {...thProps} col="po_number" width={colWidths['po_number'] || 140}>PO Number</Th>}
               {colVisible('style_color') && <Th {...thProps} col="style_color" width={colWidths['style_color'] || 110}>Style Color</Th>}
               {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
@@ -950,7 +951,7 @@ export default function FollowUpTable({
                         <ChevronRight size={14} />
                       </button>
                     </td>
-                    <td className={tdBase}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>
+                    {role !== 'main_office' && <td className={tdBase}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>}
                     {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} /></td>}
                     {colVisible('style_color') && <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>}
                     {colVisible('po_rank') && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
@@ -1005,10 +1006,21 @@ export default function FollowUpTable({
                       <div className="flex items-center gap-0.5">
                         {role === 'main_office' ? (
                           <>
-                            <button onClick={() => onDecide(po, 'APPROVED')}     title="Approved"      className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-green-50 hover:text-green-600 transition-colors"><Check size={15} /></button>
-                            <button onClick={() => onDecide(po, 'ACKNOWLEDGED')} title="Acknowledged"  className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-teal-50 hover:text-teal-600 transition-colors"><Info size={15} /></button>
-                            <button onClick={() => onDecide(po, 'REJECTED')}     title="Rejected"      className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-red-50 hover:text-red-500 transition-colors"><X size={15} /></button>
-                            <button onClick={() => onInternalNote(po)}           title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><MessageSquare size={14} /></button>
+                            <button
+                              onClick={() => onDecide(po, null)}
+                              title="Respond to DD delay"
+                              className="h-7 px-2.5 text-[11px] font-semibold rounded-[6px] bg-[#E31B7F] text-white hover:bg-[#C21571] transition-colors flex items-center gap-1.5"
+                            >
+                              <MessageSquare size={12} /> Respond
+                            </button>
+                            <button
+                              onClick={() => onFollowUp?.(po)}
+                              title="Follow up next update"
+                              className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"
+                            >
+                              <Calendar size={14} />
+                            </button>
+                            <button onClick={() => onInternalNote(po)} title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><MessageSquare size={14} /></button>
                             <button
                               onClick={() => onMarkUrgent?.(po)}
                               title={po.marked_urgent ? 'Marked urgent — click to remove' : 'Mark as urgent'}

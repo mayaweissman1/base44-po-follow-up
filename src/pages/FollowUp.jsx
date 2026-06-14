@@ -21,6 +21,7 @@ import InternalNoteModal from '@/components/followup/InternalNoteModal';
 import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
 import MarkUrgentConfirmModal from '@/components/followup/MarkUrgentConfirmModal';
+import FollowUpNextUpdateModal from '@/components/followup/FollowUpNextUpdateModal';
 import BulkActionBar from '@/components/followup/BulkActionBar';
 import OperationalKpisStrip from '@/components/followup/OperationalKpisStrip';
 import MainOfficeKpiGrid from '@/components/followup/MainOfficeKpiGrid';
@@ -348,6 +349,7 @@ export default function FollowUp() {
   const [bulkGeneralUpdatePOs, setBulkGeneralUpdatePOs] = useState(null);
   const [detailsPo, setDetailsPo] = useState(null);
   const [markUrgentPo, setMarkUrgentPo] = useState(null);
+  const [followUpState, setFollowUpState] = useState(null); // { po } | { posBulk }
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -442,10 +444,17 @@ export default function FollowUp() {
     });
   }
 
-  function handleBulkDecision(decision) {
+  function handleBulkRespond() {
     const selectedPOs = filteredRows.filter(r => selectedRows.has(r.po_number));
     if (!selectedPOs.length) return;
-    setDecisionState({ po: null, decision, posBulk: selectedPOs });
+    // No preselected decision — user picks status inside the modal.
+    setDecisionState({ po: null, decision: null, posBulk: selectedPOs });
+  }
+
+  function handleBulkFollowUp() {
+    const selectedPOs = filteredRows.filter(r => selectedRows.has(r.po_number));
+    if (!selectedPOs.length) return;
+    setFollowUpState({ po: null, posBulk: selectedPOs });
   }
 
   function onActionSaved() {
@@ -456,6 +465,7 @@ export default function FollowUp() {
     setBulkLogDelayPOs(null);
     setBulkGeneralUpdatePOs(null);
     setMarkUrgentPo(null);
+    setFollowUpState(null);
     setSelectedRows(new Set());
     loadData();
   }
@@ -713,6 +723,7 @@ export default function FollowUp() {
           onViewLogs={po => setLogsDrawerPo(po)}
           onInternalNote={po => setInternalNotePo(po)}
           onMarkUrgent={activeRole === 'main_office' ? po => setMarkUrgentPo(po) : undefined}
+          onFollowUp={activeRole === 'main_office' ? po => setFollowUpState({ po, posBulk: null }) : undefined}
           isRepScopeTable={activeRole === 'main_office' && mainOfficeViewMode === 'Rep'}
         />
       </div>
@@ -720,9 +731,8 @@ export default function FollowUp() {
       <BulkActionBar
         count={selectedRows.size}
         role={activeRole}
-        onApproveAll={() => handleBulkDecision('APPROVED')}
-        onAcknowledgeAll={() => handleBulkDecision('ACKNOWLEDGED')}
-        onRejectAll={() => handleBulkDecision('REJECTED')}
+        onRespond={handleBulkRespond}
+        onFollowUp={handleBulkFollowUp}
         onBulkLogDelay={() => setBulkLogDelayPOs(filteredRows.filter(r => selectedRows.has(r.po_number)))}
         onBulkGeneralUpdate={() => setBulkGeneralUpdatePOs(filteredRows.filter(r => selectedRows.has(r.po_number)))}
         onExport={() => exportRowsToCSV(filteredRows.filter(r => selectedRows.has(r.po_number)), 'selected-pos.csv')}
@@ -796,6 +806,14 @@ export default function FollowUp() {
         <MarkUrgentConfirmModal
           po={markUrgentPo}
           onClose={() => setMarkUrgentPo(null)}
+          onSaved={onActionSaved}
+        />
+      )}
+      {followUpState && (
+        <FollowUpNextUpdateModal
+          po={followUpState.po}
+          posBulk={followUpState.posBulk}
+          onClose={() => setFollowUpState(null)}
           onSaved={onActionSaved}
         />
       )}
