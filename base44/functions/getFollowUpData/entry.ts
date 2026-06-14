@@ -21,6 +21,42 @@ async function query(sql, params = []) {
 // Match legacy cutting: po_status = 3 (Open) AND done = false.
 const PO_STATUS_INCLUDE = [3];
 
+// Dedupe urgent_priority — strips US-/UK- prefixes and removes duplicates.
+// "US-O WITH CLOSE DROP DATE,UK-O WITH CLOSE DROP DATE" → "O WITH CLOSE DROP DATE"
+function dedupePriority(raw) {
+  if (!raw) return null;
+  const parts = String(raw).split(/[,;|]+/);
+  const seen = new Set();
+  const out = [];
+  for (const p of parts) {
+    const stripped = p.trim().replace(/^(US|UK)\s*[-–:]\s*/i, '').trim();
+    if (stripped && !seen.has(stripped)) {
+      seen.add(stripped);
+      out.push(stripped);
+    }
+  }
+  return out.length > 0 ? out.join(', ') : null;
+}
+
+// "Needs your attention" — per user spec, evaluated only on PO data we already
+// have. Mirrors the SQL rule (urgent_reasons_base + po.urgent + pm_tags).
+function computeNeedsAttention(po) {
+  const isWrRSwimr = ['WR', 'R', 'SWIMR'].includes(po.urb_po_type);
+  const isOSwim   = ['O', 'SWIM'].includes(po.urb_po_type);
+  const scInd     = po.urb_sc_ind != null ? Number(po.urb_sc_ind) : null;
+  const skuMinInd = po.urb_sku_min_ind != null ? Number(po.urb_sku_min_ind) : null;
+  const daysRisk  = po.urb_days_in_risk_status != null ? Number(po.urb_days_in_risk_status) : 0;
+  if (po.urgent) return true;
+  if (po.urb_pu_tag === true) return true;
+  if (po.urb_urgent_tagged === true) return true;
+  if (isWrRSwimr && ((scInd != null && scInd <= 30) || (skuMinInd != null && skuMinInd <= 5))) return true;
+  if (isOSwim) return true;
+  if (daysRisk > 0) return true;
+  // pm_tags label contains "URGENT BEFORE CNY"
+  if (po.pm_tag_label && /urgent before cny/i.test(po.pm_tag_label)) return true;
+  return false;
+}
+
 Deno.serve(async (req) => {
   try {
     const base44 = createClientFromRequest(req);
@@ -449,14 +485,18 @@ Deno.serve(async (req) => {
         uk_priority: po.uk_priority_raw ? (po.uk_priority_raw === 3 ? 'BEST_SELLER' : po.uk_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
         // Computed urgent priority (per spec §3.3.2). Main Office "Mark as Urgent"
         // override forces this to 'MANUAL' regardless of the SQL computation.
-        // Strip US-/UK- destination prefixes — the column is a PO-level priority.
+        // Strip US-/UK- destination prefixes and dedupe — the column is PO-level,
+        // so "US-O WITH CLOSE DROP DATE,UK-O WITH CLOSE DROP DATE" collapses to one.
         urgent_priority: ov.marked_urgent
           ? 'MANUAL'
-          : (po.urgent_priority
-              ? String(po.urgent_priority).replace(/^(US|UK)\s*[-–:]\s*/i, '').trim()
-              : null),
+          : dedupePriority(po.urgent_priority),
         marked_urgent: !!ov.marked_urgent,
         marked_urgent_reason: ov.marked_urgent_reason || null,
+        // "Needs your attention" — true when the PO matches the urgent-base rule
+        // AND isn't already manually marked urgent (small alert in PO cell).
+        needs_attention: !ov.marked_urgent && computeNeedsAttention(po),
+        // PU tag — single boolean from urgent_reasons_base.pu_tag
+        pu_tag: po.urb_pu_tag === true,
       };
     });
 

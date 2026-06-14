@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { RefreshCw, ChevronDown, Download, LogOut, User as UserIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
+import { useToast } from '@/components/ui/use-toast';
 import {
   ROLE_DISPLAY,
   NOT_STARTED_DD_STATUSES,
@@ -20,7 +21,6 @@ import DecisionModal from '@/components/followup/DecisionModal';
 import InternalNoteModal from '@/components/followup/InternalNoteModal';
 import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
-import MarkUrgentConfirmModal from '@/components/followup/MarkUrgentConfirmModal';
 import FollowUpNextUpdateModal from '@/components/followup/FollowUpNextUpdateModal';
 import BulkActionBar from '@/components/followup/BulkActionBar';
 import OperationalKpisStrip from '@/components/followup/OperationalKpisStrip';
@@ -302,6 +302,7 @@ function exportRowsToCSV(exportRows, filename = 'follow-up.csv') {
 
 export default function FollowUp() {
   const { user, logout } = useAuth();
+  const { toast } = useToast();
   const isAdmin = user?.role === 'admin';
   const [showUserMenu, setShowUserMenu] = useState(false);
   // Roles available to this user: admin sees all, others see their assigned roles.
@@ -348,8 +349,28 @@ export default function FollowUp() {
   const [bulkLogDelayPOs, setBulkLogDelayPOs] = useState(null);
   const [bulkGeneralUpdatePOs, setBulkGeneralUpdatePOs] = useState(null);
   const [detailsPo, setDetailsPo] = useState(null);
-  const [markUrgentPo, setMarkUrgentPo] = useState(null);
   const [followUpState, setFollowUpState] = useState(null); // { po } | { posBulk }
+
+  // Mark a PO as urgent immediately (no modal). Toggles off if already marked.
+  async function handleMarkUrgent(po) {
+    const nextMarked = !po.marked_urgent;
+    // Optimistic UI update
+    setRows(prev => prev.map(r => r.po_number === po.po_number ? { ...r, marked_urgent: nextMarked, urgent_priority: nextMarked ? 'MANUAL' : r.urgent_priority } : r));
+    const res = await base44.functions.invoke('saveFollowUpAction', {
+      action_type: 'MARK_URGENT',
+      po_number: po.po_number,
+      payload: { marked_urgent: nextMarked },
+    });
+    if (res.data?.error) {
+      toast({ title: 'Failed to update urgency', description: res.data.error, variant: 'destructive' });
+      loadData();
+      return;
+    }
+    toast({
+      title: nextMarked ? 'Marked as urgent' : 'Urgent mark removed',
+      description: `${po.po_number} · ${po.style_color}`,
+    });
+  }
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -464,7 +485,6 @@ export default function FollowUp() {
     setInternalNotePo(null);
     setBulkLogDelayPOs(null);
     setBulkGeneralUpdatePOs(null);
-    setMarkUrgentPo(null);
     setFollowUpState(null);
     setSelectedRows(new Set());
     loadData();
@@ -722,7 +742,7 @@ export default function FollowUp() {
           onGeneralUpdate={po => setGeneralUpdatePo(po)}
           onViewLogs={po => setLogsDrawerPo(po)}
           onInternalNote={po => setInternalNotePo(po)}
-          onMarkUrgent={activeRole === 'main_office' ? po => setMarkUrgentPo(po) : undefined}
+          onMarkUrgent={activeRole === 'main_office' ? handleMarkUrgent : undefined}
           onFollowUp={activeRole === 'main_office' ? po => setFollowUpState({ po, posBulk: null }) : undefined}
           isRepScopeTable={activeRole === 'main_office' && mainOfficeViewMode === 'Rep'}
         />
@@ -800,13 +820,6 @@ export default function FollowUp() {
         <PoDetailsDrawer
           po={detailsPo}
           onClose={() => setDetailsPo(null)}
-        />
-      )}
-      {markUrgentPo && (
-        <MarkUrgentConfirmModal
-          po={markUrgentPo}
-          onClose={() => setMarkUrgentPo(null)}
-          onSaved={onActionSaved}
         />
       )}
       {followUpState && (
