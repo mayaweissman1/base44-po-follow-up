@@ -237,12 +237,32 @@ Deno.serve(async (req) => {
         FROM sub_po_ranks
         GROUP BY po_number
       ),
-      inv_per_style AS (
+      -- IND per (style_color, destination) — destination in history is 'US'/'UK'.
+      -- Maps to sub_po_view destinations: 'Edikted' -> 'US', 'EdiktedUK' -> 'UK'.
+      inv_per_style_dest AS (
         SELECT "Style Color" AS style_color,
+               "Destination" AS dest_code,
                MIN("Inv Days") AS inv_days
         FROM edktd_history.repeats_sc_united_history
         WHERE "Inv Days" IS NOT NULL
-        GROUP BY "Style Color"
+        GROUP BY "Style Color", "Destination"
+      ),
+      -- For each PO, take MIN(inv_days) across its sub_po destinations only.
+      -- Sub-PO level: each sub_po has one destination → its IND is the (style, dest) value.
+      -- The PO row shows the worst (lowest) IND across its sub_pos.
+      inv_per_po AS (
+        SELECT spv.po_number, MIN(ipd.inv_days) AS inv_days
+        FROM sub_po_view spv
+        LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+        LEFT JOIN inv_per_style_dest ipd
+          ON ipd.style_color = spv.style_color
+         AND ipd.dest_code = CASE
+                               WHEN sd.destination = 'Edikted'   THEN 'US'
+                               WHEN sd.destination = 'EdiktedUK' THEN 'UK'
+                               ELSE NULL
+                             END
+        WHERE ipd.inv_days IS NOT NULL
+        GROUP BY spv.po_number
       ),
       missing_per_style AS (
         SELECT "Style Color" AS style_color,
@@ -325,7 +345,7 @@ Deno.serve(async (req) => {
       LEFT JOIN sub_bno_per_po sbn ON sbn.po_number = pov.po_number
       LEFT JOIN shipping_methods_per_po smp ON smp.po_number = pov.po_number
       LEFT JOIN dest_priority_per_po dpp ON dpp.po_number = pov.po_number
-      LEFT JOIN inv_per_style ips ON ips.style_color = pov.style_color
+      LEFT JOIN inv_per_po ips ON ips.po_number = pov.po_number
       LEFT JOIN missing_per_style mps ON mps.style_color = pov.style_color
       LEFT JOIN urgent_priority_per_po upp ON upp.po_number = pov.po_number
       LEFT JOIN urgent_tagged_styles uts ON uts.style_color = pov.style_color
