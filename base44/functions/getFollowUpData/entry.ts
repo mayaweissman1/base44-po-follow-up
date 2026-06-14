@@ -63,6 +63,48 @@ Deno.serve(async (req) => {
     ]);
     const activePoNumbers = [...activeSet];
 
+    // Check if optional table urgent_reasons_base exists — it's not present in all environments.
+    let hasUrgentReasonsBase = false;
+    try {
+      const checkRes = await query(`SELECT to_regclass('public.urgent_reasons_base') AS r`);
+      hasUrgentReasonsBase = !!checkRes[0]?.r;
+    } catch {
+      hasUrgentReasonsBase = false;
+    }
+
+    const urgentPriorityCte = hasUrgentReasonsBase ? `
+      urgent_priority_per_po AS (
+        SELECT urb.po_number,
+          CASE
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
+                 AND urb.open_quantity >= 1000::numeric
+                 AND urb.published >= (CURRENT_DATE - INTERVAL '45 days')
+                 AND urb.sc_ind <= 15::numeric              THEN 'BEST SELLER NEW'
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
+                 AND urb.open_quantity >= 1500::numeric
+                 AND urb.all_sales > 10000::numeric
+                 AND urb.sc_ind <= 15::numeric              THEN 'BEST SELLER OLD'
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
+                 AND urb.sku_min_ind <= 5::numeric          THEN
+              CASE WHEN urb.sku_max_ind <= 5::numeric THEN 'SOLD OUT'
+                   ELSE 'MISSING SIZES' END
+            WHEN urb.pu_tag = true                          THEN 'MANUAL'
+            WHEN urb.urgent_tagged = true                   THEN urb.sc_pm_tags
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR']) THEN 'URGENT'
+            WHEN urb.po_type = ANY (ARRAY['O','SWIM'])      THEN
+              concat('Drop',
+                CASE WHEN urb.special_collection IS NULL THEN ' '
+                     ELSE concat(' ', urb.special_collection, ' ') END,
+                urb.drop_date)
+            WHEN urb.days_in_risk_status > 5                THEN 'Risk in Fabric/PPS'
+            ELSE NULL
+          END AS urgent_priority
+        FROM urgent_reasons_base urb
+      )` : `
+      urgent_priority_per_po AS (
+        SELECT NULL::text AS po_number, NULL::text AS urgent_priority WHERE FALSE
+      )`;
+
     // PRIMARY QUERY — po_view, one row per PO.
     // Matches current project semantics: po_status IN (3,5), done=false.
     // Date window: ±60d / +180d, OR PO has base44 activity.
@@ -160,34 +202,7 @@ Deno.serve(async (req) => {
         WHERE "Missing Sizes" IS NOT NULL AND "Missing Sizes" <> ''
         GROUP BY "Style Color"
       ),
-      urgent_priority_per_po AS (
-        SELECT urb.po_number,
-          CASE
-            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
-                 AND urb.open_quantity >= 1000::numeric
-                 AND urb.published >= (CURRENT_DATE - INTERVAL '45 days')
-                 AND urb.sc_ind <= 15::numeric              THEN 'BEST SELLER NEW'
-            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
-                 AND urb.open_quantity >= 1500::numeric
-                 AND urb.all_sales > 10000::numeric
-                 AND urb.sc_ind <= 15::numeric              THEN 'BEST SELLER OLD'
-            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
-                 AND urb.sku_min_ind <= 5::numeric          THEN
-              CASE WHEN urb.sku_max_ind <= 5::numeric THEN 'SOLD OUT'
-                   ELSE 'MISSING SIZES' END
-            WHEN urb.pu_tag = true                          THEN 'MANUAL'
-            WHEN urb.urgent_tagged = true                   THEN urb.sc_pm_tags
-            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR']) THEN 'URGENT'
-            WHEN urb.po_type = ANY (ARRAY['O','SWIM'])      THEN
-              concat('Drop',
-                CASE WHEN urb.special_collection IS NULL THEN ' '
-                     ELSE concat(' ', urb.special_collection, ' ') END,
-                urb.drop_date)
-            WHEN urb.days_in_risk_status > 5                THEN 'Risk in Fabric/PPS'
-            ELSE NULL
-          END AS urgent_priority
-        FROM urgent_reasons_base urb
-      )
+      ${urgentPriorityCte}
       SELECT
         pov.po_number,
         pov.po_status,
