@@ -156,7 +156,7 @@ export default function CustomFilterModal({ columns, rules, onChange, onClose, a
           </button>
         </div>
 
-        <div className="px-4 py-3 space-y-2 max-h-[60vh] overflow-y-auto">
+        <div className="px-4 py-3 space-y-2 max-h-[60vh] overflow-y-auto overflow-x-visible" style={{ overflow: 'visible' }}>
           {draft.map((rule, idx) => {
             const col = columns.find(c => c.key === rule.field);
             const type = col?.type || 'text';
