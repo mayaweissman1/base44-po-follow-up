@@ -977,7 +977,7 @@ export default function FollowUpTable({
                     {role === 'main_office' && (
                       <td className={tdBase}>
                         {po.urgency_reason_raw
-                          ? <span className="text-[#525252] text-xs max-w-[160px] truncate inline-block" title={po.urgency_reason_raw}>{po.urgency_reason_raw}</span>
+                          ? <PriorityBadge priority={po.urgency_reason_raw} />
                           : <span className="text-[#A3A3A3]">—</span>}
                       </td>
                     )}

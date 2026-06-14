@@ -390,8 +390,9 @@ Deno.serve(async (req) => {
 
       // Priority label: prefer the explicit urgency reason (e.g. "Best Seller New")
       // when present; otherwise fall back to URGENT/Deadline/Normal.
+      // Dedupe US-/UK- prefixes — same rule as urgent_priority / urgency_reason_raw.
       let priority = 'Normal';
-      if (po.urgency_reason) priority = po.urgency_reason;
+      if (po.urgency_reason) priority = dedupePriority(po.urgency_reason) || 'Normal';
       else if (po.urgent) priority = 'URGENT';
       else if (daysLateCounting > 3) priority = 'Deadline';
 
@@ -478,7 +479,8 @@ Deno.serve(async (req) => {
         inv_days: po.inv_days != null ? Math.round(Number(po.inv_days)) : null,
         missing_sizes: Array.isArray(po.missing_sizes) ? po.missing_sizes : [],
         // Raw urgency reason from po_urgent_status — the most accurate priority signal.
-        urgency_reason_raw: po.urgency_reason || null,
+        // Dedupe + strip US-/UK- destination prefixes (PO-level value, not per-dest).
+        urgency_reason_raw: dedupePriority(po.urgency_reason),
         // Per-destination priority (US = Edikted, UK = EdiktedUK).
         // Maps 0=None / 1=Normal / 2=Urgent / 3=Best Seller
         us_priority: po.us_priority_raw ? (po.us_priority_raw === 3 ? 'BEST_SELLER' : po.us_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
