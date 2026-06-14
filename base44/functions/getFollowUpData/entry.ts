@@ -38,22 +38,23 @@ function dedupePriority(raw) {
   return out.length > 0 ? out.join(', ') : null;
 }
 
-// "Needs your attention" — per user spec, evaluated only on PO data we already
-// have. Mirrors the SQL rule (urgent_reasons_base + po.urgent + pm_tags).
+// "Needs your attention" — mirrors the urgents_view WHERE conditions.
+// Uses fields fetched by the main SQL query (not urb_ aliases from urgent_orders_base_mv).
+// Called only for POs where po.urgent = false and ov.marked_urgent = false.
 function computeNeedsAttention(po) {
-  const isWrRSwimr = ['WR', 'R', 'SWIMR'].includes(po.urb_po_type);
-  const isOSwim   = ['O', 'SWIM'].includes(po.urb_po_type);
-  const scInd     = po.urb_sc_ind != null ? Number(po.urb_sc_ind) : null;
-  const skuMinInd = po.urb_sku_min_ind != null ? Number(po.urb_sku_min_ind) : null;
-  const daysRisk  = po.urb_days_in_risk_status != null ? Number(po.urb_days_in_risk_status) : 0;
-  if (po.urgent) return true;
-  if (po.urb_pu_tag === true) return true;
-  if (po.urb_urgent_tagged === true) return true;
-  if (isWrRSwimr && ((scInd != null && scInd <= 30) || (skuMinInd != null && skuMinInd <= 5))) return true;
-  if (isOSwim) return true;
-  if (daysRisk > 0) return true;
-  // pm_tags label contains "URGENT BEFORE CNY"
+  const poTypePrefix = (po.po_type_prefix || '').trim();
+  const isWrRSwimr = ['WR', 'R', 'SWIMR'].includes(poTypePrefix);
+  const isOSwim    = ['O', 'SWIM'].includes(poTypePrefix);
+  const scInd      = po.inv_days != null ? Number(po.inv_days) : null;
+
+  if (po.pu_tag === true) return true;
+  if (po.urgent_tagged === true) return true;
+  // "URGENT BEFORE CNY" tag in pm_tags
   if (po.pm_tag_label && /urgent before cny/i.test(po.pm_tag_label)) return true;
+  if (isWrRSwimr && scInd != null && scInd <= 30) return true;
+  if (isOSwim) return true;
+  // collection_type_id = 18 with O or R orders
+  if (po.collection_type_id === 18 && ['O', 'R'].includes(poTypePrefix)) return true;
   return false;
 }
 
@@ -110,7 +111,7 @@ Deno.serve(async (req) => {
 
     const urgentPriorityCte = hasUrgentReasonsBase ? `
       urgent_priority_per_po AS (
-        SELECT urb.po_number,
+        SELECT DISTINCT ON (urb.po_number) urb.po_number,
           CASE
             WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
                  AND urb.open_quantity >= 1000::numeric
@@ -136,6 +137,7 @@ Deno.serve(async (req) => {
             ELSE NULL
           END AS urgent_priority
         FROM urgent_reasons_base urb
+        ORDER BY urb.po_number
       )` : `
       urgent_priority_per_po AS (
         SELECT NULL::text AS po_number, NULL::text AS urgent_priority WHERE FALSE
@@ -151,9 +153,21 @@ Deno.serve(async (req) => {
         WHERE pus.reason ILIKE '%Best Seller%'
       ),
       urgency_reason_per_po AS (
-        SELECT po_number, reason AS urgency_reason
-        FROM po_urgent_status
-        WHERE reason IS NOT NULL AND reason <> ''
+        SELECT po_number, string_agg(reason, ',' ORDER BY reason) AS urgency_reason
+        FROM (SELECT DISTINCT po_number, reason FROM po_urgent_status WHERE reason IS NOT NULL AND reason <> '') _r
+        GROUP BY po_number
+      ),
+      pu_tag_id AS (
+        SELECT id FROM pm_tags WHERE pm_tag = 'PU' LIMIT 1
+      ),
+      urgent_tagged_styles AS (
+        SELECT DISTINCT sc_inner.style_color
+        FROM style_colors sc_inner
+        WHERE EXISTS (
+          SELECT 1 FROM pm_tags pmt_inner
+          WHERE pmt_inner.id = ANY(sc_inner.pm_tags)
+          AND pmt_inner.pm_tag ILIKE 'urgent-%'
+        )
       ),
       sub_bno_per_po AS (
         SELECT
@@ -285,7 +299,11 @@ Deno.serve(async (req) => {
         mps.missing_sizes AS missing_sizes,
         dpp.us_priority AS us_priority_raw,
         dpp.uk_priority AS uk_priority_raw,
-        upp.urgent_priority AS urgent_priority
+        upp.urgent_priority AS urgent_priority,
+        TRIM(BOTH FROM pt.prefix) AS po_type_prefix,
+        CASE WHEN (SELECT id FROM pu_tag_id) = ANY(sc.pm_tags) THEN true ELSE false END AS pu_tag,
+        CASE WHEN uts.style_color IS NOT NULL THEN true ELSE false END AS urgent_tagged,
+        c.collection_type_id AS collection_type_id
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -310,6 +328,7 @@ Deno.serve(async (req) => {
       LEFT JOIN inv_per_style ips ON ips.style_color = pov.style_color
       LEFT JOIN missing_per_style mps ON mps.style_color = pov.style_color
       LEFT JOIN urgent_priority_per_po upp ON upp.po_number = pov.po_number
+      LEFT JOIN urgent_tagged_styles uts ON uts.style_color = pov.style_color
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
@@ -494,11 +513,11 @@ Deno.serve(async (req) => {
           : dedupePriority(po.urgent_priority),
         marked_urgent: !!ov.marked_urgent,
         marked_urgent_reason: ov.marked_urgent_reason || null,
-        // "Needs your attention" — true when the PO matches the urgent-base rule
-        // AND isn't already manually marked urgent (small alert in PO cell).
-        needs_attention: !ov.marked_urgent && computeNeedsAttention(po),
-        // PU tag — single boolean from urgent_reasons_base.pu_tag
-        pu_tag: po.urb_pu_tag === true,
+        // "Needs your attention" — true when the PO is not already urgent/marked
+        // but matches the urgents_view entry conditions (mirrors SQL WHERE logic).
+        needs_attention: !po.urgent && !ov.marked_urgent && computeNeedsAttention(po),
+        // PU tag — computed from style_color.pm_tags matching the 'PU' pm_tag id.
+        pu_tag: po.pu_tag === true,
       };
     });
 
