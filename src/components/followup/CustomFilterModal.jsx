@@ -54,25 +54,39 @@ function emptyRule(columns) {
 
 function Combo({ value, onChange, options, placeholder, className = '', renderOption }) {
   const [open, setOpen] = useState(false);
+  const [openUp, setOpenUp] = useState(false);
   const ref = useRef(null);
+  const btnRef = useRef(null);
   useEffect(() => {
     function h(e) { if (ref.current && !ref.current.contains(e.target)) setOpen(false); }
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
   }, []);
+  // Decide pop direction based on available space when opening
+  function handleToggle() {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const spaceAbove = rect.top;
+      const desired = 280; // matches max-h-[260px] + padding
+      setOpenUp(spaceBelow < desired && spaceAbove > spaceBelow);
+    }
+    setOpen(o => !o);
+  }
   const selected = options.find(o => o.value === value);
   return (
     <div ref={ref} className={`relative ${className}`}>
       <button
+        ref={btnRef}
         type="button"
-        onClick={() => setOpen(o => !o)}
+        onClick={handleToggle}
         className={`h-8 w-full pl-2.5 pr-7 flex items-center gap-1.5 text-xs font-medium text-[#0A0A0A] bg-white border rounded-[6px] hover:border-[#E31B7F] focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 transition-colors text-left ${open ? 'border-[#E31B7F] ring-2 ring-[#E31B7F]/10' : 'border-[#D4D4D4]'}`}
       >
         {selected ? (renderOption ? renderOption(selected) : <span className="truncate">{selected.label}</span>) : <span className="text-[#A3A3A3]">{placeholder}</span>}
         <ChevronDown size={11} className="absolute right-2 top-1/2 -translate-y-1/2 text-[#A3A3A3]" />
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.12)] z-50 min-w-[180px] max-h-[260px] overflow-y-auto">
+        <div className={`absolute left-0 bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_4px_16px_rgba(0,0,0,.12)] z-50 min-w-[180px] max-h-[260px] overflow-y-auto ${openUp ? 'bottom-full mb-1' : 'top-full mt-1'}`}>
           {options.map(opt => {
             const isSel = opt.value === value;
             return (
