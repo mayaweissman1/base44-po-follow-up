@@ -20,6 +20,7 @@ import DecisionModal from '@/components/followup/DecisionModal';
 import InternalNoteModal from '@/components/followup/InternalNoteModal';
 import ActivityLogDrawer from '@/components/followup/ActivityLogDrawer';
 import PoDetailsDrawer from '@/components/followup/PoDetailsDrawer';
+import MarkUrgentConfirmModal from '@/components/followup/MarkUrgentConfirmModal';
 import BulkActionBar from '@/components/followup/BulkActionBar';
 import OperationalKpisStrip from '@/components/followup/OperationalKpisStrip';
 import MainOfficeKpiGrid from '@/components/followup/MainOfficeKpiGrid';
@@ -109,9 +110,11 @@ function normalizeUrgencyReasons(raw) {
   return out;
 }
 
-// Helper: does row match urgency-reason token? Matches if ANY of the row's
-// normalized urgency categories equals the selected token.
+// Helper: does row match urgency-reason token? Matches against the computed
+// urgent_priority (per spec §3.3.2) when available, else falls back to the
+// legacy normalized urgency_reason_raw categories.
 function matchUrgencyReason(row, p) {
+  if (row.urgent_priority && row.urgent_priority === p) return true;
   const raw = row.urgency_reason_raw || row.priority || '';
   const cats = normalizeUrgencyReasons(raw);
   return cats.has(p);
@@ -344,6 +347,7 @@ export default function FollowUp() {
   const [bulkLogDelayPOs, setBulkLogDelayPOs] = useState(null);
   const [bulkGeneralUpdatePOs, setBulkGeneralUpdatePOs] = useState(null);
   const [detailsPo, setDetailsPo] = useState(null);
+  const [markUrgentPo, setMarkUrgentPo] = useState(null);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -451,6 +455,7 @@ export default function FollowUp() {
     setInternalNotePo(null);
     setBulkLogDelayPOs(null);
     setBulkGeneralUpdatePOs(null);
+    setMarkUrgentPo(null);
     setSelectedRows(new Set());
     loadData();
   }
@@ -470,13 +475,16 @@ export default function FollowUp() {
       if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
 
-      // Urgency reason — normalize to canonical categories (strip US-/UK- prefixes
-      // and split on comma/semicolon/pipe), then count POs per category. A PO with
-      // multiple categories increments each category once.
-      const urgRaw = r.urgency_reason_raw || r.priority;
-      if (urgRaw) {
-        for (const cat of normalizeUrgencyReasons(urgRaw)) {
-          urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
+      // Urgent Priority — prefer the computed urgent_priority (single closed-list
+      // value per PO from §3.3.2). Fallback: normalize legacy urgency_reason_raw.
+      if (r.urgent_priority) {
+        urgMap.set(r.urgent_priority, (urgMap.get(r.urgent_priority) || 0) + 1);
+      } else {
+        const urgRaw = r.urgency_reason_raw || r.priority;
+        if (urgRaw) {
+          for (const cat of normalizeUrgencyReasons(urgRaw)) {
+            urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
+          }
         }
       }
 
@@ -704,6 +712,7 @@ export default function FollowUp() {
           onGeneralUpdate={po => setGeneralUpdatePo(po)}
           onViewLogs={po => setLogsDrawerPo(po)}
           onInternalNote={po => setInternalNotePo(po)}
+          onMarkUrgent={activeRole === 'main_office' ? po => setMarkUrgentPo(po) : undefined}
           isRepScopeTable={activeRole === 'main_office' && mainOfficeViewMode === 'Rep'}
         />
       </div>
@@ -781,6 +790,13 @@ export default function FollowUp() {
         <PoDetailsDrawer
           po={detailsPo}
           onClose={() => setDetailsPo(null)}
+        />
+      )}
+      {markUrgentPo && (
+        <MarkUrgentConfirmModal
+          po={markUrgentPo}
+          onClose={() => setMarkUrgentPo(null)}
+          onSaved={onActionSaved}
         />
       )}
 

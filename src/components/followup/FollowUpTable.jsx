@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
-import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns, Filter } from 'lucide-react';
+import { Check, Info, X, Clock, MessageSquare, ChevronRight, ChevronUp, ChevronDown, Columns, Filter, Zap } from 'lucide-react';
 import StatusBadge from './StatusBadge';
 import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
 import PriorityBadge from './PriorityBadge';
 import { fmtDate, ddmm } from '@/lib/followUpConstants';
-import PoSizeBreakdown from './PoSizeBreakdown';
+import SubPoDestinationTable from './SubPoDestinationTable';
 import StyleThumbnail from './StyleThumbnail';
 import PmTagsPills from './PmTagsPills';
 import CustomFilterModal, { evaluateCustomFilters } from './CustomFilterModal';
@@ -20,7 +20,7 @@ const CUSTOM_FILTER_COLUMNS = {
     { key: 'style_color',                label: 'Style Color',       type: 'text' },
     { key: 'effective_dd_status',        label: 'Production Stage',  type: 'text' },
     { key: 'current_status',             label: 'DDD Status',        type: 'text' },
-    { key: 'priority',                   label: 'Urgency Reason',    type: 'text' },
+    { key: 'urgent_priority',            label: 'Urgent Priority',   type: 'text' },
     { key: 'inv_days',                   label: 'IND',               type: 'number' },
     { key: 'dd_manager_name',            label: 'DD Manager',        type: 'text' },
     { key: 'supplier',                   label: 'Supplier',          type: 'text' },
@@ -457,7 +457,7 @@ function renderManagerCell(po, key) {
 const PAGE_SIZE = 100;
 
 export default function FollowUpTable({
-  rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, loading,
+  rows, role, filterStatus, onDecide, onLogDelay, onGeneralUpdate, onViewLogs, onInternalNote, onMarkUrgent, loading,
   selectedRows = new Set(), onSelectRow, onSelectAll, onPoDetails,
   isRepScopeTable = false,
 }) {
@@ -682,8 +682,8 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={empColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 900 }}>
-                          <PoSizeBreakdown poNumber={po.po_number} />
+                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
+                          <SubPoDestinationTable poNumber={po.po_number} />
                         </div>
                       </td>
                     </tr>
@@ -778,8 +778,8 @@ export default function FollowUpTable({
                     {isExpanded && (
                       <tr>
                         <td colSpan={ddmColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                          <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 900 }}>
-                            <PoSizeBreakdown poNumber={po.po_number} />
+                          <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
+                            <SubPoDestinationTable poNumber={po.po_number} />
                           </div>
                         </td>
                       </tr>
@@ -906,7 +906,7 @@ export default function FollowUpTable({
               {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
-              {colVisible('priority') && <Th {...thProps} col="priority" width={colWidths['priority'] || 110} tooltip="Urgency reason from po_urgent_status (e.g. Best Seller, US-Sizes Inv Days)">Urgency Reason</Th>}
+              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed from urgent_reasons_base — see spec §3.3.2. MANUAL = marked by Main Office.">Urgent Priority</Th>}
               {role === 'main_office' && <Th {...thProps} col="inv_days" width={colWidths['inv_days'] || 70} tooltip="Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)">IND</Th>}
               {colVisible('dd_manager_name') && <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>}
               {colVisible('supplier') && <Th {...thProps} col="supplier" width={colWidths['supplier'] || 90}>Supplier</Th>}
@@ -956,7 +956,7 @@ export default function FollowUpTable({
                     {colVisible('po_rank') && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
-                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgency_reason_raw || po.priority} /></td>}
+                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority || po.urgency_reason_raw || po.priority} /></td>}
                     {role === 'main_office' && (
                       <td className={tdBase}>
                         {po.inv_days == null ? <span className="text-[#A3A3A3]">—</span> :
@@ -1009,6 +1009,13 @@ export default function FollowUpTable({
                             <button onClick={() => onDecide(po, 'ACKNOWLEDGED')} title="Acknowledged"  className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-teal-50 hover:text-teal-600 transition-colors"><Info size={15} /></button>
                             <button onClick={() => onDecide(po, 'REJECTED')}     title="Rejected"      className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-red-50 hover:text-red-500 transition-colors"><X size={15} /></button>
                             <button onClick={() => onInternalNote(po)}           title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><MessageSquare size={14} /></button>
+                            <button
+                              onClick={() => onMarkUrgent?.(po)}
+                              title={po.marked_urgent ? 'Marked urgent — click to remove' : 'Mark as urgent'}
+                              className={`w-7 h-7 flex items-center justify-center rounded-[6px] transition-colors ${po.marked_urgent ? 'bg-[#FFF0F7] text-[#E31B7F]' : 'text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F]'}`}
+                            >
+                              <Zap size={14} fill={po.marked_urgent ? 'currentColor' : 'none'} />
+                            </button>
                           </>
                         ) : (
                           <>
@@ -1025,8 +1032,8 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={expandColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 900 }}>
-                          <PoSizeBreakdown poNumber={po.po_number} />
+                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
+                          <SubPoDestinationTable poNumber={po.po_number} />
                         </div>
                       </td>
                     </tr>

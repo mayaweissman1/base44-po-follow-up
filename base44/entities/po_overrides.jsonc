@@ -32,6 +32,23 @@
     "last_general_update_id": {
       "type": "string",
       "description": "FK to dd_updates.id - latest GENERAL_UPDATE"
+    },
+    "marked_urgent": {
+      "type": "boolean",
+      "description": "Main Office override \u2014 manually mark this PO as urgent. Forces urgent_priority to MANUAL."
+    },
+    "marked_urgent_by_email": {
+      "type": "string",
+      "description": "Who toggled the urgent mark"
+    },
+    "marked_urgent_at": {
+      "type": "string",
+      "format": "date-time",
+      "description": "When the urgent mark was last toggled"
+    },
+    "marked_urgent_reason": {
+      "type": "string",
+      "description": "Optional free-text reason (max 200 chars) for the manual urgent mark"
     }
   },
   "required": [

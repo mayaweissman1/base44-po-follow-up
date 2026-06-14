@@ -28,7 +28,7 @@ const CHIP_FORMATTERS = {
   po:                v => `PO: ${v}`,
   style:             v => `Style: ${v}`,
   status:            v => ({ HOLD: 'DDD: Pending', HANDLED: 'DDD: Handled', APPROVED: 'DDD: Approved', REJECTED: 'DDD: Rejected', ACKNOWLEDGED: 'DDD: Acknowledged', ACK_APPROVED: 'DDD: Acknowledged', AUTOMATICALLY: 'DDD: Auto' }[v] || `DDD: ${v}`),
-  urgencyReason:     v => `Urgency: ${v.length}`,
+  urgencyReason:     v => `Urgent Priority: ${v.length}`,
   priorityUS:        v => `US Priority: ${v.length}`,
   priorityUK:        v => `UK Priority: ${v.length}`,
   supplier:          v => `Supplier: ${v.length}`,
@@ -207,7 +207,7 @@ export default function FilterToolbar({
           <FilterField label="Style Color">
             <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
           </FilterField>
-          <FilterField label="Urgency Reason">
+          <FilterField label="Urgent Priority">
             <MultiSelect
               value={filters.urgencyReason}
               onChange={v => set('urgencyReason', v)}

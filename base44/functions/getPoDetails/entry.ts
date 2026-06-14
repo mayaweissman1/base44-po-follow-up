@@ -42,22 +42,29 @@ Deno.serve(async (req) => {
       ORDER BY pv.sub_po_number, s.sort_order NULLS LAST, pv.sku
     `, [po_number]);
 
-    // Destinations per sub-PO (so we can group by destination + size)
+    // Sub-POs with destination, urgency, shipping method, air OTW
     const subRes = await client.query(`
       SELECT
         spv.sub_po_number,
         sd.destination AS destination_name,
-        spv.urgent     AS sub_urgent
+        spv.urgent     AS sub_urgent,
+        spv.qty_otw_air,
+        sm.method      AS shipping_method_name
       FROM sub_po_view spv
       LEFT JOIN shipment_destination sd ON sd.id = spv.destination
+      LEFT JOIN shipment_methods sm     ON sm.id = spv.shipping_method
       WHERE spv.po_number = $1
     `, [po_number]);
 
     const destBySubPo = {};
     const urgentBySubPo = {};
+    const airOtwBySubPo = {};
+    const shippingBySubPo = {};
     for (const r of subRes.rows) {
       destBySubPo[r.sub_po_number] = r.destination_name || '—';
       urgentBySubPo[r.sub_po_number] = !!r.sub_urgent;
+      airOtwBySubPo[r.sub_po_number] = Number(r.qty_otw_air) || 0;
+      shippingBySubPo[r.sub_po_number] = r.shipping_method_name || null;
     }
 
     // Urgency reason (Best Seller / URGENT) per PO — applies to all destinations
@@ -65,26 +72,43 @@ Deno.serve(async (req) => {
       SELECT reason FROM po_urgent_status WHERE po_number = $1 LIMIT 1
     `, [po_number]);
     const isBestSeller = urgRes.rows[0]?.reason?.toLowerCase().includes('best seller') || false;
-    const isUrgent = urgRes.rows[0]?.reason?.toLowerCase().includes('urgent') || false;
+    const isUrgent     = urgRes.rows[0]?.reason?.toLowerCase().includes('urgent') || false;
 
-    // Per-destination priority
-    const priorityByDest = {};
-    for (const r of subRes.rows) {
-      const dest = r.destination_name || '—';
-      const p = isBestSeller ? 'BEST_SELLER' : (isUrgent || r.sub_urgent ? 'URGENT' : 'NORMAL');
-      // Worst-case wins (Best Seller > URGENT > NORMAL)
-      const rank = { BEST_SELLER: 3, URGENT: 2, NORMAL: 1 };
-      if (!priorityByDest[dest] || rank[p] > rank[priorityByDest[dest]]) {
-        priorityByDest[dest] = p;
-      }
+    // Style color for IND join
+    const styleRes = await client.query(`SELECT style_color FROM po_view WHERE po_number = $1 LIMIT 1`, [po_number]);
+    const styleColor = styleRes.rows[0]?.style_color || null;
+
+    // IND per style_color (min across SKUs). The Edikted repeats history is
+    // PO-/style-scoped, not per destination — same value applied to every dest.
+    let indByStyle = null;
+    if (styleColor) {
+      const indRes = await client.query(`
+        SELECT MIN("Inv Days") AS inv_days
+        FROM edktd_history.repeats_sc_united_history
+        WHERE "Style Color" = $1 AND "Inv Days" IS NOT NULL
+      `, [styleColor]);
+      const v = indRes.rows[0]?.inv_days;
+      indByStyle = v == null ? null : Math.round(Number(v));
     }
 
-    // Group by destination, with array of size rows
+    // Group sizes by destination → { sizes_by_size: { XS: 30, S: 60, … } }
     const byDest = {};
     for (const r of skuRes.rows) {
-      const dest = destBySubPo[r.sub_po_number] || '—';
-      if (!byDest[dest]) byDest[dest] = [];
-      byDest[dest].push({
+      const subPo = r.sub_po_number;
+      const dest = destBySubPo[subPo] || '—';
+      if (!byDest[dest]) {
+        byDest[dest] = {
+          destination: dest,
+          sub_po_numbers: new Set(),
+          sizes: [],              // legacy per-SKU list (kept for backward compat)
+          sizes_by_size: {},      // new: { sizeName -> total ordered qty }
+          air_otw: 0,
+          shipping_methods_set: new Set(),
+          sub_urgent: false,
+        };
+      }
+      byDest[dest].sub_po_numbers.add(subPo);
+      byDest[dest].sizes.push({
         sku: r.sku,
         size: r.size_name || '—',
         ordered_qty: Number(r.ordered_qty) || 0,
@@ -92,13 +116,45 @@ Deno.serve(async (req) => {
         good_for_sale: Number(r.good_for_sale) || 0,
         balance: Number(r.balance) || 0,
       });
+      const sz = (r.size_name || '').toUpperCase();
+      if (sz) {
+        byDest[dest].sizes_by_size[sz] = (byDest[dest].sizes_by_size[sz] || 0) + (Number(r.ordered_qty) || 0);
+      }
     }
 
-    const destinations = Object.entries(byDest).map(([destination, sizes]) => ({
-      destination,
-      sizes,
-      priority: priorityByDest[destination] || null,
-    }));
+    // Layer in sub-PO-level fields (air OTW, shipping methods, urgent flag)
+    for (const r of subRes.rows) {
+      const dest = r.destination_name || '—';
+      if (!byDest[dest]) {
+        byDest[dest] = {
+          destination: dest,
+          sub_po_numbers: new Set(),
+          sizes: [],
+          sizes_by_size: {},
+          air_otw: 0,
+          shipping_methods_set: new Set(),
+          sub_urgent: false,
+        };
+      }
+      byDest[dest].sub_po_numbers.add(r.sub_po_number);
+      byDest[dest].air_otw += Number(r.qty_otw_air) || 0;
+      if (r.shipping_method_name) byDest[dest].shipping_methods_set.add(r.shipping_method_name);
+      if (r.sub_urgent) byDest[dest].sub_urgent = true;
+    }
+
+    const destinations = Object.values(byDest).map(d => {
+      const priority = isBestSeller ? 'BEST_SELLER' : (isUrgent || d.sub_urgent ? 'URGENT' : 'NORMAL');
+      return {
+        destination: d.destination,
+        sub_po_numbers: [...d.sub_po_numbers],
+        sizes: d.sizes,
+        sizes_by_size: d.sizes_by_size,
+        air_otw: d.air_otw,
+        shipping_method_names: [...d.shipping_methods_set],
+        inv_days: indByStyle,
+        priority,
+      };
+    });
 
     return Response.json({ po_number, destinations });
   } catch (e) {

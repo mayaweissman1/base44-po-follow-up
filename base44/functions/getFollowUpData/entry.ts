@@ -159,6 +159,34 @@ Deno.serve(async (req) => {
              LATERAL regexp_split_to_table(COALESCE("Missing Sizes",''), '[,;|/]+') AS s
         WHERE "Missing Sizes" IS NOT NULL AND "Missing Sizes" <> ''
         GROUP BY "Style Color"
+      ),
+      urgent_priority_per_po AS (
+        SELECT urb.po_number,
+          CASE
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
+                 AND urb.open_quantity >= 1000::numeric
+                 AND urb.published >= (CURRENT_DATE - INTERVAL '45 days')
+                 AND urb.sc_ind <= 15::numeric              THEN 'BEST SELLER NEW'
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
+                 AND urb.open_quantity >= 1500::numeric
+                 AND urb.all_sales > 10000::numeric
+                 AND urb.sc_ind <= 15::numeric              THEN 'BEST SELLER OLD'
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR'])
+                 AND urb.sku_min_ind <= 5::numeric          THEN
+              CASE WHEN urb.sku_max_ind <= 5::numeric THEN 'SOLD OUT'
+                   ELSE 'MISSING SIZES' END
+            WHEN urb.pu_tag = true                          THEN 'MANUAL'
+            WHEN urb.urgent_tagged = true                   THEN urb.sc_pm_tags
+            WHEN urb.po_type = ANY (ARRAY['WR','R','SWIMR']) THEN 'URGENT'
+            WHEN urb.po_type = ANY (ARRAY['O','SWIM'])      THEN
+              concat('Drop',
+                CASE WHEN urb.special_collection IS NULL THEN ' '
+                     ELSE concat(' ', urb.special_collection, ' ') END,
+                urb.drop_date)
+            WHEN urb.days_in_risk_status > 5                THEN 'Risk in Fabric/PPS'
+            ELSE NULL
+          END AS urgent_priority
+        FROM urgent_reasons_base urb
       )
       SELECT
         pov.po_number,
@@ -205,7 +233,8 @@ Deno.serve(async (req) => {
         ips.inv_days AS inv_days,
         mps.missing_sizes AS missing_sizes,
         dpp.us_priority AS us_priority_raw,
-        dpp.uk_priority AS uk_priority_raw
+        dpp.uk_priority AS uk_priority_raw,
+        upp.urgent_priority AS urgent_priority
       FROM po_view pov
       LEFT JOIN suppliers sup ON sup.id = pov.supplier
       LEFT JOIN po_types pt ON pt.id = pov.po_type
@@ -229,6 +258,7 @@ Deno.serve(async (req) => {
       LEFT JOIN dest_priority_per_po dpp ON dpp.po_number = pov.po_number
       LEFT JOIN inv_per_style ips ON ips.style_color = pov.style_color
       LEFT JOIN missing_per_style mps ON mps.style_color = pov.style_color
+      LEFT JOIN urgent_priority_per_po upp ON upp.po_number = pov.po_number
       WHERE pov.po_status = ANY($1::int[])
         AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
@@ -402,6 +432,11 @@ Deno.serve(async (req) => {
         // Maps 0=None / 1=Normal / 2=Urgent / 3=Best Seller
         us_priority: po.us_priority_raw ? (po.us_priority_raw === 3 ? 'BEST_SELLER' : po.us_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
         uk_priority: po.uk_priority_raw ? (po.uk_priority_raw === 3 ? 'BEST_SELLER' : po.uk_priority_raw === 2 ? 'URGENT' : 'NORMAL') : null,
+        // Computed urgent priority (per spec §3.3.2). Main Office "Mark as Urgent"
+        // override forces this to 'MANUAL' regardless of the SQL computation.
+        urgent_priority: ov.marked_urgent ? 'MANUAL' : (po.urgent_priority || null),
+        marked_urgent: !!ov.marked_urgent,
+        marked_urgent_reason: ov.marked_urgent_reason || null,
       };
     });
 

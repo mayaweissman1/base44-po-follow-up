@@ -170,6 +170,27 @@ Deno.serve(async (req) => {
       return Response.json({ success: true });
     }
 
+    // ── MARK_URGENT (Main Office only) ──────────────────────────
+    // Manually toggle po_overrides.marked_urgent on a PO. Forces urgent_priority
+    // to 'MANUAL' in getFollowUpData; unmarking restores the computed value.
+    if (action_type === 'MARK_URGENT') {
+      const { marked_urgent, marked_urgent_reason } = payload || {};
+      const now = new Date().toISOString();
+      const overrideData = {
+        marked_urgent: !!marked_urgent,
+        marked_urgent_by_email: user.email,
+        marked_urgent_at: now,
+        marked_urgent_reason: marked_urgent_reason || null,
+      };
+      const existing = await base44.entities.po_overrides.filter({ po_number });
+      if (existing.length > 0) {
+        await base44.entities.po_overrides.update(existing[0].id, overrideData);
+      } else {
+        await base44.entities.po_overrides.create({ po_number, ...overrideData });
+      }
+      return Response.json({ success: true });
+    }
+
     // ── INTERNAL_NOTE ───────────────────────────────────────────
     if (action_type === 'INTERNAL_NOTE') {
       const { internal_note, last_ddd_update_id } = payload;

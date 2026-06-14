@@ -1,6 +1,6 @@
 # Edikted Follow-Up — Product Specification
 
-**Version:** Current (June 2026)
+**Version:** Current (June 2026) · §3.3.2 / §10.6 / §10.7 implemented
 **Stack:** React 18 + Vite + Tailwind + shadcn/ui · Base44 BaaS · External Postgres (Edikted DB via `EDIKTED_DB_URL`)
 **Brand:** Edikted Pink (`#E31B7F`) · Inter (body/UI) · JetBrains Mono (numbers, codes, dates) · Pink-forward fashion-tech aesthetic
 
