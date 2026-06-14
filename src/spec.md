@@ -46,8 +46,9 @@ Admins (User.role = `admin`) can switch role from the header dropdown (every rol
 | Archive toggle | ❌ | ✅ (advanced filter panel) | ❌ |
 | Last Comment (internal) column | ✅ | ❌ | ❌ |
 | HOLD Age column | ✅ | ❌ | ❌ |
-| IND (Inventory Days) column | ✅ | ❌ | ❌ |
+| IND (Inventory Days) column | ❌ *(moved to sub-PO row — see §10.6)* | ❌ | ❌ |
 | PO Rank column | ✅ | ❌ | ❌ |
+| Sub-PO row (2-line: per-destination data + actions) | ✅ | ✅ | ✅ |
 
 ---
 
@@ -72,6 +73,11 @@ Common fields: `po_number`, `actor_email`, `type`.
 **`po_overrides`** — one row per PO, read-cache of the latest effective state:
 `delayed_due_date`, `dd_status`, `next_update_date`, `dd_status_changed_at`, `last_ddd_update_id`, `last_general_update_id`.
 
+**`sub_po_notes`** *(new — supports sub-PO actions, see §10.6)* — one row per sub-PO, holds the DD team's internal annotations:
+`sub_po_number`, `po_number`, `follow_up_date` (internal, not exposed to Main Office decisions), `internal_comment`, `marked_urgent` (boolean override on top of the source-system `urgent`), `marked_urgent_by_email`, `marked_urgent_at`, `last_updated_by_email`.
+
+Sub-PO actions only **augment** the read-only Edikted DB data — they never write back to the source `sub_po_view`.
+
 ### 3.3 Status enum
 Defined in `lib/followUpConstants.js → STATUS_ENUM`:
 - `HOLD` — Awaiting main office decision (amber badge)
@@ -79,6 +85,19 @@ Defined in `lib/followUpConstants.js → STATUS_ENUM`:
 - `APPROVED` — Approved — delay justified (green badge)
 - `ACKNOWLEDGED` — Accepted — no other choice (teal badge)
 - `REJECTED` — Delay not acceptable (red badge)
+
+### 3.3.1 Urgent flag — how the "URGENT" tag works today
+
+Two independent boolean fields drive the "URGENT" pill that shows under PO Number today:
+
+1. **`po_view.urgent`** — set in the source Edikted system on the **PO level**. Boolean.
+2. **`sub_po_view.urgent`** — set on the **sub-PO level** (per destination). Boolean.
+
+The PO-level pill shown in the table is `!!po.urgent` (the PO-level flag). Sub-PO–level urgency is currently only surfaced inside `getPoDetails` (used by `PoSizeBreakdown` to color the destination chip).
+
+In addition, `po_urgent_status.reason` (free-text per PO) — values like `"Best Seller"`, `"URGENT"`, `"O Order"` — provides a richer *priority* signal that gets normalized into `us_priority` / `uk_priority` per destination.
+
+**New (per §10.6):** the DD team can now manually mark a sub-PO as urgent via the sub-PO action. This writes to `sub_po_notes.marked_urgent` and acts as an **override on top of** the source-system `spv.urgent` — the sub-PO's URGENT chip shows red when EITHER `spv.urgent === true` OR `sub_po_notes.marked_urgent === true`.
 
 ### 3.4 Auto-approval rule
 At delay-request submission:
@@ -136,7 +155,9 @@ The backend hydrates each row with derived fields that drive KPIs, filters, and 
 | `hold_age_days` | days a HOLD has been awaiting decision (Main Office) |
 | `urgency_reason_raw` | raw text from `po_urgent_status` table |
 | `us_priority` / `uk_priority` | per-destination tag: BEST_SELLER / URGENT / NORMAL |
-| `inv_days` | Inventory Days = (stock + air OTW) ÷ (virtual7d / 7) — Main Office only |
+| `inv_days` | Inventory Days = (stock + air OTW) ÷ (virtual7d / 7) — **rendered on the sub-PO row (per destination), not on the PO row** |
+| `air_otw` | Air OTW quantity — **rendered on the sub-PO row (per destination)** |
+| `shipping_method_names` | Array of shipping method names — **rendered on the sub-PO row (per destination)** |
 | `bno_high_low_otw` | boolean: demand high vs. OTW low |
 | `is_best_seller`, `urgent` | flag booleans |
 | `po_rank` | sub-PO order within same destination + style_color group, ranked by delayed/original DD |
@@ -290,7 +311,9 @@ All three layouts share one shell:
 ### 10.1 Main Office view
 
 **Columns** (left to right):
-☐ · ▸ · img · **PO Number** · Style Color · Rank · Production Stage · DDD Status · Urgency Reason · IND · DD Manager · Supplier · Delivery Status · Due Date · Delayed DD · Final DD · Next Update · Days Late · DD Reason · DDD Comment · DD Comment · HOLD Age · Delay Response · **Last Comment (internal)** · DDD Count · PM Tags · *Missing Sizes (Rep scope only)* · Actions
+☐ · ▸ · img · **PO Number** · Style Color · Rank · Production Stage · DDD Status · Urgency Reason · DD Manager · Supplier · Delivery Status · Due Date · Delayed DD · Final DD · Next Update · Days Late · DD Reason · DDD Comment · DD Comment · HOLD Age · Delay Response · **Last Comment (internal)** · DDD Count · PM Tags · *Missing Sizes (Rep scope only)* · Actions
+
+> **Note**: IND is no longer a PO-level column. It now lives on the per-destination sub-PO row inside the expand area (see §10.6) because IND is computed per destination, not per PO.
 
 **Actions per row:**
 - ✅ Approve (`onDecide(po, 'APPROVED')`)
@@ -320,7 +343,7 @@ Original DD · DD Date · Flags · Supplier · Delivery Status · DDD Count · S
 - Update (general update)
 - 🕐 View Logs
 
-**Expandable row** → renders `PoSizeBreakdown` (size-by-size breakdown per destination).
+**Expandable row** → renders the new **Sub-PO Table** (see §10.6).
 
 ### 10.3 DD Team Employee view
 
@@ -333,7 +356,7 @@ Style Color · Production Stage · DD Comment · DDD Status · PO Response · DD
 
 **Actions per row:** identical to Manager view (Report delay / Update / Logs).
 
-**Expandable row** → renders `PoSizeBreakdown`.
+**Expandable row** → renders the new **Sub-PO Table** (see §10.6).
 
 ### 10.4 Sorting & resizing
 - Click any column header to sort asc → desc → none. Numeric sort for number fields, locale-numeric string sort otherwise.
@@ -341,6 +364,54 @@ Style Color · Production Stage · DD Comment · DDD Status · PO Response · DD
 
 ### 10.5 Tooltips
 Each column header has a one-line tooltip on hover (`TIPS` map) — e.g. `IND`: *Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)*; `HOLD Age`: *Days the delay request has been awaiting Main Office decision*.
+
+### 10.6 Sub-PO Table (expandable row)
+
+Replaces the legacy `PoSizeBreakdown` cards. When the user expands a PO row, the expand area renders a **table with one block per sub-PO (one per destination — typically US and UK)**. Each block has **two header rows + one size-row**:
+
+```
+┌────────────────────────────────────────────────────────────────────────────────────────┐
+│ [US] · Best Seller · sub_po_number XYZ           [⚡ Urgent] [📅 14 Jun] [💬 …] [Actions]│
+├──────────────┬────────┬────────┬────────┬────────┬────────┬────────┬────────┬─────────┤
+│              │   XS   │   S    │   M    │   L    │   XL   │  XXL   │ Total  │         │
+│ Ordered      │   30   │   60   │   80   │   60   │   30   │   10   │  270   │         │
+│ Received     │   10   │   20   │   40   │   30   │   10   │   0    │  110   │         │
+│ Air OTW      │   5    │   10   │   20   │   10   │   5    │   0    │   50   │         │
+├──────────────┴────────┴────────┴────────┴────────┴────────┴────────┴────────┴─────────┤
+│ IND: 18d   ·   Shipping: Air Express, Sea Freight   ·   Follow-up: 14 Jun  ·  💬 "wait"│
+└────────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+**Per-destination header (top row of each block):**
+- Destination chip (US / UK) — pink pill
+- Priority chip (BEST_SELLER amber / URGENT red / NORMAL hidden)
+- Sub-PO number (mono, small)
+- Right-aligned: action buttons (see below)
+
+**Table body (three quantity rows × N sizes + Total column):**
+- **Ordered** — `ordered_qty` per size from `pod_view`
+- **Received** — `qty_received` per size
+- **Air OTW** — air OTW quantity per size (new — pulled from `sub_po_view.qty_otw_air` distributed per size, or shown as a total in the Total column only if per-size split isn't available from the source)
+
+**Footer strip (metadata + actions):**
+- **IND** (Inventory Days) — calculated per destination, color-coded (red < 5 · amber < 14 · normal otherwise · `∞` when stock is sufficient indefinitely)
+- **Shipping Method** — comma-joined `shipping_method_names` for that sub-PO
+- **Follow-up Date** (internal, DD team only) — date pill, click to edit
+- **Internal Comment** (DD team only) — quote-styled text, click to edit, truncated with full text on hover
+
+**Sub-PO actions** (rendered as small icon buttons in the per-destination header):
+
+| Action | Icon | Behaviour |
+|---|---|---|
+| Set / edit follow-up date | 📅 Calendar | Opens `SubPoFollowUpModal` — date picker only, optional clear. Saves to `sub_po_notes.follow_up_date`. Internal — not visible to Main Office's decision flow. |
+| Add / edit internal comment | 💬 MessageSquare | Opens `SubPoCommentModal` — textarea (max 280 chars). Saves to `sub_po_notes.internal_comment`. Internal — DD team only. |
+| Mark / unmark as urgent | ⚡ Zap | One-click toggle. Saves `sub_po_notes.marked_urgent` boolean + actor email + timestamp. The sub-PO's priority chip flips to URGENT (red) regardless of the source-system `spv.urgent`. Unmarking restores the source-system value. |
+
+**Visible to all DD roles.** Main Office sees the same sub-PO data **read-only** (no action buttons in Main Office's expand area).
+
+**Backend additions to support 10.6:**
+- `getPoDetails` is extended to return per-sub-PO `inv_days`, `air_otw` (total + per-size if available), `shipping_method_names`, and the merged `sub_po_notes` row.
+- New write endpoint **`saveSubPoNote`** (or extend `saveFollowUpAction` with `action_type = 'SUB_PO_NOTE'`) — takes `{ sub_po_number, po_number, follow_up_date?, internal_comment?, marked_urgent? }` and upserts the `sub_po_notes` row.
 
 ---
 
@@ -377,6 +448,8 @@ Per-role column schemas in `CUSTOM_FILTER_COLUMNS`:
 | **`ActivityLogDrawer`** | Row 🕐 Logs button; PO Number click in any table | Right-side drawer (`PoActivityLog`). Chronological history of all updates: DDD_UPDATEs (with reason, comment, decision badge), GENERAL_UPDATEs (stage, comment, next update). Internal notes shown only to `main_office` role. |
 | **`PoDetailsDrawer`** | Row click (Main Office only) | Right-side drawer with sub-blocks: Hero (PO info + thumb) · Progress (qty bars per destination) · Delay (history of DDD_UPDATEs) · Meta (collection/order type/drop/dates) · Timeline (all events) · Readiness (production stage timeline). Loads from `getPoDetails`. |
 | **`LeaderboardDrawer`** | Click any row in Insights strip | Right-side drawer with full ranked list of suppliers or managers by the chosen metric (late% / ontime% / workload / urgent count). |
+| **`SubPoFollowUpModal`** *(new)* | Sub-PO 📅 button in expand area | Date picker for the per-destination internal follow-up date. Optional clear. Writes to `sub_po_notes.follow_up_date`. DD team only. |
+| **`SubPoCommentModal`** *(new)* | Sub-PO 💬 button in expand area | Textarea (max 280 chars) for the per-destination internal comment. Writes to `sub_po_notes.internal_comment`. DD team only. |
 | **`BulkActionBar`** | Appears when ≥ 1 row selected | Floating bottom bar showing selection count, Clear button, role-specific bulk action buttons, and Export Selected. |
 
 ---
