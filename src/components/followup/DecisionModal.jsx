@@ -1,31 +1,67 @@
 import React, { useState } from 'react';
 import { X, Check, Info } from 'lucide-react';
-import { STATUS_ENUM, DELAY_RESPONSE_OPTIONS } from '@/lib/followUpConstants';
+import { STATUS_ENUM, DELAY_RESPONSE_OPTIONS, fmtDate } from '@/lib/followUpConstants';
 import { base44 } from '@/api/base44Client';
+import ReasonTag from './ReasonTag';
 
-// Three status options shown as icon-buttons at the top of the modal.
+// Three status options — same icons as the row Actions cluster.
 const STATUS_OPTIONS = [
   { key: 'APPROVED',     label: 'Approve',     Icon: Check, color: 'green' },
   { key: 'ACKNOWLEDGED', label: 'Acknowledge', Icon: Info,  color: 'teal' },
   { key: 'REJECTED',     label: 'Reject',      Icon: X,     color: 'red' },
 ];
 
-function StatusButton({ option, selected, onClick }) {
+function StatusIconButton({ option, selected, onClick }) {
   const { Icon, color, label, key } = option;
   const palette = {
-    green: { sel: 'bg-green-50 border-green-500 text-green-700', idle: 'border-[#E5E5E5] text-[#525252] hover:border-green-300 hover:bg-green-50/50' },
-    teal:  { sel: 'bg-teal-50 border-teal-500 text-teal-700',    idle: 'border-[#E5E5E5] text-[#525252] hover:border-teal-300 hover:bg-teal-50/50' },
-    red:   { sel: 'bg-red-50 border-red-500 text-red-600',       idle: 'border-[#E5E5E5] text-[#525252] hover:border-red-300 hover:bg-red-50/50' },
+    green: { sel: 'bg-green-50 text-green-600 ring-green-500',  idle: 'text-[#A3A3A3] hover:bg-green-50 hover:text-green-600' },
+    teal:  { sel: 'bg-teal-50 text-teal-600 ring-teal-500',     idle: 'text-[#A3A3A3] hover:bg-teal-50 hover:text-teal-600' },
+    red:   { sel: 'bg-red-50 text-red-500 ring-red-500',        idle: 'text-[#A3A3A3] hover:bg-red-50 hover:text-red-500' },
   }[color];
   return (
     <button
       type="button"
       onClick={() => onClick(key)}
-      className={`flex-1 flex flex-col items-center justify-center gap-1.5 py-3 rounded-[10px] border-2 transition-all ${selected ? palette.sel : palette.idle}`}
+      title={label}
+      className={`w-8 h-8 flex items-center justify-center rounded-[6px] transition-all ${selected ? `${palette.sel} ring-2` : palette.idle}`}
     >
-      <Icon size={18} strokeWidth={2.5} />
-      <span className="text-[11px] font-bold uppercase tracking-wide">{label}</span>
+      <Icon size={16} strokeWidth={2.5} />
     </button>
+  );
+}
+
+function DetailRow({ label, children }) {
+  return (
+    <>
+      <dt className="text-[#525252] font-semibold">{label}</dt>
+      <dd className="text-[#0A0A0A] min-w-0 break-words">{children}</dd>
+    </>
+  );
+}
+
+function DelayRequestDetails({ po }) {
+  const original = po.due_date;
+  const newDate = po.effective_delayed_due_date;
+  const reasons = po.ddd_reasons && po.ddd_reasons.length > 0 ? po.ddd_reasons : (po.ddd_reason ? [po.ddd_reason] : []);
+  const comment = po.ddd_comment;
+  return (
+    <div className="mb-5 bg-[#FAFAFA] border border-[#E5E5E5] rounded-[8px] p-3">
+      <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] mb-2">Delay Request</div>
+      <dl className="grid text-xs" style={{ gridTemplateColumns: 'max-content 1fr', gap: '6px 14px' }}>
+        <DetailRow label="Original DD">
+          <span className="font-mono">{fmtDate(original)}</span>
+        </DetailRow>
+        <DetailRow label="New DD">
+          <span className="font-mono font-semibold text-[#E31B7F]">{newDate ? fmtDate(newDate) : '—'}</span>
+        </DetailRow>
+        <DetailRow label="Reason">
+          {reasons.length > 0 ? <ReasonTag reasons={reasons} /> : <span className="text-[#A3A3A3]">—</span>}
+        </DetailRow>
+        <DetailRow label="Comment">
+          {comment ? <span className="text-[#525252] leading-snug">{comment}</span> : <span className="text-[#A3A3A3]">—</span>}
+        </DetailRow>
+      </dl>
+    </div>
   );
 }
 
@@ -114,13 +150,21 @@ export default function DecisionModal({ po, posBulk, decision: initialDecision, 
         </div>
 
         <div className="px-5 py-5 overflow-y-auto flex-1">
-          {/* Status selector — 3 icon buttons */}
+          {/* Request details — single-PO only */}
+          {!isBulk && <DelayRequestDetails po={po} />}
+
+          {/* Status selector — icon-only buttons matching the row action cluster */}
           <div className="mb-5">
             <label className="block text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] mb-2">Decision</label>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-1.5">
               {STATUS_OPTIONS.map(opt => (
-                <StatusButton key={opt.key} option={opt} selected={decision === opt.key} onClick={k => { setDecision(k); setError(''); }} />
+                <StatusIconButton key={opt.key} option={opt} selected={decision === opt.key} onClick={k => { setDecision(k); setError(''); }} />
               ))}
+              {decision && (
+                <span className={`ml-2 text-[11px] font-bold uppercase tracking-wide ${decisionColor}`}>
+                  {newLabel}
+                </span>
+              )}
             </div>
             {isOverride && (
               <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[6px] px-2.5 py-1.5">
