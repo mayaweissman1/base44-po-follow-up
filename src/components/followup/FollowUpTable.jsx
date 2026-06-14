@@ -1006,13 +1006,15 @@ export default function FollowUpTable({
                       <div className="flex items-center gap-0.5">
                         {role === 'main_office' ? (
                           <>
-                            <button
-                              onClick={() => onDecide(po, null)}
-                              title="Respond to DD delay"
-                              className="h-7 px-2.5 text-[11px] font-semibold rounded-[6px] bg-[#E31B7F] text-white hover:bg-[#C21571] transition-colors flex items-center gap-1.5"
-                            >
-                              <MessageSquare size={12} /> Respond
-                            </button>
+                            {po.last_ddd_update_id && (
+                              <button
+                                onClick={() => onDecide(po, null)}
+                                title="Respond to DD delay"
+                                className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"
+                              >
+                                <MessageSquare size={14} />
+                              </button>
+                            )}
                             <button
                               onClick={() => onFollowUp?.(po)}
                               title="Follow up next update"
@@ -1021,13 +1023,15 @@ export default function FollowUpTable({
                               <Calendar size={14} />
                             </button>
                             <button onClick={() => onInternalNote(po)} title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><MessageSquare size={14} /></button>
-                            <button
-                              onClick={() => onMarkUrgent?.(po)}
-                              title={po.marked_urgent ? 'Marked urgent — click to remove' : 'Mark as urgent'}
-                              className={`w-7 h-7 flex items-center justify-center rounded-[6px] transition-colors ${po.marked_urgent ? 'bg-[#FFF0F7] text-[#E31B7F]' : 'text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F]'}`}
-                            >
-                              <Zap size={14} fill={po.marked_urgent ? 'currentColor' : 'none'} />
-                            </button>
+                            {!po.marked_urgent && (
+                              <button
+                                onClick={() => onMarkUrgent?.(po)}
+                                title="Mark as urgent"
+                                className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"
+                              >
+                                <Zap size={14} />
+                              </button>
+                            )}
                           </>
                         ) : (
                           <>
