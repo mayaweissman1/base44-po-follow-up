@@ -150,10 +150,10 @@ function PoCell({ po, onLogsClick }) {
         <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
       </div>
       <div className="flex gap-1 mt-1 flex-wrap">
-        {po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
+        {po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
         {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
         {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
-        {isFuture && !po.urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
+        {isFuture && !po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
       </div>
     </div>
   );
@@ -1023,7 +1023,7 @@ export default function FollowUpTable({
                               <Calendar size={14} />
                             </button>
                             <button onClick={() => onInternalNote(po)} title="Internal note" className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"><StickyNote size={14} /></button>
-                            {!po.marked_urgent && !po.urgent && (
+                            {!po.marked_urgent && (
                               <button
                                 onClick={() => onMarkUrgent?.(po)}
                                 title="Mark as urgent"
