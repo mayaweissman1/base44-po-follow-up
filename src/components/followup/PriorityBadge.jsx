@@ -14,7 +14,10 @@ const BASE = 'inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px]
  *   "Best Seller New", "URGENT", "US-Sizes Inv Days", "Deadline at risk".
  */
 export default function PriorityBadge({ priority }) {
-  if (!priority || priority === 'Normal') {
+  if (!priority) {
+    return <span className="text-[#A3A3A3]">—</span>;
+  }
+  if (priority === 'Normal') {
     return <span className={`${BASE} bg-gray-50 text-gray-400 border-gray-200`}>Normal</span>;
   }
 

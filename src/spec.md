@@ -1,5 +1,5 @@
 # PO Follow-Up Tool — Specification
-Version: 2.0  Status: Approved  Last updated: 2026-06-15
+Version: 2.1  Status: Approved  Last updated: 2026-06-15
 
 ---
 
@@ -38,7 +38,7 @@ A mockup banner is shown at the very top of the page indicating preview-only dat
 | `urgency_reason_raw` | `po_urgent_status.reason` | Raw string aggregated from `po_urgent_status` rows; US-/UK- prefixes are stripped + deduped server-side |
 | `pu_tag` | `style_color.pm_tags` contains the 'PU' pm_tag id | Boolean; renders the PU tag pill |
 | `urgent_tagged` | `style_color.pm_tags` contains any 'urgent-*' pm_tag | Boolean |
-| `needs_attention` | Computed in backend | True when PO is NOT urgent and NOT marked_urgent but matches `urgents_view` entry conditions (PU tag, urgent-* tag, "URGENT BEFORE CNY" PM tag, IND ≤ 30 for WR/R/SWIMR, O/SWIM order, collection_type_id=18 for O/R). Renders pulsing amber dot + "Needs Attention" badge. |
+| `needs_attention` | Computed in backend | True when PO is NOT urgent and NOT marked_urgent but matches `urgents_view` entry conditions (PU tag, urgent-* tag, "URGENT BEFORE CNY" PM tag, IND ≤ 30 for WR/R/SWIMR, O/SWIM order, collection_type_id=18 for O/R). Renders as a small orange "May be urgent" warning icon next to the PO Number with a tooltip explaining why (replaces the previous "Needs Attention" badge — v2.1). |
 | `marked_urgent` | `po_overrides.marked_urgent` | Main Office override — forces `urgent_priority` to MANUAL |
 | `marked_urgent_reason` | `po_overrides.marked_urgent_reason` | Optional free-text reason (max 200 chars) |
 | `missing_sizes` | `dbt_marts.mart_repeats__sc_united_with_groups` | Array of missing size codes — Rep Orders only |
@@ -46,7 +46,7 @@ A mockup banner is shown at the very top of the page indicating preview-only dat
 | `bno_high_low_otw` | `sub_bno_per_po` CTE | Boolean: US balance > 3000 with OTW < 50%, or UK balance > 1000 |
 | `is_best_seller` | `bs_flag` CTE | Boolean derived from `po_urgent_status.reason ILIKE '%Best Seller%'` |
 | `shipped_percent` | Computed | `(qty_sent_out / ordered_qty) * 100` |
-| `inv_days` | `inv_per_po` CTE | **Sub-PO level**: MIN(Inv Days) across the PO's sub-PO destinations. Each sub_po → (style_color, destination) lookup in `edktd_history.repeats_sc_united_history` where destination is 'US' (Edikted) or 'UK' (EdiktedUK). The PO row shows the worst (lowest) IND across its sub_pos. |
+| `inv_days` | `inv_per_po` CTE | **Sub-PO level only (v2.1)**: keyed by (style_color, destination) in `edktd_history.repeats_sc_united_history` (destination 'US' = Edikted, 'UK' = EdiktedUK). Shown only in the expanded sub-PO destination table — no longer rendered as a column on the PO row. Still available on the row object for filters/KPIs. |
 | `shipping_methods` / `shipping_method_names` | `shipping_methods_per_po` CTE | Per-PO list of shipping method IDs and human-readable names |
 | `late_future` | Computed | `'RECEIVED'` (qty_received ≥ ordered_qty) / `'LATE'` (final_dd < today) / `'FUTURE'` |
 | `po_rank` | `po_rank_per_po` CTE | Min sub-PO rank for the PO — sub-POs ranked by destination + style_color + delayed/original DD |
@@ -243,7 +243,7 @@ Range filters:
 - Next Update `DateRangePicker`
 - Delay Request (days) `RangeSlider` (0–120, suffix `d`)
 - Shipped % `RangeSlider` (0–100, suffix `%`) — **New scope only**
-- IND `RangeSlider` (0–60, suffix `d`) — **main_office only**
+<!-- IND filter removed in v2.1 — IND no longer surfaced at PO level -->
 
 Toggle strip (dd_team_manager only): Archive `ToggleSwitch`.
 
@@ -364,10 +364,9 @@ Key columns (both scopes):
 | Rank | `po_rank` | Sub-PO rank within destination + style_color |
 | Production Stage | `effective_dd_status` | `DdStatusBadge` |
 | DDD Status | `current_status` | `StatusBadge` |
-| Urgent Priority | `urgent_priority` | `PriorityBadge` |
-| Urgency Reason | `urgency_reason_raw` | Orange pill (raw deduped reason, max 200ch truncated) |
+| Urgent Priority | `urgent_priority` | `PriorityBadge` — closed-list value from `urgent_priority_per_po` CTE only (no fallback to `urgency_reason_raw`). Shows "—" when null. |
+| Urgency Reason | `urgency_reason_raw` | Orange pill (raw deduped reason from `po_urgent_status`) |
 | PU Tags | `pu_tag` | Amber "PU" pill when true |
-| IND | `inv_days` | Color-coded: red < 5, amber < 14, gray otherwise |
 | DD Manager | `dd_manager_name` | |
 | Supplier | `supplier` | |
 | Delivery Status | `delivery_date_status` | |
@@ -509,10 +508,12 @@ Component: `src/components/followup/SubPoDestinationTable.jsx`.
 
 Shown when a row's expand chevron is clicked. Fetches per-destination breakdown via `getPoDetails`.
 
-Columns: Destination (US/UK pill) · IND (per destination) · sizes (XS/S/M/L/XL/XXL) · Total · Shipping Method · Air OTW.
+Columns: Destination (US/UK pill) · IND (per destination) · sizes (XS/S/M/L/XL/XXL) · Total · Shipping · Air OTW.
 
 Destination labels are mapped: `Edikted` → `US` (pink), `EdiktedUK` → `UK` (blue).
-IND color: red < 5, amber < 14, gray otherwise; `∞` for ≥ 9999.
+IND is per (style_color, destination) — `US` row reads from `'US'` history; `UK` row from `'UK'` history. Color: red < 5, amber < 14, gray otherwise; `∞` for ≥ 9999.
+
+**v2.1 styling:** removed the "Sub-POs by Destination · N destination(s)" header line, tighter row padding, single-line table for a cleaner look. `getPoDetails` now runs its SQL queries in parallel for faster expand-row loading.
 
 ---
 
@@ -529,7 +530,7 @@ Sub-blocks: HeroBlock · ProgressBlock · DelayBlock · MetaBlock · TimelineBlo
 ### Row actions
 
 **Main Office:**
-- `MessageSquare` — Respond to DD delay (`DecisionModal`)
+- `MessageSquare` — Respond to DD delay (`DecisionModal`). **When `current_status === 'HOLD'`** the icon is highlighted red with a red "!" badge — visual cue that the PO is awaiting Main Office decision (v2.1).
 - `Calendar` — Follow up next update (`FollowUpNextUpdateModal`)
 - `StickyNote` — Internal note (`InternalNoteModal`)
 - `Zap` — Mark as urgent (toggles `marked_urgent` via `saveFollowUpAction` action_type `MARK_URGENT`; optimistic UI)
@@ -552,7 +553,7 @@ Visible when `selectedRows.size > 0`.
 ### Modals
 - `LogDelayModal` — single or bulk DDD update
 - `GeneralUpdateModal` — single or bulk general update
-- `DecisionModal` — single or bulk decision (APPROVED / REJECTED / ACKNOWLEDGED) with optional delay response comment
+- `DecisionModal` — single or bulk decision (APPROVED / REJECTED / ACKNOWLEDGED) with optional delay response comment. **v2.1**: enlarged decision buttons (80×80px tiles with 28px icon + label below).
 - `InternalNoteModal` — internal note (Main Office)
 - `FollowUpNextUpdateModal` — set next update date (Main Office, single or bulk)
 - `ActivityLogDrawer` — audit trail via `getPoActivityLog`

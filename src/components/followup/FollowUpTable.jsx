@@ -21,7 +21,6 @@ const CUSTOM_FILTER_COLUMNS = {
     { key: 'effective_dd_status',        label: 'Production Stage',  type: 'text' },
     { key: 'current_status',             label: 'DDD Status',        type: 'text' },
     { key: 'urgent_priority',            label: 'Urgent Priority',   type: 'text' },
-    { key: 'inv_days',                   label: 'IND',               type: 'number' },
     { key: 'dd_manager_name',            label: 'DD Manager',        type: 'text' },
     { key: 'supplier',                   label: 'Supplier',          type: 'text' },
     { key: 'delivery_date_status',       label: 'Delivery Status',   type: 'text' },
@@ -144,30 +143,28 @@ function PoCell({ po, onLogsClick }) {
   const isLate = po.late_future === 'LATE';
   const isFuture = po.late_future === 'FUTURE';
   const isReceived = po.late_future === 'RECEIVED';
-  // "Needs attention" — small pulsing alert dot when the PO matches the urgent-base
-  // rule but hasn't been manually marked urgent yet. Subtle, non-blocking.
-  const needsAttention = po.needs_attention && !po.marked_urgent;
+  // "May be urgent" — small orange flame icon with tooltip when the PO matches
+  // the urgent-base rule but hasn't been manually marked urgent yet. Subtle,
+  // non-blocking — communicates "this could become urgent, please review".
+  const mayBeUrgent = po.needs_attention && !po.marked_urgent;
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
-        {needsAttention && (
-          <span title="Needs your attention" className="relative flex w-2 h-2 flex-shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+        {mayBeUrgent && (
+          <span
+            title="May be urgent — this PO matches one or more urgent criteria (PU tag, low IND, special order type, etc.). Review and mark as urgent if needed."
+            className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex-shrink-0 cursor-help"
+          >
+            <AlertTriangle size={10} strokeWidth={2.5} />
           </span>
         )}
         <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
       </div>
       <div className="flex gap-1 mt-1 flex-wrap">
         {po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
-        {needsAttention && (
-          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">
-            <AlertTriangle size={9} strokeWidth={2.5} /> Needs Attention
-          </span>
-        )}
         {isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
         {isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
-        {isFuture && !po.marked_urgent && !needsAttention && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
+        {isFuture && !po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">FUTURE</span>}
       </div>
     </div>
   );
@@ -696,7 +693,7 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={empColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
+                        <div className="sticky left-0 px-4 py-2" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
                           <SubPoDestinationTable poNumber={po.po_number} />
                         </div>
                       </td>
@@ -792,7 +789,7 @@ export default function FollowUpTable({
                     {isExpanded && (
                       <tr>
                         <td colSpan={ddmColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                          <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
+                          <div className="sticky left-0 px-4 py-2" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
                             <SubPoDestinationTable poNumber={po.po_number} />
                           </div>
                         </td>
@@ -844,10 +841,10 @@ export default function FollowUpTable({
     : [];
 
   // colSpan for the expand row.
-  // Main Office: 2 fixed (checkbox+expand) + priority + urgency_reason + pu_tags + inv_days + 17 standard + hold_age + internal_note + actions = 26 (+1 missing-sizes in Rep)
+  // Main Office: 2 fixed (checkbox+expand) + priority + urgency_reason + pu_tags + 17 standard + hold_age + internal_note + actions = 25 (+1 missing-sizes in Rep)
   const expandColSpan = role === 'dd_team_manager'
     ? 4 + DDM_ALL_COLS.filter(c => !!ddmOptCols[c.key]).length
-    : (26 + (isRepScopeTable ? 1 : 0));
+    : (25 + (isRepScopeTable ? 1 : 0));
 
   function renderAdditionalTds(po, bg) {
     return additionalCols.map(col => {
@@ -921,10 +918,9 @@ export default function FollowUpTable({
               {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
-              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW / DROP / URGENT / MISSING SIZES / MANUAL etc.">Urgent Priority</Th>}
+              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW/OLD · SOLD OUT · MISSING SIZES · MANUAL · URGENT · Drop … · Risk in Fabric/PPS">Urgent Priority</Th>}
               {role === 'main_office' && <Th {...thProps} col="urgency_reason_raw" width={colWidths['urgency_reason_raw'] || 160} tooltip="Raw urgency reason from po_urgent_status (destination-prefix stripped)">Urgency Reason</Th>}
               {role === 'main_office' && <Th {...thProps} col={null} width={colWidths['pu_tags'] || 100} tooltip="PU tags from urgent_reasons_base">PU Tags</Th>}
-              {role === 'main_office' && <Th {...thProps} col="inv_days" width={colWidths['inv_days'] || 70} tooltip="Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)">IND</Th>}
               {colVisible('dd_manager_name') && <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>}
               {colVisible('supplier') && <Th {...thProps} col="supplier" width={colWidths['supplier'] || 90}>Supplier</Th>}
               {colVisible('delivery_date_status') && <Th {...thProps} col="delivery_date_status" width={colWidths['delivery_date_status'] || 140}>Delivery Status</Th>}
@@ -973,7 +969,7 @@ export default function FollowUpTable({
                     {colVisible('po_rank') && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
-                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority || po.priority} /></td>}
+                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority} /></td>}
                     {role === 'main_office' && (
                       <td className={tdBase}>
                         {po.urgency_reason_raw
@@ -986,14 +982,6 @@ export default function FollowUpTable({
                         {po.pu_tag
                           ? <span title="PU tag from urgent_reasons_base" className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-700 border border-amber-200">PU</span>
                           : <span className="text-[#A3A3A3]">—</span>}
-                      </td>
-                    )}
-                    {role === 'main_office' && (
-                      <td className={tdBase}>
-                        {po.inv_days == null ? <span className="text-[#A3A3A3]">—</span> :
-                          po.inv_days >= 9999 ? <span className="font-mono text-[#A3A3A3]">∞</span> :
-                          <span className={`font-mono font-semibold ${po.inv_days < 5 ? 'text-red-500' : po.inv_days < 14 ? 'text-amber-600' : 'text-[#0A0A0A]'}`}>{po.inv_days}d</span>
-                        }
                       </td>
                     )}
                     {colVisible('dd_manager_name') && <td className={tdBase}><span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-[#FFF0F7] text-[#E31B7F]">{po.dd_manager_name || '—'}</span></td>}
@@ -1039,10 +1027,13 @@ export default function FollowUpTable({
                             {po.last_ddd_update_id && (
                               <button
                                 onClick={() => onDecide(po, null)}
-                                title="Respond to DD delay"
-                                className="w-7 h-7 flex items-center justify-center rounded-[6px] text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F] transition-colors"
+                                title={po.current_status === 'HOLD' ? 'Awaiting your response — Respond to DD delay' : 'Respond to DD delay'}
+                                className={`relative w-7 h-7 flex items-center justify-center rounded-[6px] transition-colors ${po.current_status === 'HOLD' ? 'text-red-500 bg-red-50 hover:bg-red-100' : 'text-[#A3A3A3] hover:bg-[#FFF0F7] hover:text-[#E31B7F]'}`}
                               >
                                 <MessageSquare size={14} />
+                                {po.current_status === 'HOLD' && (
+                                  <span className="absolute -top-0.5 -right-0.5 w-3 h-3 flex items-center justify-center rounded-full bg-red-500 text-white text-[8px] font-bold leading-none">!</span>
+                                )}
                               </button>
                             )}
                             <button
@@ -1078,7 +1069,7 @@ export default function FollowUpTable({
                   {isExpanded && (
                     <tr>
                       <td colSpan={expandColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
-                        <div className="sticky left-0 px-6 py-4" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
+                        <div className="sticky left-0 px-4 py-2" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
                           <SubPoDestinationTable poNumber={po.po_number} />
                         </div>
                       </td>

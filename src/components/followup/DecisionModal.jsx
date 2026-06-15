@@ -23,9 +23,10 @@ function StatusIconButton({ option, selected, onClick }) {
       type="button"
       onClick={() => onClick(key)}
       title={label}
-      className={`w-8 h-8 flex items-center justify-center rounded-[6px] transition-all ${selected ? `${palette.sel} ring-2` : palette.idle}`}
+      className={`flex flex-col items-center justify-center gap-1 w-20 h-20 rounded-[10px] transition-all ${selected ? `${palette.sel} ring-2` : palette.idle}`}
     >
-      <Icon size={16} strokeWidth={2.5} />
+      <Icon size={28} strokeWidth={2.5} />
+      <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
     </button>
   );
 }
@@ -153,18 +154,13 @@ export default function DecisionModal({ po, posBulk, decision: initialDecision, 
           {/* Request details — single-PO only */}
           {!isBulk && <DelayRequestDetails po={po} />}
 
-          {/* Status selector — icon-only buttons matching the row action cluster */}
+          {/* Status selector — larger icon buttons with label below */}
           <div className="mb-5">
             <label className="block text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] mb-2">Decision</label>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-3">
               {STATUS_OPTIONS.map(opt => (
                 <StatusIconButton key={opt.key} option={opt} selected={decision === opt.key} onClick={k => { setDecision(k); setError(''); }} />
               ))}
-              {decision && (
-                <span className={`ml-2 text-[11px] font-bold uppercase tracking-wide ${decisionColor}`}>
-                  {newLabel}
-                </span>
-              )}
             </div>
             {isOverride && (
               <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-[6px] px-2.5 py-1.5">
