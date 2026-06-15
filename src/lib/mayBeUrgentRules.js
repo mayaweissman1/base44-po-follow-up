@@ -1,8 +1,9 @@
 // "May be urgent" — modular rule engine
 // =====================================
-// Each rule has an id, label, description, an optional threshold field, and an
-// evaluator(row, settings) → boolean. The user can toggle rules on/off and tune
-// thresholds via the settings modal; settings are stored in localStorage.
+// Each rule has an id, label, description, optional settings (threshold or
+// other config), and an evaluator(row, settings) → boolean. The user can toggle
+// rules on/off and tune values via the settings modal; settings are stored in
+// localStorage.
 
 const STORAGE_KEY = 'may-be-urgent-settings';
 
@@ -17,9 +18,24 @@ export const MAY_BE_URGENT_RULES = [
   },
   {
     id: 'urgent_pm_tag',
-    label: 'Urgent-* PM tag',
-    description: 'The style color has any PM tag starting with "urgent-".',
-    evaluate: (row) => row.urgent_tagged === true,
+    label: 'PM tag matches pattern',
+    description: 'The style color has a PM tag whose name matches the pattern below (case-insensitive, supports * wildcard).',
+    setting: {
+      kind: 'text',
+      key: 'urgentPmTagPattern',
+      label: 'Match pattern',
+      defaultValue: 'urgent-*',
+      placeholder: 'e.g. urgent-*',
+    },
+    evaluate: (row, s) => {
+      const pattern = (s.urgentPmTagPattern || 'urgent-*').trim();
+      if (!pattern) return false;
+      // Convert simple `*` wildcard pattern to a case-insensitive regex.
+      const escaped = pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
+      const re = new RegExp(`^${escaped}$`, 'i');
+      const tags = String(row.pm_tags_label || '').split(',').map(t => t.trim()).filter(Boolean);
+      return tags.some(t => re.test(t));
+    },
   },
   {
     id: 'urgent_before_cny',
@@ -30,8 +46,9 @@ export const MAY_BE_URGENT_RULES = [
   {
     id: 'low_ind_repeats',
     label: 'Low inventory days (Repeats: WR / R / SWIMR)',
-    description: 'A repeat order whose minimum Inventory Days across destinations is at or below the threshold.',
-    threshold: {
+    description: 'A repeat order whose minimum Inventory Days across destinations is at or below the threshold. (IND is only computed for Rep orders.)',
+    setting: {
+      kind: 'number',
       key: 'lowIndRepeatsMax',
       label: 'Inv Days ≤',
       defaultValue: 30,
@@ -40,8 +57,8 @@ export const MAY_BE_URGENT_RULES = [
       suffix: 'd',
     },
     evaluate: (row, s) => {
-      const prefix = (row.po_type_prefix || row.po_type || '').toUpperCase();
-      const isRepeat = ['WR', 'R', 'SWIMR'].some(t => prefix.includes(t));
+      const prefix = (row.po_type_prefix || '').toUpperCase();
+      const isRepeat = ['WR', 'R', 'SWIMR'].includes(prefix);
       if (!isRepeat) return false;
       if (row.inv_days == null) return false;
       return Number(row.inv_days) <= Number(s.lowIndRepeatsMax ?? 30);
@@ -52,31 +69,39 @@ export const MAY_BE_URGENT_RULES = [
     label: 'New "O" / SWIM order',
     description: 'The PO is a new O or SWIM order — these are flagged as needing attention by default.',
     evaluate: (row) => {
-      const prefix = (row.po_type_prefix || row.po_type || '').toUpperCase();
-      return prefix.includes('O') || prefix.includes('SWIM');
+      const prefix = (row.po_type_prefix || '').toUpperCase();
+      return prefix === 'O' || prefix === 'SWIM';
     },
   },
   {
-    id: 'collection_18',
-    label: 'Special collection (id 18) with O / R orders',
-    description: 'PO belongs to collection_type_id = 18 AND is an O or R order.',
-    evaluate: (row) => {
-      if (row.collection_type_id !== 18) return false;
-      const prefix = (row.po_type_prefix || row.po_type || '').toUpperCase();
-      return prefix === 'O' || prefix === 'R' || prefix.includes('O') || prefix.includes('R');
+    id: 'special_collection',
+    label: 'Special collection with O / R orders',
+    description: 'PO belongs to a chosen collection type AND is an O or R order. Pick a collection name; the system resolves its id automatically. Default: Barbie (id 18).',
+    setting: {
+      kind: 'collection',
+      key: 'specialCollectionTypeId',
+      label: 'Collection',
+      defaultValue: 18,
+      defaultLabel: 'Barbie',
+    },
+    evaluate: (row, s) => {
+      const targetId = s.specialCollectionTypeId ?? 18;
+      if (row.collection_type_id !== Number(targetId)) return false;
+      const prefix = (row.po_type_prefix || '').toUpperCase();
+      return prefix === 'O' || prefix === 'R';
     },
   },
 ];
 
-// Defaults: every rule ON, thresholds at their default values.
+// Defaults: every rule ON, settings at their default values.
 export function defaultMayBeUrgentSettings() {
   const enabled = {};
-  const thresholds = {};
+  const settings = {};
   for (const r of MAY_BE_URGENT_RULES) {
     enabled[r.id] = true;
-    if (r.threshold) thresholds[r.threshold.key] = r.threshold.defaultValue;
+    if (r.setting) settings[r.setting.key] = r.setting.defaultValue;
   }
-  return { enabled, ...thresholds };
+  return { enabled, ...settings };
 }
 
 export function loadMayBeUrgentSettings() {

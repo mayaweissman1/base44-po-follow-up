@@ -109,6 +109,10 @@ Deno.serve(async (req) => {
       hasUrgentReasonsBase = false;
     }
 
+    // Build priority from urgent_reasons_base when available. When it's NOT
+    // available we compute priority *inline* on the client (computePriorityFallback
+    // below) using the fields we already pull from po_view, so every PO gets a
+    // value — not only the ones marked urgent.
     const urgentPriorityCte = hasUrgentReasonsBase ? `
       urgent_priority_per_po AS (
         SELECT DISTINCT ON (urb.po_number) urb.po_number,
@@ -142,6 +146,27 @@ Deno.serve(async (req) => {
       urgent_priority_per_po AS (
         SELECT NULL::text AS po_number, NULL::text AS urgent_priority WHERE FALSE
       )`;
+
+    // Inline priority fallback — used when urgent_reasons_base is missing.
+    // Computes a "best effort" priority from fields available in po_view.
+    function computePriorityFallback(po) {
+      const prefix = String(po.po_type_prefix || '').toUpperCase();
+      const isRepeat = ['WR','R','SWIMR'].includes(prefix);
+      const isNew = ['O','SWIM'].includes(prefix);
+      const ind = po.inv_days != null ? Number(po.inv_days) : null;
+      // Rules — order matters, first match wins.
+      if (po.is_best_seller) return 'BEST SELLER';
+      if (isRepeat && ind != null && ind <= 5) return 'SOLD OUT';
+      if (isRepeat && ind != null && ind <= 15) return 'MISSING SIZES';
+      if (po.pu_tag === true) return 'MANUAL';
+      if (po.urgent_tagged === true) return po.pm_tag_label || 'URGENT';
+      if (po.urgent === true && isRepeat) return 'URGENT';
+      if (isNew) {
+        const drop = po.drop ? new Date(po.drop).toISOString().slice(5,10) : null;
+        return drop ? `Drop ${drop}` : 'Drop';
+      }
+      return null;
+    }
 
     // PRIMARY QUERY — po_view, one row per PO.
     // Matches current project semantics: po_status IN (3,5), done=false.
@@ -251,9 +276,14 @@ Deno.serve(async (req) => {
       -- For each PO, take MIN(inv_days) across its sub_po destinations only.
       -- Sub-PO level: each sub_po has one destination → its IND is the (style, dest) value.
       -- The PO row shows the worst (lowest) IND across its sub_pos.
+      -- IND is only meaningful for **Rep orders** — the mart_repeats view is
+      -- repeats-only and a join match on non-Rep POs returns stale 0s. Gate by
+      -- po_type prefix here so non-Rep POs get NULL.
       inv_per_po AS (
         SELECT spv.po_number, MIN(ipd.inv_days) AS inv_days
         FROM sub_po_view spv
+        JOIN po_view pov2 ON pov2.po_number = spv.po_number
+        JOIN po_types pt2 ON pt2.id = pov2.po_type
         LEFT JOIN shipment_destination sd ON sd.id = spv.destination
         LEFT JOIN inv_per_style_dest ipd
           ON ipd.style_color = spv.style_color
@@ -263,6 +293,7 @@ Deno.serve(async (req) => {
                                ELSE NULL
                              END
         WHERE ipd.inv_days IS NOT NULL
+          AND TRIM(BOTH FROM pt2.prefix) = ANY(ARRAY['WR','R','SWIMR'])
         GROUP BY spv.po_number
       ),
       missing_per_style AS (
@@ -531,7 +562,7 @@ Deno.serve(async (req) => {
         // so "US-O WITH CLOSE DROP DATE,UK-O WITH CLOSE DROP DATE" collapses to one.
         urgent_priority: ov.marked_urgent
           ? 'MANUAL'
-          : dedupePriority(po.urgent_priority),
+          : (dedupePriority(po.urgent_priority) || (hasUrgentReasonsBase ? null : computePriorityFallback(po))),
         marked_urgent: !!ov.marked_urgent,
         marked_urgent_reason: ov.marked_urgent_reason || null,
         // "Needs your attention" — true when the PO is not already urgent/marked

@@ -1,21 +1,102 @@
 import React, { useState, useEffect } from 'react';
 import { X, AlertTriangle, RotateCcw } from 'lucide-react';
+import { base44 } from '@/api/base44Client';
 import {
   MAY_BE_URGENT_RULES,
   defaultMayBeUrgentSettings,
 } from '@/lib/mayBeUrgentRules';
 
+// Per-rule setting input — switches on rule.setting.kind:
+//   - 'number'     → numeric threshold input
+//   - 'text'       → free-text pattern input (supports * wildcard)
+//   - 'collection' → name picker that resolves to the matching collection_type id
+function RuleSettingInput({ setting, value, onChange, collectionTypes, loadingCollections }) {
+  if (setting.kind === 'number') {
+    return (
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] font-semibold text-[#525252]">{setting.label}</label>
+        <input
+          type="number"
+          min={setting.min}
+          max={setting.max}
+          value={value ?? setting.defaultValue}
+          onChange={e => onChange(Number(e.target.value))}
+          className="h-7 w-20 px-2 border border-[#D4D4D4] rounded-[6px] text-xs font-mono font-semibold text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
+        />
+        {setting.suffix && (
+          <span className="text-[11px] text-[#A3A3A3] font-mono">{setting.suffix}</span>
+        )}
+      </div>
+    );
+  }
+  if (setting.kind === 'text') {
+    return (
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] font-semibold text-[#525252] whitespace-nowrap">{setting.label}</label>
+        <input
+          type="text"
+          value={value ?? setting.defaultValue}
+          placeholder={setting.placeholder}
+          onChange={e => onChange(e.target.value)}
+          className="h-7 flex-1 max-w-[220px] px-2.5 border border-[#D4D4D4] rounded-[6px] text-xs font-mono text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
+        />
+        <span className="text-[10px] text-[#A3A3A3]">use * as wildcard</span>
+      </div>
+    );
+  }
+  if (setting.kind === 'collection') {
+    const currentId = value ?? setting.defaultValue;
+    return (
+      <div className="flex items-center gap-2">
+        <label className="text-[11px] font-semibold text-[#525252] whitespace-nowrap">{setting.label}</label>
+        <select
+          value={currentId}
+          onChange={e => onChange(Number(e.target.value))}
+          disabled={loadingCollections}
+          className="h-7 px-2 pr-7 border border-[#D4D4D4] rounded-[6px] text-xs font-semibold text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 disabled:opacity-50"
+        >
+          {loadingCollections ? (
+            <option>Loading…</option>
+          ) : collectionTypes.length === 0 ? (
+            // Fallback option when the lookup hasn't loaded yet — keep the
+            // current id selectable so the value isn't lost.
+            <option value={currentId}>{setting.defaultLabel} (id {currentId})</option>
+          ) : (
+            collectionTypes.map(ct => (
+              <option key={ct.id} value={ct.id}>{ct.name} (id {ct.id})</option>
+            ))
+          )}
+        </select>
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function MayBeUrgentSettingsModal({ settings, onChange, onClose }) {
   const [local, setLocal] = useState(settings);
+  const [collectionTypes, setCollectionTypes] = useState([]);
+  const [loadingCollections, setLoadingCollections] = useState(true);
 
-  // Keep local state in sync if parent settings change while open.
   useEffect(() => { setLocal(settings); }, [settings]);
+
+  // Load collection types once when the modal opens so the "Special collection"
+  // rule can show a name picker that resolves to the matching id.
+  useEffect(() => {
+    let cancelled = false;
+    base44.functions.invoke('lookupCollectionTypes', {}).then(res => {
+      if (cancelled) return;
+      setCollectionTypes(res.data?.collection_types || []);
+      setLoadingCollections(false);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   function toggleRule(id) {
     setLocal(prev => ({ ...prev, enabled: { ...prev.enabled, [id]: !prev.enabled[id] } }));
   }
 
-  function setThreshold(key, value) {
+  function setRuleValue(key, value) {
     setLocal(prev => ({ ...prev, [key]: value }));
   }
 
@@ -81,21 +162,16 @@ export default function MayBeUrgentSettingsModal({ settings, onChange, onClose }
                     <div className="text-[13px] font-semibold text-[#0A0A0A] leading-tight">{rule.label}</div>
                     <div className="text-[11.5px] text-[#525252] mt-1 leading-snug">{rule.description}</div>
 
-                    {/* Threshold input */}
-                    {rule.threshold && (
-                      <div className={`mt-2.5 flex items-center gap-2 ${enabled ? '' : 'opacity-50 pointer-events-none'}`}>
-                        <label className="text-[11px] font-semibold text-[#525252]">{rule.threshold.label}</label>
-                        <input
-                          type="number"
-                          min={rule.threshold.min}
-                          max={rule.threshold.max}
-                          value={local[rule.threshold.key] ?? rule.threshold.defaultValue}
-                          onChange={e => setThreshold(rule.threshold.key, Number(e.target.value))}
-                          className="h-7 w-20 px-2 border border-[#D4D4D4] rounded-[6px] text-xs font-mono font-semibold text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10"
+                    {/* Setting input */}
+                    {rule.setting && (
+                      <div className={`mt-2.5 ${enabled ? '' : 'opacity-50 pointer-events-none'}`}>
+                        <RuleSettingInput
+                          setting={rule.setting}
+                          value={local[rule.setting.key]}
+                          onChange={v => setRuleValue(rule.setting.key, v)}
+                          collectionTypes={collectionTypes}
+                          loadingCollections={loadingCollections}
                         />
-                        {rule.threshold.suffix && (
-                          <span className="text-[11px] text-[#A3A3A3] font-mono">{rule.threshold.suffix}</span>
-                        )}
                       </div>
                     )}
                   </div>
