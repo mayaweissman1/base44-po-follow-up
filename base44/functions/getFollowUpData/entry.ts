@@ -539,6 +539,11 @@ Deno.serve(async (req) => {
         needs_attention: !po.urgent && !ov.marked_urgent && computeNeedsAttention(po),
         // PU tag — computed from style_color.pm_tags matching the 'PU' pm_tag id.
         pu_tag: po.pu_tag === true,
+        // Extra fields exposed so the client can evaluate "May be urgent" rules
+        // configurably (lib/mayBeUrgentRules.js + MayBeUrgentSettingsModal).
+        urgent_tagged: po.urgent_tagged === true,
+        po_type_prefix: po.po_type_prefix || null,
+        collection_type_id: po.collection_type_id != null ? Number(po.collection_type_id) : null,
       };
     });
 

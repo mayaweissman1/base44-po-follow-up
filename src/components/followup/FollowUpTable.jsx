@@ -144,15 +144,20 @@ function PoCell({ po, onLogsClick }) {
   const isFuture = po.late_future === 'FUTURE';
   const isReceived = po.late_future === 'RECEIVED';
   // "May be urgent" — small orange flame icon with tooltip when the PO matches
-  // the urgent-base rule but hasn't been manually marked urgent yet. Subtle,
-  // non-blocking — communicates "this could become urgent, please review".
-  const mayBeUrgent = po.needs_attention && !po.marked_urgent;
+  // any of the user-configurable rules (see lib/mayBeUrgentRules.js). The
+  // matched rule labels show in the tooltip. Falls back to the legacy server
+  // `needs_attention` flag if the client-side evaluator hasn't run yet.
+  const mayBeUrgent = (po._mayBeUrgent ?? po.needs_attention) && !po.marked_urgent;
+  const matchedLabels = po._mayBeUrgentReasons || [];
+  const tooltip = matchedLabels.length > 0
+    ? `May be urgent — matches: ${matchedLabels.join(' · ')}`
+    : 'May be urgent — This PO matches one or more urgent criteria';
   return (
     <div className="min-w-0">
       <div className="flex items-center gap-1.5">
         {mayBeUrgent && (
           <span
-            title="May be urgent — This PO matches one or more urgent criteria"
+            title={tooltip}
             className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex-shrink-0 cursor-help"
           >
             <AlertTriangle size={10} strokeWidth={2.5} />

@@ -1,8 +1,14 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { RefreshCw, ChevronDown, Download, LogOut, User as UserIcon } from 'lucide-react';
+import { RefreshCw, ChevronDown, Download, LogOut, User as UserIcon, Settings as SettingsIcon } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/lib/AuthContext';
 import { useToast } from '@/components/ui/use-toast';
+import {
+  loadMayBeUrgentSettings,
+  saveMayBeUrgentSettings,
+  evaluateMayBeUrgent,
+} from '@/lib/mayBeUrgentRules';
+import MayBeUrgentSettingsModal from '@/components/followup/MayBeUrgentSettingsModal';
 import {
   ROLE_DISPLAY,
   NOT_STARTED_DD_STATUSES,
@@ -351,6 +357,15 @@ export default function FollowUp() {
   const [detailsPo, setDetailsPo] = useState(null);
   const [followUpState, setFollowUpState] = useState(null); // { po } | { posBulk }
 
+  // "May be urgent" rule settings — modular thresholds the user can configure.
+  const [mayBeUrgentSettings, setMayBeUrgentSettings] = useState(loadMayBeUrgentSettings);
+  const [mayBeUrgentModalOpen, setMayBeUrgentModalOpen] = useState(false);
+
+  function handleSaveMayBeUrgentSettings(next) {
+    setMayBeUrgentSettings(next);
+    saveMayBeUrgentSettings(next);
+  }
+
   // Mark a PO as urgent immediately (no modal). Toggles off if already marked.
   async function handleMarkUrgent(po) {
     const nextMarked = !po.marked_urgent;
@@ -490,9 +505,20 @@ export default function FollowUp() {
     loadData();
   }
 
+  // Augment rows with the user-configurable "May be urgent" verdict before
+  // filtering — that way both the table and any future filter can use it.
+  const augmentedRows = useMemo(() => rows.map(r => {
+    const { mayBeUrgent, matchedRules } = evaluateMayBeUrgent(r, mayBeUrgentSettings);
+    return {
+      ...r,
+      _mayBeUrgent: mayBeUrgent,
+      _mayBeUrgentReasons: matchedRules.map(rule => rule.label),
+    };
+  }), [rows, mayBeUrgentSettings]);
+
   const filteredRows = useMemo(
-    () => rows.filter(r => passesFilters(r, filters, activeRole)),
-    [rows, filters, activeRole]
+    () => augmentedRows.filter(r => passesFilters(r, filters, activeRole)),
+    [augmentedRows, filters, activeRole]
   );
   const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, urgencyReasonOptions, pmTagsOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
@@ -628,6 +654,13 @@ export default function FollowUp() {
                 )}
               </div>
             )}
+            <button
+              onClick={() => setMayBeUrgentModalOpen(true)}
+              title='Configure the "May be urgent" rules'
+              className="h-8 w-8 flex items-center justify-center text-[#525252] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#FFF0F7] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors"
+            >
+              <SettingsIcon size={13} />
+            </button>
             <button
               onClick={() => exportRowsToCSV(filteredRows)}
               className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] transition-colors"
@@ -828,6 +861,14 @@ export default function FollowUp() {
           posBulk={followUpState.posBulk}
           onClose={() => setFollowUpState(null)}
           onSaved={onActionSaved}
+        />
+      )}
+
+      {mayBeUrgentModalOpen && (
+        <MayBeUrgentSettingsModal
+          settings={mayBeUrgentSettings}
+          onChange={handleSaveMayBeUrgentSettings}
+          onClose={() => setMayBeUrgentModalOpen(false)}
         />
       )}
 
