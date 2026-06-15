@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, AlertTriangle, RotateCcw } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import {
@@ -45,32 +45,121 @@ function RuleSettingInput({ setting, value, onChange, collectionTypes, loadingCo
     );
   }
   if (setting.kind === 'collection') {
-    const currentId = value ?? setting.defaultValue;
+    // Multi-select collection picker. `value` may be an array (new format), a
+    // single id (legacy) or undefined — normalize to an array of numbers.
+    const selectedIds = Array.isArray(value)
+      ? value.map(Number)
+      : value != null
+        ? [Number(value)]
+        : (setting.defaultValue || []).map(Number);
     return (
-      <div className="flex items-center gap-2">
-        <label className="text-[11px] font-semibold text-[#525252] whitespace-nowrap">{setting.label}</label>
-        <select
-          value={currentId}
-          onChange={e => onChange(Number(e.target.value))}
-          disabled={loadingCollections}
-          className="h-7 px-2 pr-7 border border-[#D4D4D4] rounded-[6px] text-xs font-semibold text-[#0A0A0A] bg-white focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 disabled:opacity-50"
-        >
-          {loadingCollections ? (
-            <option>Loading…</option>
-          ) : collectionTypes.length === 0 ? (
-            // Fallback option when the lookup hasn't loaded yet — keep the
-            // current id selectable so the value isn't lost.
-            <option value={currentId}>{setting.defaultLabel} (id {currentId})</option>
-          ) : (
-            collectionTypes.map(ct => (
-              <option key={ct.id} value={ct.id}>{ct.name} (id {ct.id})</option>
-            ))
-          )}
-        </select>
+      <div className="space-y-1.5">
+        <label className="text-[11px] font-semibold text-[#525252] block">{setting.label}</label>
+        <CollectionMultiSelect
+          selectedIds={selectedIds}
+          collectionTypes={collectionTypes}
+          loading={loadingCollections}
+          fallbackLabel={setting.defaultLabel}
+          onChange={onChange}
+        />
       </div>
     );
   }
   return null;
+}
+
+function CollectionMultiSelect({ selectedIds, collectionTypes, loading, fallbackLabel, onChange }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const ref = useRef(null);
+
+  useEffect(() => {
+    function onDocClick(e) {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false);
+    }
+    if (open) document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, [open]);
+
+  const selectedSet = new Set(selectedIds);
+  const filtered = collectionTypes.filter(ct =>
+    !query || ct.name.toLowerCase().includes(query.toLowerCase()) || String(ct.id).includes(query)
+  );
+
+  function toggle(id) {
+    const next = selectedSet.has(id)
+      ? selectedIds.filter(x => x !== id)
+      : [...selectedIds, id];
+    onChange(next);
+  }
+
+  // Label summary for the trigger button.
+  let summary;
+  if (loading) summary = 'Loading…';
+  else if (selectedIds.length === 0) summary = 'None selected';
+  else if (collectionTypes.length === 0) summary = `${fallbackLabel} (id ${selectedIds[0]})${selectedIds.length > 1 ? ` +${selectedIds.length - 1}` : ''}`;
+  else {
+    const names = selectedIds.map(id => collectionTypes.find(c => c.id === id)?.name || `id ${id}`);
+    summary = names.length <= 2 ? names.join(', ') : `${names[0]}, ${names[1]} +${names.length - 2}`;
+  }
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        disabled={loading}
+        className="h-7 min-w-[220px] px-2.5 pr-7 flex items-center justify-between gap-2 border border-[#D4D4D4] rounded-[6px] text-xs font-semibold text-[#0A0A0A] bg-white hover:border-[#E31B7F] focus:outline-none focus:border-[#E31B7F] focus:ring-2 focus:ring-[#E31B7F]/10 disabled:opacity-50"
+      >
+        <span className="truncate">{summary}</span>
+        <span className="text-[#A3A3A3] text-[10px]">▼</span>
+      </button>
+      {open && (
+        <div className="absolute left-0 top-full mt-1 z-50 w-[280px] bg-white border border-[#E5E5E5] rounded-[8px] shadow-[0_8px_24px_rgba(0,0,0,.12)] overflow-hidden">
+          <div className="p-2 border-b border-[#F0F0F0]">
+            <input
+              autoFocus
+              type="text"
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Search collections…"
+              className="w-full h-7 px-2 border border-[#E5E5E5] rounded-[6px] text-xs text-[#0A0A0A] focus:outline-none focus:border-[#E31B7F]"
+            />
+          </div>
+          <div className="max-h-[220px] overflow-y-auto py-1">
+            {filtered.length === 0 ? (
+              <div className="px-3 py-2 text-[11px] text-[#A3A3A3]">No matches</div>
+            ) : (
+              filtered.map(ct => (
+                <label key={ct.id} className="flex items-center gap-2 px-3 py-1.5 hover:bg-[#FFF0F7] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedSet.has(ct.id)}
+                    onChange={() => toggle(ct.id)}
+                    className="accent-[#E31B7F] w-3.5 h-3.5"
+                  />
+                  <span className="text-xs text-[#0A0A0A] truncate flex-1">{ct.name}</span>
+                  <span className="text-[10px] text-[#A3A3A3] font-mono">id {ct.id}</span>
+                </label>
+              ))
+            )}
+          </div>
+          {selectedIds.length > 0 && (
+            <div className="px-3 py-2 border-t border-[#F0F0F0] flex items-center justify-between">
+              <span className="text-[10px] text-[#A3A3A3]">{selectedIds.length} selected</span>
+              <button
+                type="button"
+                onClick={() => onChange([])}
+                className="text-[10px] font-semibold text-[#E31B7F] hover:underline"
+              >
+                Clear
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function MayBeUrgentSettingsModal({ settings, onChange, onClose }) {

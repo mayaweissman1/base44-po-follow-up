@@ -76,17 +76,23 @@ export const MAY_BE_URGENT_RULES = [
   {
     id: 'special_collection',
     label: 'Special collection with O / R orders',
-    description: 'PO belongs to a chosen collection type AND is an O or R order. Pick a collection name; the system resolves its id automatically. Default: Barbie (id 18).',
+    description: 'PO belongs to any of the chosen collection types AND is an O or R order. Pick one or more collection names; the system resolves their ids automatically. Default: Barbie (id 18).',
     setting: {
       kind: 'collection',
-      key: 'specialCollectionTypeId',
-      label: 'Collection',
-      defaultValue: 18,
+      key: 'specialCollectionTypeIds',
+      label: 'Collections',
+      defaultValue: [18],
       defaultLabel: 'Barbie',
     },
     evaluate: (row, s) => {
-      const targetId = s.specialCollectionTypeId ?? 18;
-      if (row.collection_type_id !== Number(targetId)) return false;
+      // Backward-compat: older saved settings stored a single id under
+      // specialCollectionTypeId. Fall back to it when the array is missing.
+      let ids = s.specialCollectionTypeIds;
+      if (!Array.isArray(ids)) {
+        ids = s.specialCollectionTypeId != null ? [s.specialCollectionTypeId] : [18];
+      }
+      const idSet = new Set(ids.map(Number));
+      if (!idSet.has(Number(row.collection_type_id))) return false;
       const prefix = (row.po_type_prefix || '').toUpperCase();
       return prefix === 'O' || prefix === 'R';
     },
