@@ -5,7 +5,7 @@ import ReasonTag from './ReasonTag';
 import DdStatusBadge from './DdStatusBadge';
 import PriorityBadge from './PriorityBadge';
 import { fmtDate, ddmm } from '@/lib/followUpConstants';
-import SubPoDestinationTable from './SubPoDestinationTable';
+import SubPoDestinationTable, { prefetchPoDetails } from './SubPoDestinationTable';
 import StyleThumbnail from './StyleThumbnail';
 import PmTagsPills from './PmTagsPills';
 import CustomFilterModal, { evaluateCustomFilters } from './CustomFilterModal';
@@ -152,7 +152,7 @@ function PoCell({ po, onLogsClick }) {
       <div className="flex items-center gap-1.5">
         {mayBeUrgent && (
           <span
-            title="May be urgent — this PO matches one or more urgent criteria (PU tag, low IND, special order type, etc.). Review and mark as urgent if needed."
+            title="May be urgent — This PO matches one or more urgent criteria"
             className="flex items-center justify-center w-4 h-4 rounded-full bg-orange-100 text-orange-600 flex-shrink-0 cursor-help"
           >
             <AlertTriangle size={10} strokeWidth={2.5} />
@@ -628,7 +628,7 @@ export default function FollowUpTable({
 
                 return (
                   <React.Fragment key={po.po_number}>
-                  <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
+                  <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)} onMouseEnter={() => prefetchPoDetails(po.po_number)}>
                     <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 0, zIndex: 20 }} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>
@@ -758,7 +758,7 @@ export default function FollowUpTable({
                 const actionCellBase = isRejected ? 'bg-red-50 group-hover:bg-red-100' : 'bg-white group-hover:bg-[#FFF0F7]';
                 return (
                   <React.Fragment key={po.po_number}>
-                    <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
+                    <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)} onMouseEnter={() => prefetchPoDetails(po.po_number)}>
                       <td className={`${tdCls} ${rowBg}`} style={{ position: 'sticky', left: 0, zIndex: 20 }} onClick={e => e.stopPropagation()}>
                         <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                       </td>
@@ -918,7 +918,7 @@ export default function FollowUpTable({
               {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
-              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW/OLD · SOLD OUT · MISSING SIZES · MANUAL · URGENT · Drop … · Risk in Fabric/PPS">Urgent Priority</Th>}
+              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW/OLD · SOLD OUT · MISSING SIZES · MANUAL · URGENT · Drop … · Risk in Fabric/PPS">Priority</Th>}
               {role === 'main_office' && <Th {...thProps} col="urgency_reason_raw" width={colWidths['urgency_reason_raw'] || 160} tooltip="Raw urgency reason from po_urgent_status (destination-prefix stripped)">Urgency Reason</Th>}
               {role === 'main_office' && <Th {...thProps} col={null} width={colWidths['pu_tags'] || 100} tooltip="PU tags from urgent_reasons_base">PU Tags</Th>}
               {colVisible('dd_manager_name') && <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>}
@@ -954,7 +954,7 @@ export default function FollowUpTable({
 
               return (
                 <React.Fragment key={po.po_number}>
-                  <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)}>
+                  <tr className="group cursor-pointer" onClick={() => onPoDetails?.(po)} onMouseEnter={() => prefetchPoDetails(po.po_number)}>
                     <td className={`${tdBase} w-9`} onClick={e => e.stopPropagation()}>
                       <Checkbox checked={selectedRows.has(po.po_number)} onChange={() => onSelectRow?.(po.po_number)} />
                     </td>

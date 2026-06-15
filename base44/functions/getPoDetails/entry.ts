@@ -24,8 +24,9 @@ Deno.serve(async (req) => {
 
     const client = await getPgClient();
 
-    // Run all queries in parallel for speed (previously sequential ≈ 4× slower)
-    const [skuRes, subRes, urgRes, styleRes] = await Promise.all([
+    // All four queries run in parallel. The IND lookup uses a subquery on
+    // po_view so we don't have to wait for styleColor — saves 1 round trip.
+    const [skuRes, subRes, urgRes, indRes] = await Promise.all([
       // Per-SKU breakdown joined with size names via skus + sizes
       client.query(`
         SELECT
@@ -61,38 +62,27 @@ Deno.serve(async (req) => {
       // Urgency reason (Best Seller / URGENT) per PO — applies to all destinations
       client.query(`SELECT reason FROM po_urgent_status WHERE po_number = $1 LIMIT 1`, [po_number]),
 
-      // Style color for IND join
-      client.query(`SELECT style_color FROM po_view WHERE po_number = $1 LIMIT 1`, [po_number]),
+      // IND per destination — joined via po_view in one round trip.
+      // Uses the current dbt mart snapshot (history table contains stale 0-rows).
+      client.query(`
+        SELECT m."Destination" AS dest_code, m."Inv Days" AS inv_days
+        FROM dbt_marts.mart_repeats__sc_united_with_groups m
+        JOIN po_view pv ON pv.style_color = m."Style Color"
+        WHERE pv.po_number = $1 AND m."Inv Days" IS NOT NULL
+      `, [po_number]),
     ]);
 
     const destBySubPo = {};
-    const urgentBySubPo = {};
-    const airOtwBySubPo = {};
-    const shippingBySubPo = {};
     for (const r of subRes.rows) {
       destBySubPo[r.sub_po_number] = r.destination_name || '—';
-      urgentBySubPo[r.sub_po_number] = !!r.sub_urgent;
-      airOtwBySubPo[r.sub_po_number] = Number(r.qty_otw_air) || 0;
-      shippingBySubPo[r.sub_po_number] = r.shipping_method_name || null;
     }
 
     const isBestSeller = urgRes.rows[0]?.reason?.toLowerCase().includes('best seller') || false;
     const isUrgent     = urgRes.rows[0]?.reason?.toLowerCase().includes('urgent') || false;
-    const styleColor   = styleRes.rows[0]?.style_color || null;
 
-    // IND per (style_color, destination) — the repeats history is keyed by
-    // ('US' for Edikted, 'UK' for EdiktedUK). Each destination gets its own IND.
-    let indByDest = {};
-    if (styleColor) {
-      const indRes = await client.query(`
-        SELECT "Destination" AS dest_code, MIN("Inv Days") AS inv_days
-        FROM edktd_history.repeats_sc_united_history
-        WHERE "Style Color" = $1 AND "Inv Days" IS NOT NULL
-        GROUP BY "Destination"
-      `, [styleColor]);
-      for (const r of indRes.rows) {
-        indByDest[r.dest_code] = r.inv_days == null ? null : Math.round(Number(r.inv_days));
-      }
+    const indByDest = {};
+    for (const r of indRes.rows) {
+      indByDest[r.dest_code] = r.inv_days == null ? null : Math.round(Number(r.inv_days));
     }
 
     // Group sizes by destination → { sizes_by_size: { XS: 30, S: 60, … } }

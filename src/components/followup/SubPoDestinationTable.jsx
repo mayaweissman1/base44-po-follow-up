@@ -2,6 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { SIZE_ORDER } from '@/lib/followUpConstants';
 
+// Simple in-memory cache + prefetch — re-expanding the same PO is instant,
+// and hovering the expand chevron starts the request before the click.
+const _cache = new Map();         // po_number -> destinations[]
+const _inflight = new Map();      // po_number -> Promise
+
+export function prefetchPoDetails(poNumber) {
+  if (!poNumber || _cache.has(poNumber) || _inflight.has(poNumber)) return;
+  const p = base44.functions.invoke('getPoDetails', { po_number: poNumber })
+    .then(res => {
+      const dests = res?.data?.destinations || [];
+      _cache.set(poNumber, dests);
+      _inflight.delete(poNumber);
+      return dests;
+    })
+    .catch(err => {
+      _inflight.delete(poNumber);
+      throw err;
+    });
+  _inflight.set(poNumber, p);
+}
+
 // Map raw destination names to short display labels (Edikted → US, EdiktedUK → UK)
 function destLabel(name) {
   const n = String(name || '').trim().toLowerCase().replace(/[\s_-]/g, '');
@@ -42,15 +63,29 @@ function SizeCell({ value }) {
  * Compact card with a clear header strip and tidy size grid.
  */
 export default function SubPoDestinationTable({ poNumber }) {
-  const [destinations, setDestinations] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [destinations, setDestinations] = useState(() => _cache.get(poNumber) || null);
+  const [loading, setLoading] = useState(() => !_cache.has(poNumber));
 
   useEffect(() => {
     let cancelled = false;
+    if (_cache.has(poNumber)) {
+      setDestinations(_cache.get(poNumber));
+      setLoading(false);
+      return;
+    }
     setLoading(true);
-    base44.functions.invoke('getPoDetails', { po_number: poNumber }).then(res => {
+    let promise = _inflight.get(poNumber);
+    if (!promise) {
+      prefetchPoDetails(poNumber);
+      promise = _inflight.get(poNumber);
+    }
+    promise?.then(dests => {
       if (cancelled) return;
-      setDestinations(res?.data?.destinations || []);
+      setDestinations(dests || []);
+      setLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setDestinations([]);
       setLoading(false);
     });
     return () => { cancelled = true; };

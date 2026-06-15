@@ -237,15 +237,16 @@ Deno.serve(async (req) => {
         FROM sub_po_ranks
         GROUP BY po_number
       ),
-      -- IND per (style_color, destination) — destination in history is 'US'/'UK'.
+      -- IND per (style_color, destination) — destination in mart is 'US'/'UK'.
       -- Maps to sub_po_view destinations: 'Edikted' -> 'US', 'EdiktedUK' -> 'UK'.
+      -- Use the current dbt mart (one row per style+dest) — history contains
+      -- stale 0-snapshots that made MIN() return 0 incorrectly.
       inv_per_style_dest AS (
         SELECT "Style Color" AS style_color,
                "Destination" AS dest_code,
-               MIN("Inv Days") AS inv_days
-        FROM edktd_history.repeats_sc_united_history
+               "Inv Days" AS inv_days
+        FROM dbt_marts.mart_repeats__sc_united_with_groups
         WHERE "Inv Days" IS NOT NULL
-        GROUP BY "Style Color", "Destination"
       ),
       -- For each PO, take MIN(inv_days) across its sub_po destinations only.
       -- Sub-PO level: each sub_po has one destination → its IND is the (style, dest) value.

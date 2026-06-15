@@ -14,19 +14,28 @@ const STATUS_OPTIONS = [
 function StatusIconButton({ option, selected, onClick }) {
   const { Icon, color, label, key } = option;
   const palette = {
-    green: { sel: 'bg-green-50 text-green-600 ring-green-500',  idle: 'text-[#A3A3A3] hover:bg-green-50 hover:text-green-600' },
-    teal:  { sel: 'bg-teal-50 text-teal-600 ring-teal-500',     idle: 'text-[#A3A3A3] hover:bg-teal-50 hover:text-teal-600' },
-    red:   { sel: 'bg-red-50 text-red-500 ring-red-500',        idle: 'text-[#A3A3A3] hover:bg-red-50 hover:text-red-500' },
+    green: {
+      sel:  'bg-green-50 text-green-700 border-green-500 shadow-[0_2px_8px_rgba(34,197,94,.15)]',
+      idle: 'bg-white text-[#525252] border-[#E5E5E5] hover:bg-green-50 hover:text-green-600 hover:border-green-200',
+    },
+    teal: {
+      sel:  'bg-teal-50 text-teal-700 border-teal-500 shadow-[0_2px_8px_rgba(20,184,166,.15)]',
+      idle: 'bg-white text-[#525252] border-[#E5E5E5] hover:bg-teal-50 hover:text-teal-600 hover:border-teal-200',
+    },
+    red: {
+      sel:  'bg-red-50 text-red-600 border-red-500 shadow-[0_2px_8px_rgba(239,68,68,.15)]',
+      idle: 'bg-white text-[#525252] border-[#E5E5E5] hover:bg-red-50 hover:text-red-500 hover:border-red-200',
+    },
   }[color];
   return (
     <button
       type="button"
       onClick={() => onClick(key)}
       title={label}
-      className={`flex flex-col items-center justify-center gap-1 w-20 h-20 rounded-[10px] transition-all ${selected ? `${palette.sel} ring-2` : palette.idle}`}
+      className={`flex-1 flex flex-col items-center justify-center gap-1.5 h-[88px] rounded-[10px] border-2 transition-all duration-150 ${selected ? palette.sel : palette.idle}`}
     >
-      <Icon size={28} strokeWidth={2.5} />
-      <span className="text-[10px] font-bold uppercase tracking-wide">{label}</span>
+      <Icon size={26} strokeWidth={2.25} />
+      <span className="text-[10px] font-bold uppercase tracking-[.06em]">{label}</span>
     </button>
   );
 }
@@ -154,10 +163,10 @@ export default function DecisionModal({ po, posBulk, decision: initialDecision, 
           {/* Request details — single-PO only */}
           {!isBulk && <DelayRequestDetails po={po} />}
 
-          {/* Status selector — larger icon buttons with label below */}
+          {/* Status selector — equal-width bordered tiles, fill the row */}
           <div className="mb-5">
             <label className="block text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] mb-2">Decision</label>
-            <div className="flex items-center gap-3">
+            <div className="flex items-stretch gap-2">
               {STATUS_OPTIONS.map(opt => (
                 <StatusIconButton key={opt.key} option={opt} selected={decision === opt.key} onClick={k => { setDecision(k); setError(''); }} />
               ))}
