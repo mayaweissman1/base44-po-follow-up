@@ -64,11 +64,17 @@ Deno.serve(async (req) => {
 
       // IND per destination — joined via po_view in one round trip.
       // Uses the current dbt mart snapshot (history table contains stale 0-rows).
+      // IND is only meaningful for **Rep orders**; the mart_repeats view is
+      // repeats-only and matches against new orders return stale 0s. Gate by
+      // po_type prefix so new/SWIM orders don't get a fake IND.
       client.query(`
         SELECT m."Destination" AS dest_code, m."Inv Days" AS inv_days
         FROM dbt_marts.mart_repeats__sc_united_with_groups m
         JOIN po_view pv ON pv.style_color = m."Style Color"
-        WHERE pv.po_number = $1 AND m."Inv Days" IS NOT NULL
+        JOIN po_types pt ON pt.id = pv.po_type
+        WHERE pv.po_number = $1
+          AND m."Inv Days" IS NOT NULL
+          AND TRIM(BOTH FROM pt.prefix) = ANY(ARRAY['WR','R','SWIMR'])
       `, [po_number]),
     ]);
 

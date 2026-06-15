@@ -699,7 +699,7 @@ export default function FollowUpTable({
                     <tr>
                       <td colSpan={empColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
                         <div className="sticky left-0 px-4 py-2" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
-                          <SubPoDestinationTable poNumber={po.po_number} />
+                          <SubPoDestinationTable poNumber={po.po_number} parentRow={po} />
                         </div>
                       </td>
                     </tr>
@@ -795,7 +795,7 @@ export default function FollowUpTable({
                       <tr>
                         <td colSpan={ddmColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
                           <div className="sticky left-0 px-4 py-2" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
-                            <SubPoDestinationTable poNumber={po.po_number} />
+                            <SubPoDestinationTable poNumber={po.po_number} parentRow={po} />
                           </div>
                         </td>
                       </tr>
@@ -1075,7 +1075,7 @@ export default function FollowUpTable({
                     <tr>
                       <td colSpan={expandColSpan} className="p-0 bg-[#FAFAFA] border-b border-[#E5E5E5]">
                         <div className="sticky left-0 px-4 py-2" style={{ width: 'calc(100vw - 96px)', maxWidth: 1100 }}>
-                          <SubPoDestinationTable poNumber={po.po_number} />
+                          <SubPoDestinationTable poNumber={po.po_number} parentRow={po} />
                         </div>
                       </td>
                     </tr>

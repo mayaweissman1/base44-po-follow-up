@@ -4,15 +4,26 @@ import { SIZE_ORDER } from '@/lib/followUpConstants';
 
 // Simple in-memory cache + prefetch — re-expanding the same PO is instant,
 // and hovering the expand chevron starts the request before the click.
-const _cache = new Map();         // po_number -> destinations[]
+// CACHE_VERSION — bump when the getPoDetails response shape changes so
+// already-mounted clients drop their stale entries on next render.
+const CACHE_VERSION = 'v3-rep-ind-priority';
+const _cache = new Map();         // po_number -> { v, dests }
 const _inflight = new Map();      // po_number -> Promise
 
+function readCache(poNumber) {
+  const e = _cache.get(poNumber);
+  return e && e.v === CACHE_VERSION ? e.dests : null;
+}
+function writeCache(poNumber, dests) {
+  _cache.set(poNumber, { v: CACHE_VERSION, dests });
+}
+
 export function prefetchPoDetails(poNumber) {
-  if (!poNumber || _cache.has(poNumber) || _inflight.has(poNumber)) return;
+  if (!poNumber || readCache(poNumber) || _inflight.has(poNumber)) return;
   const p = base44.functions.invoke('getPoDetails', { po_number: poNumber })
     .then(res => {
       const dests = res?.data?.destinations || [];
-      _cache.set(poNumber, dests);
+      writeCache(poNumber, dests);
       _inflight.delete(poNumber);
       return dests;
     })
@@ -51,6 +62,34 @@ function indText(v) {
   return `${v}d`;
 }
 
+// Per-destination priority for the expand row. Prefers the per-destination
+// value (us_priority/uk_priority from po_view) when present; falls back to the
+// PO-level urgent_priority (closed-list ladder from getFollowUpData). Returns
+// null when the parent row has no priority for that destination so we render
+// "—" instead of a noisy "NORMAL" pill.
+function priorityForDest(destName, parentRow) {
+  if (!parentRow) return null;
+  const l = destLabel(destName);
+  if (l === 'US' && parentRow.us_priority) return parentRow.us_priority;
+  if (l === 'UK' && parentRow.uk_priority) return parentRow.uk_priority;
+  return parentRow.urgent_priority || null;
+}
+
+function PriorityCell({ value }) {
+  if (!value) return <span className="text-[#A3A3A3]">—</span>;
+  const v = String(value);
+  let cls = 'bg-[#F8F8F8] text-[#525252] border-[#E5E5E5]';
+  if (/best.?seller/i.test(v)) cls = 'bg-[#FFF0F7] text-[#E31B7F] border-[#FFCCDE]';
+  else if (/sold.?out|missing/i.test(v)) cls = 'bg-red-50 text-red-600 border-red-200';
+  else if (/urgent|manual|risk/i.test(v)) cls = 'bg-amber-50 text-amber-700 border-amber-200';
+  else if (/^drop/i.test(v)) cls = 'bg-teal-50 text-teal-700 border-teal-200';
+  return (
+    <span className={`inline-flex items-center px-1.5 py-0.5 rounded-[0.5rem] border text-[10px] font-bold uppercase tracking-[.04em] ${cls}`} title={v}>
+      {v}
+    </span>
+  );
+}
+
 function SizeCell({ value }) {
   if (!value || value <= 0) {
     return <span className="text-[#D4D4D4] font-mono">—</span>;
@@ -62,14 +101,15 @@ function SizeCell({ value }) {
  * Expanded sub-PO view — one row per destination (US / UK / …).
  * Compact card with a clear header strip and tidy size grid.
  */
-export default function SubPoDestinationTable({ poNumber }) {
-  const [destinations, setDestinations] = useState(() => _cache.get(poNumber) || null);
-  const [loading, setLoading] = useState(() => !_cache.has(poNumber));
+export default function SubPoDestinationTable({ poNumber, parentRow }) {
+  const [destinations, setDestinations] = useState(() => readCache(poNumber));
+  const [loading, setLoading] = useState(() => !readCache(poNumber));
 
   useEffect(() => {
     let cancelled = false;
-    if (_cache.has(poNumber)) {
-      setDestinations(_cache.get(poNumber));
+    const cached = readCache(poNumber);
+    if (cached) {
+      setDestinations(cached);
       setLoading(false);
       return;
     }
@@ -109,6 +149,7 @@ export default function SubPoDestinationTable({ poNumber }) {
         <thead>
           <tr className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-[#FAFAFA]">
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Destination</th>
+            <th className="text-left px-2 py-1.5 border-b border-[#E5E5E5]">Priority</th>
             <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]">IND</th>
             {SIZE_ORDER.map(s => (
               <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[38px]">{s}</th>
@@ -131,6 +172,9 @@ export default function SubPoDestinationTable({ poNumber }) {
                   <span className={`inline-flex items-center px-2 py-0.5 rounded-full border text-[11px] font-bold ${destPillColors(d.destination)}`}>
                     {destLabel(d.destination)}
                   </span>
+                </td>
+                <td className={`px-2 py-2 ${border}`}>
+                  <PriorityCell value={priorityForDest(d.destination, parentRow)} />
                 </td>
                 <td className={`px-2 py-2 text-center font-mono font-semibold ${border} ${indClass(d.inv_days)}`}>
                   {indText(d.inv_days)}
