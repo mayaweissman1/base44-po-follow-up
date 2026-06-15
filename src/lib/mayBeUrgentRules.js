@@ -117,11 +117,18 @@ export function loadMayBeUrgentSettings() {
     const parsed = JSON.parse(saved);
     // Merge with defaults so new rules added later are enabled by default.
     const defaults = defaultMayBeUrgentSettings();
-    return {
+    const merged = {
       ...defaults,
       ...parsed,
       enabled: { ...defaults.enabled, ...(parsed.enabled || {}) },
     };
+    // Migrate legacy single-id `specialCollectionTypeId` → array. Only apply
+    // when the new key is missing from stored data so we don't overwrite a
+    // freshly-saved multi-select value.
+    if (!Array.isArray(parsed.specialCollectionTypeIds) && parsed.specialCollectionTypeId != null) {
+      merged.specialCollectionTypeIds = [Number(parsed.specialCollectionTypeId)];
+    }
+    return merged;
   } catch {
     return defaultMayBeUrgentSettings();
   }
