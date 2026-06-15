@@ -844,10 +844,10 @@ export default function FollowUpTable({
     : [];
 
   // colSpan for the expand row.
-  // Main Office (no thumb): 2 fixed (checkbox+expand) + 20 standard + pu_tags + hold_age + internal_note + 1 actions = 26 (+1 missing-sizes in Rep)
+  // Main Office: 2 fixed (checkbox+expand) + priority + urgency_reason + pu_tags + inv_days + 17 standard + hold_age + internal_note + actions = 26 (+1 missing-sizes in Rep)
   const expandColSpan = role === 'dd_team_manager'
     ? 4 + DDM_ALL_COLS.filter(c => !!ddmOptCols[c.key]).length
-    : (25 + (isRepScopeTable ? 1 : 0));
+    : (26 + (isRepScopeTable ? 1 : 0));
 
   function renderAdditionalTds(po, bg) {
     return additionalCols.map(col => {
@@ -921,7 +921,8 @@ export default function FollowUpTable({
               {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
-              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed from urgent_reasons_base — see spec §3.3.2. MANUAL = marked by Main Office.">Urgent Priority</Th>}
+              {colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW / DROP / URGENT / MISSING SIZES / MANUAL etc.">Urgent Priority</Th>}
+              {role === 'main_office' && <Th {...thProps} col="urgency_reason_raw" width={colWidths['urgency_reason_raw'] || 160} tooltip="Raw urgency reason from po_urgent_status (destination-prefix stripped)">Urgency Reason</Th>}
               {role === 'main_office' && <Th {...thProps} col={null} width={colWidths['pu_tags'] || 100} tooltip="PU tags from urgent_reasons_base">PU Tags</Th>}
               {role === 'main_office' && <Th {...thProps} col="inv_days" width={colWidths['inv_days'] || 70} tooltip="Inventory Days = (stock + air OTW) ÷ (virtual7d / 7)">IND</Th>}
               {colVisible('dd_manager_name') && <Th {...thProps} col="dd_manager_name" width={colWidths['dd_manager_name'] || 95}>DD Manager</Th>}
@@ -972,7 +973,14 @@ export default function FollowUpTable({
                     {colVisible('po_rank') && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
-                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority || po.urgency_reason_raw || po.priority} /></td>}
+                    {colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority || po.priority} /></td>}
+                    {role === 'main_office' && (
+                      <td className={tdBase}>
+                        {po.urgency_reason_raw
+                          ? <span className="inline-flex items-center px-2 py-0.5 rounded-[0.65rem] text-[10px] font-semibold bg-orange-50 text-orange-600 border border-orange-200 max-w-[200px] truncate" title={po.urgency_reason_raw}>{po.urgency_reason_raw}</span>
+                          : <span className="text-[#A3A3A3]">—</span>}
+                      </td>
+                    )}
                     {role === 'main_office' && (
                       <td className={tdBase}>
                         {po.pu_tag
