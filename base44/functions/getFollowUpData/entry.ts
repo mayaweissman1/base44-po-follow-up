@@ -409,6 +409,7 @@ Deno.serve(async (req) => {
     today.setHours(0, 0, 0, 0);
 
     const rows = pos.map(po => {
+      try {
       const ov = overrideMap[po.po_number] || {};
       const mgr = managerMap[po.dd_manager] || null;
 
@@ -432,24 +433,39 @@ Deno.serve(async (req) => {
         }
       }
 
-      const dueDate = po.due_date ? new Date(po.due_date) : null;
-      const delayedDate = effectiveDelayedDD ? new Date(effectiveDelayedDD) : null;
-      const finalDate = new Date(finalDD);
+      const safeDate = (v) => {
+        if (!v) return null;
+        const d = new Date(v);
+        return isNaN(d.getTime()) ? null : d;
+      };
+      // Date columns from Postgres come back as JS Date objects. If the row holds
+      // an invalid sentinel ("0000-00-00", out-of-range), JSON.stringify will
+      // throw "Invalid time value" when serializing the response. Normalize to
+      // ISO strings (or null) before returning.
+      const safeIso = (v) => {
+        const d = safeDate(v);
+        return d ? d.toISOString() : null;
+      };
+      const dueDate = safeDate(po.due_date);
+      const delayedDate = safeDate(effectiveDelayedDD);
+      const finalDate = safeDate(finalDD);
 
       const daysLateCounting = dueDate && delayedDate
         ? Math.round((delayedDate - dueDate) / 86400000)
         : 0;
 
-      const countdown = Math.round((finalDate - today) / 86400000);
+      const countdown = finalDate ? Math.round((finalDate - today) / 86400000) : null;
 
       let holdAgeDays = null;
       if (latestDDD && latestDDD.status === 'HOLD') {
-        holdAgeDays = Math.floor((today - new Date(latestDDD.created_date)) / 86400000);
+        const d = safeDate(latestDDD.created_date);
+        if (d) holdAgeDays = Math.floor((today - d) / 86400000);
       }
 
       let daysSameStatus = null;
       if (ov.dd_status_changed_at) {
-        daysSameStatus = Math.floor((today - new Date(ov.dd_status_changed_at)) / 86400000);
+        const d = safeDate(ov.dd_status_changed_at);
+        if (d) daysSameStatus = Math.floor((today - d) / 86400000);
       }
 
       // Fully-received check: qty_received >= ordered_qty means the goods arrived,
@@ -469,9 +485,10 @@ Deno.serve(async (req) => {
 
       const lateFuture = fullyReceived
         ? 'RECEIVED'
-        : (finalDate < today ? 'LATE' : 'FUTURE');
+        : (finalDate && finalDate < today ? 'LATE' : 'FUTURE');
 
-      const nextUpdatePassed = effectiveNextUpdate && new Date(effectiveNextUpdate) < today;
+      const nextUpdateDate = safeDate(effectiveNextUpdate);
+      const nextUpdatePassed = nextUpdateDate && nextUpdateDate < today;
       const qtyError = po.good_for_sale === 0 && po.qty_sent_out > 0;
 
       // Build a thin sub_pos list with destinations only (no qty — used for chips/labels)
@@ -481,16 +498,16 @@ Deno.serve(async (req) => {
       return {
         po_number: po.po_number,
         style_color: po.style_color || '',
-        order_date: po.order_date,
-        due_date: po.due_date,
+        order_date: safeIso(po.order_date),
+        due_date: safeIso(po.due_date),
         ordered_qty: po.ordered_qty,
         qty_received: po.qty_received,
         balance: po.balance,
         good_for_sale: po.good_for_sale,
         qty_sent_out: po.qty_sent_out,
-        delivery_date: po.delivery_date,
+        delivery_date: safeIso(po.delivery_date),
         delivery_date_status: po.delivery_date_status || '',
-        goods_received: po.goods_received,
+        goods_received: safeIso(po.goods_received),
         done: !!po.done,
         dd_manager_id: po.dd_manager,
         dd_manager_name: mgr?.name || String(po.dd_manager || ''),
@@ -499,18 +516,18 @@ Deno.serve(async (req) => {
         po_type: po.po_type_name || '',
         collection: po.collection_name || '',
         urgent: !!po.urgent,
-        drop: po.drop,
+        drop: safeIso(po.drop),
         destination: destinations.join(' · '),
         sub_pos: subPos,
         pm_tags: po.pm_tags,
         pm_tags_label: po.pm_tag_label || null,
         product_image: po.product_image || null,
-        pps_receipt_date: po.pps_receipt_date,
+        pps_receipt_date: safeIso(po.pps_receipt_date),
         // Effective/computed
-        effective_delayed_due_date: effectiveDelayedDD,
+        effective_delayed_due_date: safeIso(effectiveDelayedDD),
         effective_dd_status: effectiveDdStatus,
-        effective_next_update: effectiveNextUpdate,
-        final_dd: finalDD,
+        effective_next_update: safeIso(effectiveNextUpdate),
+        final_dd: safeIso(finalDD),
         days_late_counting: daysLateCounting,
         countdown,
         priority,
@@ -576,7 +593,11 @@ Deno.serve(async (req) => {
         po_type_prefix: po.po_type_prefix || null,
         collection_type_id: po.collection_type_id != null ? Number(po.collection_type_id) : null,
       };
-    });
+      } catch {
+        // Skip rows with unrenderable date values rather than failing the whole response.
+        return null;
+      }
+    }).filter(Boolean);
 
     // If DD employee, filter to their assigned POs
     let filteredRows = rows;
