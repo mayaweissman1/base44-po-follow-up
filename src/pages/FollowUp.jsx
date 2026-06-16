@@ -159,11 +159,19 @@ function matchDdStatus(row, token) {
   return row.effective_dd_status === token;
 }
 
-// Helper: does row match an order type token (New/Rep substring or literal)?
+// Helper: does row match an order type token (New/Rep prefix bucket or literal po_type)?
+// "New" = O / SWIM prefixes, "Rep" = WR / R / SWIMR prefixes (per po_type_prefix from getFollowUpData).
+// Falls back to po_type substring match if prefix is missing.
 function matchOrderType(row, token) {
-  const t = (row.po_type || '').toLowerCase();
-  if (token === 'New') return t.includes('new');
-  if (token === 'Rep') return t.includes('rep');
+  const prefix = String(row.po_type_prefix || '').toUpperCase();
+  if (token === 'New') {
+    if (prefix) return prefix === 'O' || prefix === 'SWIM';
+    return (row.po_type || '').toLowerCase().includes('new');
+  }
+  if (token === 'Rep') {
+    if (prefix) return ['WR', 'R', 'SWIMR'].includes(prefix);
+    return (row.po_type || '').toLowerCase().includes('rep');
+  }
   return row.po_type === token;
 }
 

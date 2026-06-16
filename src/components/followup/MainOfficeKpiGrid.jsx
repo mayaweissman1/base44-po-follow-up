@@ -86,13 +86,18 @@ function KpiCard({ kpi, active, onClick, collapsed }) {
 /* ───────── KPI builder (shared logic for both views) ───────── */
 
 function matchesOrderType(row, mode) {
-  // mode is 'New' or 'Rep'. The po_types.type value in the DB is typically a
-  // longer string like "New Order" / "Repeat Order" / "Rep" / "New", so we
-  // do a case-insensitive substring match on the relevant token.
-  const t = (row.po_type || '').toLowerCase();
-  if (!t) return false;
-  if (mode === 'New') return t.includes('new');
-  if (mode === 'Rep') return t.includes('rep'); // matches "rep", "repeat"
+  // mode is 'New' or 'Rep'. Buckets by po_type_prefix:
+  //   New = O / SWIM, Rep = WR / R / SWIMR.
+  // Falls back to po_type substring match when prefix is missing.
+  const prefix = String(row.po_type_prefix || '').toUpperCase();
+  if (mode === 'New') {
+    if (prefix) return prefix === 'O' || prefix === 'SWIM';
+    return (row.po_type || '').toLowerCase().includes('new');
+  }
+  if (mode === 'Rep') {
+    if (prefix) return ['WR', 'R', 'SWIMR'].includes(prefix);
+    return (row.po_type || '').toLowerCase().includes('rep');
+  }
   return false;
 }
 
