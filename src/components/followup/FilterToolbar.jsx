@@ -191,7 +191,7 @@ export default function FilterToolbar({
   // Supplier Region also lives in Advanced.
   const primaryCols = `repeat(${showStatusFilter ? 4 : 3}, minmax(140px,1fr)) auto auto`;
   const StatusField = (
-    <FilterField label="Status">
+    <FilterField label="Delay Request Status">
       <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
         <option value="ALL">All</option>
         <option value="HOLD">Pending</option>
