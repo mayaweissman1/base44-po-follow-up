@@ -6,7 +6,7 @@ import { SIZE_ORDER } from '@/lib/followUpConstants';
 // and hovering the expand chevron starts the request before the click.
 // CACHE_VERSION — bump when the getPoDetails response shape changes so
 // already-mounted clients drop their stale entries on next render.
-const CACHE_VERSION = 'v3-rep-ind-priority';
+const CACHE_VERSION = 'v4-rep-only-ind-airotw';
 const _cache = new Map();         // po_number -> { v, dests }
 const _inflight = new Map();      // po_number -> Promise
 
@@ -62,17 +62,17 @@ function indText(v) {
   return `${v}d`;
 }
 
-// Per-destination priority for the expand row. Prefers the per-destination
-// value (us_priority/uk_priority from po_view) when present; falls back to the
-// PO-level urgent_priority (closed-list ladder from getFollowUpData). Returns
-// null when the parent row has no priority for that destination so we render
-// "—" instead of a noisy "NORMAL" pill.
+// Per-destination priority for the expand row. Shows the same closed-list
+// value (BEST SELLER / SOLD OUT / MISSING SIZES / MANUAL / URGENT / Drop … /
+// Risk in Fabric/PPS) that the main row's Priority column is filtered by.
+// Falls back to the legacy destination-specific tag (us_priority/uk_priority).
 function priorityForDest(destName, parentRow) {
   if (!parentRow) return null;
+  if (parentRow.urgent_priority) return parentRow.urgent_priority;
   const l = destLabel(destName);
   if (l === 'US' && parentRow.us_priority) return parentRow.us_priority;
   if (l === 'UK' && parentRow.uk_priority) return parentRow.uk_priority;
-  return parentRow.urgent_priority || null;
+  return null;
 }
 
 function PriorityCell({ value }) {
@@ -104,6 +104,10 @@ function SizeCell({ value }) {
 export default function SubPoDestinationTable({ poNumber, parentRow }) {
   const [destinations, setDestinations] = useState(() => readCache(poNumber));
   const [loading, setLoading] = useState(() => !readCache(poNumber));
+
+  // IND + Air OTW are only meaningful for Rep orders (they come from the
+  // repeats mart). Hide both columns entirely on New / SWIM orders.
+  const isRep = String(parentRow?.po_type || '').toLowerCase().includes('rep');
 
   useEffect(() => {
     let cancelled = false;
@@ -150,13 +154,13 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
           <tr className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-[#FAFAFA]">
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Destination</th>
             <th className="text-left px-2 py-1.5 border-b border-[#E5E5E5]">Priority</th>
-            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]">IND</th>
+            {isRep && <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Inventory days — from mart_repeats__sc_united_with_groups">IND</th>}
             {SIZE_ORDER.map(s => (
-              <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[38px]">{s}</th>
+              <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[38px]" title="Ordered quantity for this size at this destination">{s}</th>
             ))}
-            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]">Total</th>
+            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Total ordered quantity across all sizes">Total</th>
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Shipping</th>
-            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]">Air OTW</th>
+            {isRep && <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Air on-the-way — from mart_repeats__sc_united_with_groups">Air OTW</th>}
           </tr>
         </thead>
         <tbody>
@@ -176,9 +180,11 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
                 <td className={`px-2 py-2 ${border}`}>
                   <PriorityCell value={priorityForDest(d.destination, parentRow)} />
                 </td>
-                <td className={`px-2 py-2 text-center font-mono font-semibold ${border} ${indClass(d.inv_days)}`}>
-                  {indText(d.inv_days)}
-                </td>
+                {isRep && (
+                  <td className={`px-2 py-2 text-center font-mono font-semibold ${border} ${indClass(d.inv_days)}`}>
+                    {indText(d.inv_days)}
+                  </td>
+                )}
                 {SIZE_ORDER.map(s => (
                   <td key={s} className={`px-1.5 py-2 text-center ${border}`}>
                     <SizeCell value={Number(sizeMap[s]) || 0} />
@@ -196,11 +202,13 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
                     </div>
                   ) : <span className="text-[#A3A3A3]">—</span>}
                 </td>
-                <td className={`px-2 py-2 text-center ${border}`}>
-                  {d.air_otw > 0
-                    ? <span className="font-mono font-semibold text-[#0A0A0A]">{d.air_otw.toLocaleString()}</span>
-                    : <span className="text-[#A3A3A3] font-mono">0</span>}
-                </td>
+                {isRep && (
+                  <td className={`px-2 py-2 text-center ${border}`}>
+                    {d.air_otw > 0
+                      ? <span className="font-mono font-semibold text-[#0A0A0A]">{d.air_otw.toLocaleString()}</span>
+                      : <span className="text-[#A3A3A3] font-mono">{d.air_otw == null ? '—' : 0}</span>}
+                  </td>
+                )}
               </tr>
             );
           })}

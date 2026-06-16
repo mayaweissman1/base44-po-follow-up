@@ -132,12 +132,15 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
 
   const baseFilter = { orderType: [orderType] };
 
-  // Shared first row (both views)
+  // Shared first row (both views).
+  // "Urgents" uses the dedicated `urgentOnly` filter token (matches r.urgent
+  // === true), NOT `urgencyReason` which matches the closed-list priority
+  // labels. Mixing the two caused the count/filter mismatch (#7).
   const sharedCards = [
     { id: 'pending',     label: 'Pending',                  value: pending,               meta: 'HOLD requests',                accent: '',      filters: { ...baseFilter, status: 'HOLD' } },
     { id: 'late',        label: 'Late',                     value: late,                  meta: 'Past final due date',          accent: 'red',   filters: { ...baseFilter, lateFuture: ['LATE'] } },
     { id: 'not_updated', label: 'Not Updated',              value: notUpdated,            meta: 'Due today — not touched',      accent: 'red',   filters: { ...baseFilter, nextUpdate: todayStr }, alwaysRed: true },
-    { id: 'urgents',     label: 'Urgents',                  value: scoped.filter(r => r.urgent).length, meta: 'Urgent-flagged POs', accent: 'red',   filters: { ...baseFilter, urgencyReason: ['Urgent'] } },
+    { id: 'urgents',     label: 'Urgents',                  value: scoped.filter(r => r.urgent).length, meta: 'Urgent-flagged POs', accent: 'red',   filters: { ...baseFilter, urgentOnly: true } },
     { id: 'current_col', label: 'Current Collection',       value: currentColLate.length, meta: 'Late · this month',            accent: 'amber', filters: { ...baseFilter, collection: ['CURRENT'], lateFuture: ['LATE'] } },
     { id: 'will_miss',   label: 'Will miss collection',     value: willMiss,              meta: 'Risk EOM cutoff',              accent: 'red',   filters: { ...baseFilter, collection: ['CURRENT_AT_RISK'], lateFuture: ['LATE'] } },
     { id: 'not_started', label: 'Manufactured Not Started', value: notStarted,            meta: 'Production not begun',         accent: 'amber', filters: { ...baseFilter, ddStatus: ['NOT_STARTED'] } },
@@ -170,9 +173,25 @@ function buildKpisForOrderType(rows, kpis, orderType, todayStr, supplierRegion) 
   const lateBestSellers = scoped.filter(r => r.is_best_seller && r.late_future === 'LATE').length;
   const highBnoLowOtw   = scoped.filter(r => r.bno_high_low_otw).length;
   const sameStatusOver5d = scoped.filter(r => (r.days_same_status ?? 0) > 5).length;
+  // "May be urgent" — POs not yet flagged urgent but matching the configurable
+  // rules (see lib/mayBeUrgentRules.js). Pages compute _mayBeUrgent into the
+  // row before passing it down.
+  const mayBeUrgent = scoped.filter(r => (r._mayBeUrgent ?? r.needs_attention) && !r.marked_urgent && !r.urgent).length;
+
+  // Insert "May be urgent" right after "Urgents" in the shared first row
+  const urgentsIdx = sharedCards.findIndex(c => c.id === 'urgents');
+  const sharedWithMaybe = [...sharedCards];
+  sharedWithMaybe.splice(urgentsIdx + 1, 0, {
+    id: 'may_be_urgent',
+    label: 'May be urgent',
+    value: mayBeUrgent,
+    meta: 'Matches urgent rules',
+    accent: 'amber',
+    filters: { ...baseFilter, mayBeUrgentOnly: true },
+  });
 
   return [
-    ...sharedCards,
+    ...sharedWithMaybe,
     { id: 'late_best_sellers', label: 'Late Best Sellers', value: lateBestSellers,  meta: 'BS already late',     accent: 'red',   filters: { ...baseFilter, priority: ['Best Seller'], lateFuture: ['LATE'] } },
     { id: 'high_bno_low_otw',  label: 'High BNO - Low OTW', value: highBnoLowOtw,   meta: 'Demand vs supply gap', accent: 'red',   filters: { ...baseFilter, bnoHighLowOtw: true } },
     { id: 'empty_status',      label: 'Empty Status',       value: emptyStatus,     meta: 'Missing DD status',    accent: 'amber', filters: { ...baseFilter, ddStatus: ['EMPTY'] } },

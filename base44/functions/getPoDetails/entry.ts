@@ -45,13 +45,14 @@ Deno.serve(async (req) => {
         ORDER BY pv.sub_po_number, s.sort_order NULLS LAST, pv.sku
       `, [po_number]),
 
-      // Sub-POs with destination, urgency, shipping method, air OTW
+      // Sub-POs with destination, urgency, shipping method
+      // (Air OTW is taken from the mart in the next query — repeats only)
       client.query(`
         SELECT
           spv.sub_po_number,
           sd.destination AS destination_name,
+          sd.code        AS dest_code,
           spv.urgent     AS sub_urgent,
-          spv.qty_otw_air,
           sm.method      AS shipping_method_name
         FROM sub_po_view spv
         LEFT JOIN shipment_destination sd ON sd.id = spv.destination
@@ -62,18 +63,24 @@ Deno.serve(async (req) => {
       // Urgency reason (Best Seller / URGENT) per PO — applies to all destinations
       client.query(`SELECT reason FROM po_urgent_status WHERE po_number = $1 LIMIT 1`, [po_number]),
 
-      // IND per destination — joined via po_view in one round trip.
-      // Uses the current dbt mart snapshot (history table contains stale 0-rows).
-      // IND is only meaningful for **Rep orders**; the mart_repeats view is
-      // repeats-only and matches against new orders return stale 0s. Gate by
-      // po_type prefix so new/SWIM orders don't get a fake IND.
+      // IND + Air OTW per destination — Rep orders only.
+      // Source: dbt_marts.mart_repeats__sc_united_with_groups joined to
+      // sub_po_view by destination code AND style_color (per spec).
+      // The mart is repeats-only — gate by po_type prefix so new/SWIM
+      // orders don't get fake values.
       client.query(`
-        SELECT m."Destination" AS dest_code, m."Inv Days" AS inv_days
-        FROM dbt_marts.mart_repeats__sc_united_with_groups m
-        JOIN po_view pv ON pv.style_color = m."Style Color"
-        JOIN po_types pt ON pt.id = pv.po_type
-        WHERE pv.po_number = $1
-          AND m."Inv Days" IS NOT NULL
+        SELECT DISTINCT
+          rep."Destination" AS dest_code,
+          rep."Inv Days"    AS inv_days,
+          rep."Air OTW"     AS air_otw
+        FROM sub_po_view po
+        JOIN shipment_destination sd ON sd.id = po.destination
+        JOIN po_view pv              ON pv.po_number = po.po_number
+        JOIN po_types pt             ON pt.id = pv.po_type
+        JOIN dbt_marts.mart_repeats__sc_united_with_groups rep
+          ON rep."Destination" = sd.code
+         AND rep."Style Color" = po.style_color
+        WHERE po.po_number = $1
           AND TRIM(BOTH FROM pt.prefix) = ANY(ARRAY['WR','R','SWIMR'])
       `, [po_number]),
     ]);
@@ -86,9 +93,12 @@ Deno.serve(async (req) => {
     const isBestSeller = urgRes.rows[0]?.reason?.toLowerCase().includes('best seller') || false;
     const isUrgent     = urgRes.rows[0]?.reason?.toLowerCase().includes('urgent') || false;
 
+    // Per-destination IND + Air OTW from the repeats mart (keyed by sd.code → US/UK)
     const indByDest = {};
+    const airOtwByDest = {};
     for (const r of indRes.rows) {
-      indByDest[r.dest_code] = r.inv_days == null ? null : Math.round(Number(r.inv_days));
+      if (r.inv_days != null) indByDest[r.dest_code] = Math.round(Number(r.inv_days));
+      if (r.air_otw  != null) airOtwByDest[r.dest_code] = Number(r.air_otw) || 0;
     }
 
     // Group sizes by destination → { sizes_by_size: { XS: 30, S: 60, … } }
@@ -122,7 +132,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Layer in sub-PO-level fields (air OTW, shipping methods, urgent flag)
+    // Layer in sub-PO-level fields (shipping methods, urgent flag).
+    // Air OTW now comes from the repeats mart, not sub_po_view.
+    const destCodeMap = {}; // raw destination name -> sd.code (US/UK/…)
     for (const r of subRes.rows) {
       const dest = r.destination_name || '—';
       if (!byDest[dest]) {
@@ -131,35 +143,36 @@ Deno.serve(async (req) => {
           sub_po_numbers: new Set(),
           sizes: [],
           sizes_by_size: {},
-          air_otw: 0,
           shipping_methods_set: new Set(),
           sub_urgent: false,
         };
       }
       byDest[dest].sub_po_numbers.add(r.sub_po_number);
-      byDest[dest].air_otw += Number(r.qty_otw_air) || 0;
       if (r.shipping_method_name) byDest[dest].shipping_methods_set.add(r.shipping_method_name);
       if (r.sub_urgent) byDest[dest].sub_urgent = true;
+      if (r.dest_code) destCodeMap[dest] = r.dest_code;
     }
 
-    // Map raw destination name → IND lookup key (Edikted → US, EdiktedUK → UK)
-    function indForDest(name) {
+    // Map raw destination name → mart lookup key (sd.code, e.g. 'US'/'UK')
+    function codeForDest(name) {
+      if (destCodeMap[name]) return destCodeMap[name];
       const n = String(name || '').toLowerCase();
-      if (n === 'edikteduk') return indByDest['UK'] ?? null;
-      if (n === 'edikted')   return indByDest['US'] ?? null;
+      if (n === 'edikteduk') return 'UK';
+      if (n === 'edikted')   return 'US';
       return null;
     }
 
     const destinations = Object.values(byDest).map(d => {
       const priority = isBestSeller ? 'BEST_SELLER' : (isUrgent || d.sub_urgent ? 'URGENT' : 'NORMAL');
+      const code = codeForDest(d.destination);
       return {
         destination: d.destination,
         sub_po_numbers: [...d.sub_po_numbers],
         sizes: d.sizes,
         sizes_by_size: d.sizes_by_size,
-        air_otw: d.air_otw,
+        air_otw: code != null ? (airOtwByDest[code] ?? null) : null,
         shipping_method_names: [...d.shipping_methods_set],
-        inv_days: indForDest(d.destination),
+        inv_days: code != null ? (indByDest[code] ?? null) : null,
         priority,
       };
     });
