@@ -98,6 +98,7 @@ export default function FilterToolbar({
   pmTagsOptions = [],
   mainOfficeViewMode,
   advancedOpen, onAdvancedToggle,
+  showStatusFilter = true,
 }) {
   const setAdvancedOpen = onAdvancedToggle || (() => {});
   const defaultFilters = {
@@ -185,25 +186,30 @@ export default function FilterToolbar({
   }
 
   // ── Main office / DD team manager ──
+  // Primary columns: PO, [Status if shown], Style, Urgent Priority + Advanced + Reset.
+  // Supplier Region moved into Advanced.
+  const primaryCols = `repeat(${showStatusFilter ? 4 : 3}, minmax(140px,1fr)) auto auto`;
   return (
     <>
-      {/* PRIMARY BAR — 4 main filters + region + advanced toggle + reset */}
+      {/* PRIMARY BAR */}
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-2 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(4, minmax(140px,1fr)) minmax(140px,180px) auto auto' }}>
+        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: primaryCols }}>
           <FilterField label="PO Number">
             <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
           </FilterField>
-          <FilterField label="Status">
-            <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
-              <option value="ALL">All</option>
-              <option value="HOLD">Pending</option>
-              <option value="HANDLED">Handled</option>
-              <option value="APPROVED">Approved</option>
-              <option value="REJECTED">Rejected</option>
-              <option value="ACKNOWLEDGED">Acknowledged</option>
-              <option value="AUTOMATICALLY">Auto-approved</option>
-            </select>
-          </FilterField>
+          {showStatusFilter && (
+            <FilterField label="Status">
+              <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
+                <option value="ALL">All</option>
+                <option value="HOLD">Pending</option>
+                <option value="HANDLED">Handled</option>
+                <option value="APPROVED">Approved</option>
+                <option value="REJECTED">Rejected</option>
+                <option value="ACKNOWLEDGED">Acknowledged</option>
+                <option value="AUTOMATICALLY">Auto-approved</option>
+              </select>
+            </FilterField>
+          )}
           <FilterField label="Style Color">
             <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
           </FilterField>
@@ -214,13 +220,6 @@ export default function FilterToolbar({
               options={urgencyReasonOptions}
               placeholder="All"
             />
-          </FilterField>
-          <FilterField label="Supplier Region">
-            <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
-              <option value="CHINA">China</option>
-              <option value="US">US</option>
-              <option value="ALL">All</option>
-            </select>
           </FilterField>
           <button
             onClick={() => setAdvancedOpen(o => !o)}
@@ -238,6 +237,13 @@ export default function FilterToolbar({
         <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px,1fr))' }}>
             {/* ── CATEGORIES (row 1) ── */}
+            <FilterField label="Supplier Region">
+              <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
+                <option value="CHINA">China</option>
+                <option value="US">US</option>
+                <option value="ALL">All</option>
+              </select>
+            </FilterField>
             <FilterField label="DD Manager">
               <MultiSelect value={ddManagerValue} onChange={v => set('ddManager', v)} options={ddManagers} placeholder="All managers" />
             </FilterField>

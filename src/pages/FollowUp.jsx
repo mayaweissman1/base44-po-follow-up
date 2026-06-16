@@ -533,37 +533,21 @@ export default function FollowUp() {
     () => augmentedRows.filter(r => passesFilters(r, filters, activeRole)),
     [augmentedRows, filters, activeRole]
   );
-  const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, urgencyReasonOptions, pmTagsOptions } = useMemo(() => {
+  // Static option pools (suppliers, managers, collections, etc.) — derived
+  // from the full row set; not affected by current filters.
+  const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, pmTagsOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
     const smSet = new Set();
-    const urgMap = new Map(); // urgency_reason raw value -> count
-    const pmTagsMap = new Map(); // pm tag -> count
+    const pmTagsMap = new Map();
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
       if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
-
-      // Urgent Priority — prefer the computed urgent_priority (single closed-list
-      // value per PO from §3.3.2). Fallback: normalize legacy urgency_reason_raw.
-      if (r.urgent_priority) {
-        urgMap.set(r.urgent_priority, (urgMap.get(r.urgent_priority) || 0) + 1);
-      } else {
-        const urgRaw = r.urgency_reason_raw || r.priority;
-        if (urgRaw) {
-          for (const cat of normalizeUrgencyReasons(urgRaw)) {
-            urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
-          }
-        }
-      }
-
-      // Rep-view shipping method names
       const isRep = (r.po_type || '').toLowerCase().includes('rep');
       if (isRep) {
         for (const m of (r.shipping_method_names || [])) smSet.add(m);
       }
-
-      // PM tags — split label on commas, count per tag
       if (r.pm_tags_label) {
         for (const t of String(r.pm_tags_label).split(',').map(s => s.trim()).filter(Boolean)) {
           pmTagsMap.set(t, (pmTagsMap.get(t) || 0) + 1);
@@ -576,14 +560,42 @@ export default function FollowUp() {
       collections: [...col].sort(),
       orderTypes: [...types].sort(),
       shippingMethodOptions: [...smSet].sort(),
-      urgencyReasonOptions: [...urgMap.entries()]
-        .sort((a, b) => b[1] - a[1])
-        .map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
       pmTagsOptions: [...pmTagsMap.entries()]
         .sort((a, b) => b[1] - a[1])
         .map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
     };
   }, [rows]);
+
+  // Urgent Priority counts react to the current Status (delay request) filter.
+  // When a Status is selected we count POs in that status; when 'ALL' (no
+  // status filter) we count open POs only — so the user sees how many open
+  // orders match each priority bucket.
+  const urgencyReasonOptions = useMemo(() => {
+    const urgMap = new Map();
+    const status = filters.status;
+    for (const r of rows) {
+      // Status scope
+      if (status === 'HOLD' && r.current_status !== 'HOLD') continue;
+      else if (status === 'HANDLED' && !['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(r.current_status)) continue;
+      else if (status === 'ACK_APPROVED' && !['APPROVED', 'ACKNOWLEDGED'].includes(r.current_status)) continue;
+      else if (['APPROVED', 'REJECTED', 'ACKNOWLEDGED', 'AUTOMATICALLY'].includes(status) && r.current_status !== status) continue;
+      else if ((status === 'ALL' || !status) && r.done === true) continue; // open-only when no status filter
+
+      if (r.urgent_priority) {
+        urgMap.set(r.urgent_priority, (urgMap.get(r.urgent_priority) || 0) + 1);
+      } else {
+        const urgRaw = r.urgency_reason_raw || r.priority;
+        if (urgRaw) {
+          for (const cat of normalizeUrgencyReasons(urgRaw)) {
+            urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
+          }
+        }
+      }
+    }
+    return [...urgMap.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([k, c]) => ({ value: k, label: `${k} (${c})` }));
+  }, [rows, filters.status]);
 
   // Augment server KPIs with client-computed values
   const displayKpis = useMemo(() => {
@@ -667,25 +679,8 @@ export default function FollowUp() {
                 )}
               </div>
             )}
-            {/* Settings + Export live next to the New/Rep toggle for main_office;
-                show them in the top bar for other roles. */}
-            {activeRole !== 'main_office' && (
-              <>
-                <button
-                  onClick={() => setMayBeUrgentModalOpen(true)}
-                  title='Configure the "May be urgent" rules'
-                  className="h-8 w-8 flex items-center justify-center text-[#525252] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#FFF0F7] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors"
-                >
-                  <SettingsIcon size={13} />
-                </button>
-                <button
-                  onClick={() => exportRowsToCSV(filteredRows)}
-                  className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] transition-colors"
-                >
-                  <Download size={13} /> Export
-                </button>
-              </>
-            )}
+            {/* Settings + Export are main-office only and live next to the
+                New/Rep toggle inside MainOfficeKpiGrid. Other roles don't get them. */}
             <button
               onClick={loadData}
               disabled={loading}
@@ -777,6 +772,12 @@ export default function FollowUp() {
           mainOfficeViewMode={mainOfficeViewMode}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}
+          // Status (delay request) filter is only meaningful when the user is
+          // looking at the Pending KPI — show it only then for main_office.
+          showStatusFilter={
+            activeRole !== 'main_office' ||
+            activeOpKpi === `${mainOfficeViewMode}:pending`
+          }
         />
       </div>
 
