@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { SIZE_ORDER } from '@/lib/followUpConstants';
+
+// Sub-PO destination table shows per-size **inventory days** (not ordered qty)
+// for the four sizes that drive the Rep urgent ladder: XS, S, M, XS/S.
+const SUB_PO_SIZES = ['XS', 'S', 'M', 'XS/S'];
 
 // Simple in-memory cache + prefetch — re-expanding the same PO is instant,
 // and hovering the expand chevron starts the request before the click.
 // CACHE_VERSION — bump when the getPoDetails response shape changes so
 // already-mounted clients drop their stale entries on next render.
-const CACHE_VERSION = 'v4-rep-only-ind-airotw';
+const CACHE_VERSION = 'v5-size-inv-days';
 const _cache = new Map();         // po_number -> { v, dests }
 const _inflight = new Map();      // po_number -> Promise
 
@@ -90,11 +93,11 @@ function PriorityCell({ value }) {
   );
 }
 
-function SizeCell({ value }) {
-  if (!value || value <= 0) {
-    return <span className="text-[#D4D4D4] font-mono">—</span>;
-  }
-  return <span className="font-mono font-semibold text-[#0A0A0A]">{value}</span>;
+// Per-size inventory-days cell. Uses the same color ladder as the destination
+// IND column (red < 5d, amber < 14d, neutral otherwise).
+function SizeIndCell({ value }) {
+  if (value == null) return <span className="text-[#D4D4D4] font-mono">—</span>;
+  return <span className={`font-mono font-semibold ${indClass(value)}`}>{indText(value)}</span>;
 }
 
 /**
@@ -155,10 +158,9 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Destination</th>
             <th className="text-left px-2 py-1.5 border-b border-[#E5E5E5]">Priority</th>
             {isRep && <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Inventory days — from mart_repeats__sc_united_with_groups">IND</th>}
-            {SIZE_ORDER.map(s => (
-              <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[38px]" title="Ordered quantity for this size at this destination">{s}</th>
+            {isRep && SUB_PO_SIZES.map(s => (
+              <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[44px]" title={`Inventory days for size ${s} at this destination (sku_sizes_invd)`}>{s}</th>
             ))}
-            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Total ordered quantity across all sizes">Total</th>
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Shipping</th>
             {isRep && <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Air on-the-way — from mart_repeats__sc_united_with_groups">Air OTW</th>}
           </tr>
@@ -166,7 +168,6 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
         <tbody>
           {destinations.map((d, idx) => {
             const sizeMap = d.sizes_by_size || {};
-            const total = SIZE_ORDER.reduce((acc, s) => acc + (Number(sizeMap[s]) || 0), 0);
             const shippingArr = d.shipping_method_names || [];
             const isLast = idx === destinations.length - 1;
             const border = isLast ? '' : 'border-b border-[#F0F0F0]';
@@ -185,14 +186,11 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
                     {indText(d.inv_days)}
                   </td>
                 )}
-                {SIZE_ORDER.map(s => (
+                {isRep && SUB_PO_SIZES.map(s => (
                   <td key={s} className={`px-1.5 py-2 text-center ${border}`}>
-                    <SizeCell value={Number(sizeMap[s]) || 0} />
+                    <SizeIndCell value={sizeMap[s] ?? null} />
                   </td>
                 ))}
-                <td className={`px-2 py-2 text-center bg-[#FAFAFA] ${border}`}>
-                  <span className="font-mono font-bold text-[#0A0A0A]">{total.toLocaleString()}</span>
-                </td>
                 <td className={`px-3 py-2 ${border}`}>
                   {shippingArr.length > 0 ? (
                     <div className="flex flex-wrap gap-1">

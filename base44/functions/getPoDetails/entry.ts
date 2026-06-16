@@ -26,23 +26,26 @@ Deno.serve(async (req) => {
 
     // All four queries run in parallel. The IND lookup uses a subquery on
     // po_view so we don't have to wait for styleColor — saves 1 round trip.
-    const [skuRes, subRes, urgRes, indRes] = await Promise.all([
-      // Per-SKU breakdown joined with size names via skus + sizes
+    const [sizeIndRes, subRes, urgRes, indRes] = await Promise.all([
+      // Per-size inventory-days (XS / S / M / XS-S) per destination, from
+      // sku_sizes_invd. Joined by destination CODE + style_color (per spec).
+      // Gated to Rep orders — the table mirrors the repeats mart.
       client.query(`
         SELECT
-          pv.sub_po_number,
-          pv.sku,
-          pv.ordered_qty,
-          pv.qty_received,
-          pv.good_for_sale,
-          pv.balance,
-          s.size  AS size_name,
-          s.sort_order
-        FROM pod_view pv
-        LEFT JOIN skus sk ON sk.sku = pv.sku
-        LEFT JOIN sizes s ON s.id = sk.size
-        WHERE pv.po_number = $1
-        ORDER BY pv.sub_po_number, s.sort_order NULLS LAST, pv.sku
+          sd.destination AS destination_name,
+          sd.code        AS dest_code,
+          ssi.size       AS size_name,
+          ssi.inv_days   AS inv_days
+        FROM sub_po_view po
+        JOIN shipment_destination sd ON sd.id = po.destination
+        JOIN po_view pv              ON pv.po_number = po.po_number
+        JOIN po_types pt             ON pt.id = pv.po_type
+        JOIN sku_sizes_invd ssi
+          ON ssi.destination = sd.code
+         AND ssi.style_color = po.style_color
+         AND ssi.size = ANY(ARRAY['XS','S','M','XS/S'])
+        WHERE po.po_number = $1
+          AND TRIM(BOTH FROM pt.prefix) = ANY(ARRAY['WR','R','SWIMR'])
       `, [po_number]),
 
       // Sub-POs with destination, urgency, shipping method
@@ -101,34 +104,23 @@ Deno.serve(async (req) => {
       if (r.air_otw  != null) airOtwByDest[r.dest_code] = Number(r.air_otw) || 0;
     }
 
-    // Group sizes by destination → { sizes_by_size: { XS: 30, S: 60, … } }
+    // Per-size inventory-days by destination from sku_sizes_invd.
+    // sizes_by_size[size] = inv_days for that (destination, size) pair.
     const byDest = {};
-    for (const r of skuRes.rows) {
-      const subPo = r.sub_po_number;
-      const dest = destBySubPo[subPo] || '—';
+    for (const r of sizeIndRes.rows) {
+      const dest = r.destination_name || '—';
       if (!byDest[dest]) {
         byDest[dest] = {
           destination: dest,
           sub_po_numbers: new Set(),
-          sizes: [],              // legacy per-SKU list (kept for backward compat)
-          sizes_by_size: {},      // new: { sizeName -> total ordered qty }
-          air_otw: 0,
+          sizes_by_size: {},
           shipping_methods_set: new Set(),
           sub_urgent: false,
         };
       }
-      byDest[dest].sub_po_numbers.add(subPo);
-      byDest[dest].sizes.push({
-        sku: r.sku,
-        size: r.size_name || '—',
-        ordered_qty: Number(r.ordered_qty) || 0,
-        qty_received: Number(r.qty_received) || 0,
-        good_for_sale: Number(r.good_for_sale) || 0,
-        balance: Number(r.balance) || 0,
-      });
       const sz = (r.size_name || '').toUpperCase();
-      if (sz) {
-        byDest[dest].sizes_by_size[sz] = (byDest[dest].sizes_by_size[sz] || 0) + (Number(r.ordered_qty) || 0);
+      if (sz && r.inv_days != null) {
+        byDest[dest].sizes_by_size[sz] = Math.round(Number(r.inv_days));
       }
     }
 
@@ -168,7 +160,6 @@ Deno.serve(async (req) => {
       return {
         destination: d.destination,
         sub_po_numbers: [...d.sub_po_numbers],
-        sizes: d.sizes,
         sizes_by_size: d.sizes_by_size,
         air_otw: code != null ? (airOtwByDest[code] ?? null) : null,
         shipping_method_names: [...d.shipping_methods_set],

@@ -199,7 +199,7 @@ function passesFilters(row, filters, role) {
   if (filters.late7Plus && !((row.days_late_counting ?? 0) > 7)) return false;
   if (filters.bestSeller && !row.is_best_seller) return false;
   if (filters.highBno && !row.bno_high_low_otw) return false;
-  if (filters.urgentOnly && row.urgent !== true) return false;
+  if (filters.urgentOnly && row.marked_urgent !== true) return false;
   if (filters.mayBeUrgentOnly) {
     const verdict = row._mayBeUrgent ?? row.needs_attention;
     if (!verdict || row.marked_urgent || row.urgent) return false;
