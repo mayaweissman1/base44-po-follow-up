@@ -186,9 +186,23 @@ export default function FilterToolbar({
   }
 
   // ── Main office / DD team manager ──
-  // Primary columns: PO, [Status if shown], Style, Urgent Priority + Advanced + Reset.
-  // Supplier Region moved into Advanced.
+  // Primary columns: PO, [Status if Pending KPI active], Style, Urgent Priority + Advanced + Reset.
+  // When Pending isn't active, Status moves down into the Advanced section.
+  // Supplier Region also lives in Advanced.
   const primaryCols = `repeat(${showStatusFilter ? 4 : 3}, minmax(140px,1fr)) auto auto`;
+  const StatusField = (
+    <FilterField label="Status">
+      <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
+        <option value="ALL">All</option>
+        <option value="HOLD">Pending</option>
+        <option value="HANDLED">Handled</option>
+        <option value="APPROVED">Approved</option>
+        <option value="REJECTED">Rejected</option>
+        <option value="ACKNOWLEDGED">Acknowledged</option>
+        <option value="AUTOMATICALLY">Auto-approved</option>
+      </select>
+    </FilterField>
+  );
   return (
     <>
       {/* PRIMARY BAR */}
@@ -197,19 +211,7 @@ export default function FilterToolbar({
           <FilterField label="PO Number">
             <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
           </FilterField>
-          {showStatusFilter && (
-            <FilterField label="Status">
-              <select className={selectCls} value={filters.status} onChange={e => set('status', e.target.value)}>
-                <option value="ALL">All</option>
-                <option value="HOLD">Pending</option>
-                <option value="HANDLED">Handled</option>
-                <option value="APPROVED">Approved</option>
-                <option value="REJECTED">Rejected</option>
-                <option value="ACKNOWLEDGED">Acknowledged</option>
-                <option value="AUTOMATICALLY">Auto-approved</option>
-              </select>
-            </FilterField>
-          )}
+          {showStatusFilter && StatusField}
           <FilterField label="Style Color">
             <input className={inputCls} placeholder="Search…" value={filters.style} onChange={e => set('style', e.target.value)} />
           </FilterField>
@@ -237,6 +239,7 @@ export default function FilterToolbar({
         <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
           <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(170px,1fr))' }}>
             {/* ── CATEGORIES (row 1) ── */}
+            {!showStatusFilter && StatusField}
             <FilterField label="Supplier Region">
               <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
                 <option value="CHINA">China</option>
