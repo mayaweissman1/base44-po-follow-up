@@ -18,8 +18,9 @@ async function query(sql, params = []) {
   return res.rows;
 }
 
-// Match legacy cutting: po_status = 3 (Open) AND done = false.
-const PO_STATUS_INCLUDE = [3];
+// Include both Open (po_status=3, done=false) and Closed (done=true OR po_status<>3).
+// The client filters by `done` via the Order Status dropdown (Open / Closed / All).
+const PO_STATUS_INCLUDE = [3, 4, 5, 6];
 
 // Dedupe urgent_priority — strips US-/UK- prefixes and removes duplicates.
 // "US-O WITH CLOSE DROP DATE,UK-O WITH CLOSE DROP DATE" → "O WITH CLOSE DROP DATE"
@@ -382,7 +383,6 @@ Deno.serve(async (req) => {
       LEFT JOIN urgent_priority_per_po upp ON upp.po_number = pov.po_number
       LEFT JOIN urgent_tagged_styles uts ON uts.style_color = pov.style_color
       WHERE pov.po_status = ANY($1::int[])
-        AND pov.done = false
       ORDER BY pov.due_date ASC NULLS LAST, pov.po_number ASC
     `;
 

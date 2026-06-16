@@ -41,6 +41,7 @@ const DEFAULT_FILTERS = (role) => ({
   po: '',
   style: '',
   status: 'ALL',
+  orderState: 'OPEN', // OPEN | CLOSED | ALL — filters by row.done (true = closed)
   urgencyReason: [],  // raw urgency_reason values from po_urgent_status (e.g. "Best Seller New", "US-SIZES INV DAYS")
   priorityUS: [],     // BEST_SELLER / URGENT / NORMAL — per US destination
   priorityUK: [],     // BEST_SELLER / URGENT / NORMAL — per UK destination
@@ -180,6 +181,11 @@ function passesFilters(row, filters, role) {
 
   if (po && !row.po_number?.toLowerCase().includes(po.toLowerCase())) return false;
   if (style && !row.style_color?.toLowerCase().includes(style.toLowerCase())) return false;
+
+  // Order state — Open = done false, Closed = done true. ALL = both.
+  const orderState = filters.orderState || 'OPEN';
+  if (orderState === 'OPEN'   && row.done === true)  return false;
+  if (orderState === 'CLOSED' && row.done !== true)  return false;
   if (has(supplier) && !supplier.includes(row.supplier)) return false;
   // ddManager is now multi-select (array). Legacy single string still supported.
   if (Array.isArray(ddManager)) {

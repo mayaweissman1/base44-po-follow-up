@@ -171,6 +171,13 @@ export default function FilterToolbar({
             <option value="ALL">All</option>
           </select>
         </FilterField>
+        <FilterField label="Order Status">
+          <select className={selectCls} value={filters.orderState || 'OPEN'} onChange={e => set('orderState', e.target.value)}>
+            <option value="OPEN">Open</option>
+            <option value="CLOSED">Closed</option>
+            <option value="ALL">All</option>
+          </select>
+        </FilterField>
         <FilterField label="Collection">
           <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
         </FilterField>
@@ -189,7 +196,7 @@ export default function FilterToolbar({
     <>
       {/* PRIMARY BAR — 4 main filters + region + advanced toggle + reset */}
       <div className="bg-white border border-[#E5E5E5] rounded-[10px] p-3 mb-2 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(4, minmax(140px,1fr)) minmax(140px,180px) auto auto' }}>
+        <div className="grid gap-2 items-end" style={{ gridTemplateColumns: 'repeat(4, minmax(140px,1fr)) minmax(130px,160px) minmax(120px,150px) auto auto' }}>
           <FilterField label="PO Number">
             <input className={inputCls} placeholder="Search…" value={filters.po} onChange={e => set('po', e.target.value)} />
           </FilterField>
@@ -219,6 +226,13 @@ export default function FilterToolbar({
             <select className={selectCls} value={filters.supplierRegion || 'CHINA'} onChange={e => set('supplierRegion', e.target.value)}>
               <option value="CHINA">China</option>
               <option value="US">US</option>
+              <option value="ALL">All</option>
+            </select>
+          </FilterField>
+          <FilterField label="Order Status">
+            <select className={selectCls} value={filters.orderState || 'OPEN'} onChange={e => set('orderState', e.target.value)}>
+              <option value="OPEN">Open</option>
+              <option value="CLOSED">Closed</option>
               <option value="ALL">All</option>
             </select>
           </FilterField>
