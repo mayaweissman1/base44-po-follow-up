@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import AirOtwModal from './AirOtwModal';
 
 // Sub-PO destination table shows per-size **inventory days** (not ordered qty)
 // for the four sizes that drive the Rep urgent ladder: XS, S, M, XS/S.
@@ -107,6 +108,7 @@ function SizeIndCell({ value }) {
 export default function SubPoDestinationTable({ poNumber, parentRow }) {
   const [destinations, setDestinations] = useState(() => readCache(poNumber));
   const [loading, setLoading] = useState(() => !readCache(poNumber));
+  const [airOtwTarget, setAirOtwTarget] = useState(null); // { styleColor, destination }
 
   // IND + Air OTW are only meaningful for Rep orders (they come from the
   // repeats mart). Hide both columns entirely on New / SWIM orders.
@@ -203,7 +205,15 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
                 {isRep && (
                   <td className={`px-2 py-2 text-center ${border}`}>
                     {d.air_otw > 0
-                      ? <span className="font-mono font-semibold text-[#0A0A0A]">{d.air_otw.toLocaleString()}</span>
+                      ? (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setAirOtwTarget({ styleColor: parentRow?.style_color, destination: d.destination }); }}
+                          title="View Air OTW shipments"
+                          className="font-mono font-semibold text-[#E31B7F] hover:underline"
+                        >
+                          {d.air_otw.toLocaleString()}
+                        </button>
+                      )
                       : <span className="text-[#A3A3A3] font-mono">{d.air_otw == null ? '—' : 0}</span>}
                   </td>
                 )}
@@ -212,6 +222,13 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
           })}
         </tbody>
       </table>
+      {airOtwTarget && (
+        <AirOtwModal
+          styleColor={airOtwTarget.styleColor}
+          destination={airOtwTarget.destination}
+          onClose={() => setAirOtwTarget(null)}
+        />
+      )}
     </div>
   );
 }
