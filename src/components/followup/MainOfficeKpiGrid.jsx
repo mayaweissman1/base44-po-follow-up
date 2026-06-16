@@ -1,4 +1,5 @@
 import React, { useMemo, useRef, useEffect, useState } from 'react';
+import { Download, Settings as SettingsIcon } from 'lucide-react';
 import {
   NOT_STARTED_DD_STATUSES,
   FABRIC_PPS_RISK_STATUSES,
@@ -209,6 +210,8 @@ export default function MainOfficeKpiGrid({
   viewMode,
   onViewModeChange,
   supplierRegion = 'CHINA',
+  onExport,
+  onOpenSettings,
 }) {
   const todayStr = useMemo(() => new Date().toISOString().slice(0, 10), []);
   const sentinelRef = useRef(null);
@@ -270,25 +273,45 @@ export default function MainOfficeKpiGrid({
             : 'mb-4',
         ].join(' ')}
       >
-        {/* View mode toggle */}
+        {/* View mode toggle + view-scoped actions (Settings, Export) */}
         <div className={`flex items-center justify-between px-0.5 ${collapsed ? 'mb-1.5' : 'mb-2'}`}>
           <div className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.08em]">KPIs</div>
-          <div className="inline-flex bg-white border border-[#E5E5E5] rounded-[8px] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
-            {['New', 'Rep'].map(mode => (
+          <div className="flex items-center gap-2">
+            {onOpenSettings && (
               <button
-                key={mode}
-                onClick={() => onViewModeChange(mode)}
-                className={[
-                  collapsed ? 'px-2.5 h-6 text-[10px]' : 'px-4 h-7 text-[11px]',
-                  'rounded-[6px] font-semibold transition-all',
-                  viewMode === mode
-                    ? 'bg-[#E31B7F] text-white shadow-[0_1px_3px_rgba(227,27,127,.25)]'
-                    : 'text-[#525252] hover:text-[#0A0A0A]',
-                ].join(' ')}
+                onClick={onOpenSettings}
+                title='Configure the "May be urgent" rules'
+                className={`${collapsed ? 'h-6 w-6' : 'h-7 w-7'} flex items-center justify-center text-[#525252] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#FFF0F7] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors`}
               >
-                {collapsed ? mode : (mode === 'New' ? 'New Orders' : 'Rep Orders')}
+                <SettingsIcon size={12} />
               </button>
-            ))}
+            )}
+            {onExport && (
+              <button
+                onClick={onExport}
+                title="Export current view"
+                className={`${collapsed ? 'h-6 px-2 text-[10px]' : 'h-7 px-2.5 text-[11px]'} flex items-center gap-1.5 font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] transition-colors`}
+              >
+                <Download size={12} /> Export
+              </button>
+            )}
+            <div className="inline-flex bg-white border border-[#E5E5E5] rounded-[8px] p-0.5 shadow-[0_1px_3px_rgba(0,0,0,.04)]">
+              {['New', 'Rep'].map(mode => (
+                <button
+                  key={mode}
+                  onClick={() => onViewModeChange(mode)}
+                  className={[
+                    collapsed ? 'px-2.5 h-6 text-[10px]' : 'px-4 h-7 text-[11px]',
+                    'rounded-[6px] font-semibold transition-all',
+                    viewMode === mode
+                      ? 'bg-[#E31B7F] text-white shadow-[0_1px_3px_rgba(227,27,127,.25)]'
+                      : 'text-[#525252] hover:text-[#0A0A0A]',
+                  ].join(' ')}
+                >
+                  {collapsed ? mode : (mode === 'New' ? 'New Orders' : 'Rep Orders')}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 

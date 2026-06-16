@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { X, Plane } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { fmtDate } from '@/lib/followUpConstants';
@@ -38,7 +39,10 @@ export default function AirOtwModal({ styleColor, destination, onClose }) {
 
   const totalQty = (shipments || []).reduce((s, r) => s + (r.quantity || 0), 0);
 
-  return (
+  // Portal to body so the fixed backdrop isn't clipped by ancestor stacking
+  // contexts (the expanded sub-PO row uses sticky positioning which would
+  // otherwise constrain the overlay).
+  return createPortal((
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 px-4" onClick={onClose}>
       <div
         className="bg-white rounded-[12px] shadow-[0_8px_32px_rgba(0,0,0,.18)] w-full max-w-[640px] max-h-[80vh] flex flex-col overflow-hidden"
@@ -109,5 +113,5 @@ export default function AirOtwModal({ styleColor, destination, onClose }) {
         )}
       </div>
     </div>
-  );
+  ), document.body);
 }

@@ -667,19 +667,25 @@ export default function FollowUp() {
                 )}
               </div>
             )}
-            <button
-              onClick={() => setMayBeUrgentModalOpen(true)}
-              title='Configure the "May be urgent" rules'
-              className="h-8 w-8 flex items-center justify-center text-[#525252] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#FFF0F7] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors"
-            >
-              <SettingsIcon size={13} />
-            </button>
-            <button
-              onClick={() => exportRowsToCSV(filteredRows)}
-              className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] transition-colors"
-            >
-              <Download size={13} /> Export
-            </button>
+            {/* Settings + Export live next to the New/Rep toggle for main_office;
+                show them in the top bar for other roles. */}
+            {activeRole !== 'main_office' && (
+              <>
+                <button
+                  onClick={() => setMayBeUrgentModalOpen(true)}
+                  title='Configure the "May be urgent" rules'
+                  className="h-8 w-8 flex items-center justify-center text-[#525252] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#FFF0F7] hover:text-[#E31B7F] hover:border-[#E31B7F] transition-colors"
+                >
+                  <SettingsIcon size={13} />
+                </button>
+                <button
+                  onClick={() => exportRowsToCSV(filteredRows)}
+                  className="h-8 px-3.5 flex items-center gap-2 text-xs font-semibold text-[#0A0A0A] bg-white border border-[#E5E5E5] rounded-[8px] hover:bg-[#F8F8F8] transition-colors"
+                >
+                  <Download size={13} /> Export
+                </button>
+              </>
+            )}
             <button
               onClick={loadData}
               disabled={loading}
@@ -731,6 +737,8 @@ export default function FollowUp() {
             viewMode={mainOfficeViewMode}
             onViewModeChange={handleMainOfficeViewModeChange}
             supplierRegion={filters.supplierRegion || 'CHINA'}
+            onExport={() => exportRowsToCSV(filteredRows)}
+            onOpenSettings={() => setMayBeUrgentModalOpen(true)}
           />
         ) : (
           <KpiCards
