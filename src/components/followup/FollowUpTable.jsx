@@ -165,13 +165,9 @@ function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = f
         )}
         <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
       </div>
-      {showPriority && po.urgent_priority && (
-        <div className="mt-1">
-          <PriorityBadge priority={po.urgent_priority} />
-        </div>
-      )}
-      {(po.marked_urgent || (showLateFutureBadges && (isReceived || isLate || isFuture))) && (
-        <div className="flex gap-1 mt-1 flex-wrap">
+      {((showPriority && po.urgent_priority) || po.marked_urgent || (showLateFutureBadges && (isReceived || isLate || isFuture))) && (
+        <div className="flex gap-1 mt-1 flex-wrap items-center">
+          {showPriority && po.urgent_priority && <PriorityBadge priority={po.urgent_priority} />}
           {po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
           {showLateFutureBadges && isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
           {showLateFutureBadges && isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
