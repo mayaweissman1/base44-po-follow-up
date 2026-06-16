@@ -10,7 +10,7 @@ const SUB_PO_SIZES = ['XS', 'S', 'M', 'XS/S'];
 // and hovering the expand chevron starts the request before the click.
 // CACHE_VERSION — bump when the getPoDetails response shape changes so
 // already-mounted clients drop their stale entries on next render.
-const CACHE_VERSION = 'v5-size-inv-days';
+const CACHE_VERSION = 'v6-air-otw-all-types';
 const _cache = new Map();         // po_number -> { v, dests }
 const _inflight = new Map();      // po_number -> Promise
 
@@ -164,7 +164,7 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
               <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[44px]" title={`Inventory days for size ${s} at this destination (sku_sizes_invd)`}>{s}</th>
             ))}
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Shipping</th>
-            {isRep && <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Air on-the-way — from mart_repeats__sc_united_with_groups">Air OTW</th>}
+            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Air on-the-way — open shipments in transit (pl_po + shipments, all order types)">Air OTW</th>
           </tr>
         </thead>
         <tbody>
@@ -202,21 +202,19 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
                     </div>
                   ) : <span className="text-[#A3A3A3]">—</span>}
                 </td>
-                {isRep && (
-                  <td className={`px-2 py-2 text-center ${border}`}>
-                    {d.air_otw > 0
-                      ? (
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setAirOtwTarget({ styleColor: parentRow?.style_color, destination: d.destination }); }}
-                          title="View Air OTW shipments"
-                          className="font-mono font-semibold text-[#E31B7F] hover:underline"
-                        >
-                          {d.air_otw.toLocaleString()}
-                        </button>
-                      )
-                      : <span className="text-[#A3A3A3] font-mono">{d.air_otw == null ? '—' : 0}</span>}
-                  </td>
-                )}
+                <td className={`px-2 py-2 text-center ${border}`}>
+                  {d.air_otw > 0
+                    ? (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setAirOtwTarget({ styleColor: parentRow?.style_color, destination: d.destination }); }}
+                        title="View Air OTW shipments"
+                        className="font-mono font-semibold text-[#E31B7F] hover:underline"
+                      >
+                        {d.air_otw.toLocaleString()}
+                      </button>
+                    )
+                    : <span className="text-[#A3A3A3] font-mono">{d.air_otw == null ? '—' : 0}</span>}
+                </td>
               </tr>
             );
           })}

@@ -24,13 +24,18 @@ Deno.serve(async (req) => {
 
     const client = await getPgClient();
 
-    // All four queries run in parallel. The IND lookup uses a subquery on
-    // po_view so we don't have to wait for styleColor — saves 1 round trip.
-    const [sizeIndRes, subRes, urgRes, indRes] = await Promise.all([
+    // All five queries run in parallel. Optional tables (sku_sizes_invd, the
+    // repeats mart) may not exist in every environment — wrap their queries
+    // so a missing table doesn't break Air OTW / sub-PO listing for everyone.
+    const safe = (p) => p.catch(err => {
+      console.warn('getPoDetails optional query failed:', err.message);
+      return { rows: [] };
+    });
+    const [sizeIndRes, subRes, urgRes, indRes, airOtwRes] = await Promise.all([
       // Per-size inventory-days (XS / S / M / XS-S) per destination, from
       // sku_sizes_invd. Joined by destination CODE + style_color (per spec).
       // Gated to Rep orders — the table mirrors the repeats mart.
-      client.query(`
+      safe(client.query(`
         SELECT
           sd.destination AS destination_name,
           sd.code        AS dest_code,
@@ -46,10 +51,10 @@ Deno.serve(async (req) => {
          AND ssi.size = ANY(ARRAY['XS','S','M','XS/S'])
         WHERE po.po_number = $1
           AND TRIM(BOTH FROM pt.prefix) = ANY(ARRAY['WR','R','SWIMR'])
-      `, [po_number]),
+      `, [po_number])),
 
       // Sub-POs with destination, urgency, shipping method
-      // (Air OTW is taken from the mart in the next query — repeats only)
+      // (Air OTW is taken from pl_po+shipments in the airOtwRes query — all order types)
       client.query(`
         SELECT
           spv.sub_po_number,
@@ -66,16 +71,12 @@ Deno.serve(async (req) => {
       // Urgency reason (Best Seller / URGENT) per PO — applies to all destinations
       client.query(`SELECT reason FROM po_urgent_status WHERE po_number = $1 LIMIT 1`, [po_number]),
 
-      // IND + Air OTW per destination — Rep orders only.
-      // Source: dbt_marts.mart_repeats__sc_united_with_groups joined to
-      // sub_po_view by destination code AND style_color (per spec).
-      // The mart is repeats-only — gate by po_type prefix so new/SWIM
-      // orders don't get fake values.
-      client.query(`
+      // IND per destination (Rep-only, sourced from the repeats mart).
+      // Air OTW is now computed separately for ALL order types (see airOtwRes).
+      safe(client.query(`
         SELECT DISTINCT
           rep."Destination" AS dest_code,
-          rep."Inv Days"    AS inv_days,
-          rep."Air OTW"     AS air_otw
+          rep."Inv Days"    AS inv_days
         FROM sub_po_view po
         JOIN shipment_destination sd ON sd.id = po.destination
         JOIN po_view pv              ON pv.po_number = po.po_number
@@ -85,6 +86,27 @@ Deno.serve(async (req) => {
          AND rep."Style Color" = po.style_color
         WHERE po.po_number = $1
           AND TRIM(BOTH FROM pt.prefix) = ANY(ARRAY['WR','R','SWIMR'])
+      `, [po_number])),
+
+      // Air OTW per destination — works for ALL order types.
+      // Mirrors the getAirOtwShipments query but aggregates per (style_color, destination)
+      // for every sub-PO destination on this PO.
+      client.query(`
+        SELECT
+          sd.code AS dest_code,
+          SUM(pl_po.quantity) AS air_otw
+        FROM sub_po_view spo
+        JOIN style_colors sc          ON sc.style_color = spo.style_color
+        JOIN skus s                   ON s.style_color = sc.id
+        JOIN pl_po                    ON pl_po.sku = s.sku
+        JOIN shipments ship           ON pl_po.shipment_id = ship.id
+        JOIN shipment_statuses st     ON ship.status = st.id
+        JOIN shipment_destination sd  ON sd.id = ship.destination
+        WHERE spo.po_number = $1
+          AND upper(st.status) = 'ON THE WAY'
+          AND ship.method <> 2
+          AND sd.id = spo.destination
+        GROUP BY sd.code
       `, [po_number]),
     ]);
 
@@ -96,12 +118,14 @@ Deno.serve(async (req) => {
     const isBestSeller = urgRes.rows[0]?.reason?.toLowerCase().includes('best seller') || false;
     const isUrgent     = urgRes.rows[0]?.reason?.toLowerCase().includes('urgent') || false;
 
-    // Per-destination IND + Air OTW from the repeats mart (keyed by sd.code → US/UK)
+    // Per-destination IND (Rep-only, from repeats mart) + Air OTW (all order types, from pl_po+shipments)
     const indByDest = {};
     const airOtwByDest = {};
     for (const r of indRes.rows) {
       if (r.inv_days != null) indByDest[r.dest_code] = Math.round(Number(r.inv_days));
-      if (r.air_otw  != null) airOtwByDest[r.dest_code] = Number(r.air_otw) || 0;
+    }
+    for (const r of airOtwRes.rows) {
+      if (r.air_otw != null) airOtwByDest[r.dest_code] = Number(r.air_otw) || 0;
     }
 
     // Per-size inventory-days by destination from sku_sizes_invd.
