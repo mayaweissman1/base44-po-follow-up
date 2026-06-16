@@ -59,6 +59,7 @@ const DEFAULT_FILTERS = (role) => ({
   // Date ranges
   dropDateFrom: '',
   dropDateTo: '',
+  dropDates: [],         // Rep view — drop dates picked from the selected collection
   finalDdFrom: '',
   finalDdTo: '',
   // Numeric ranges

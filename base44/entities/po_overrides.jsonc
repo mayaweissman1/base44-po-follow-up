@@ -18,7 +18,12 @@
     "next_update_date": {
       "type": "string",
       "format": "date",
-      "description": "Overrides purchase_orders.next_update"
+      "description": "Overrides purchase_orders.next_update (set by DD team via General Update)"
+    },
+    "follow_up_next_update_date": {
+      "type": "string",
+      "format": "date",
+      "description": "Set by Main Office via 'Follow up next update' action \u2014 separate from next_update_date so the UI can show both."
     },
     "dd_status_changed_at": {
       "type": "string",

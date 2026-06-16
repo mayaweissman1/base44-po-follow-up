@@ -31,7 +31,7 @@ Deno.serve(async (req) => {
       console.warn('getPoDetails optional query failed:', err.message);
       return { rows: [] };
     });
-    const [sizeIndRes, subRes, urgRes, indRes, airOtwRes] = await Promise.all([
+    const [sizeIndRes, subRes, urgRes, indRes, airOtwRes, shipmentsRes, sizeBreakdownRes] = await Promise.all([
       // Per-size inventory-days (XS / S / M / XS-S) per destination, from
       // sku_sizes_invd. Joined by destination CODE + style_color (per spec).
       // Gated to Rep orders — the table mirrors the repeats mart.
@@ -108,6 +108,61 @@ Deno.serve(async (req) => {
           AND sd.id = spo.destination
         GROUP BY sd.code
       `, [po_number]),
+
+      // Earliest open shipment per destination — used by the PO drawer's
+      // "Shipment Details" section to surface departure/arrival/method.
+      // Picks the shipment with the earliest est_arrival_date so the user sees
+      // the next inbound batch per destination.
+      safe(client.query(`
+        WITH ranked AS (
+          SELECT
+            sd.code         AS dest_code,
+            ship.shipment_number,
+            ship.departure_date,
+            ship.departure_date + smd.est_transition_days AS est_arrival_date,
+            sm.method       AS shipping_method,
+            SUM(pl_po.quantity) AS quantity,
+            ROW_NUMBER() OVER (
+              PARTITION BY sd.code
+              ORDER BY (ship.departure_date + smd.est_transition_days) ASC NULLS LAST, ship.shipment_number
+            ) AS rn
+          FROM sub_po_view spo
+          JOIN style_colors sc          ON sc.style_color = spo.style_color
+          JOIN skus s                   ON s.style_color = sc.id
+          JOIN pl_po                    ON pl_po.sku = s.sku
+          JOIN shipments ship           ON pl_po.shipment_id = ship.id
+          JOIN shipment_statuses st     ON ship.status = st.id
+          JOIN shipment_destination sd  ON sd.id = ship.destination
+          JOIN shipment_method_destinations smd
+            ON ship.method = smd.shipment_method AND ship.destination = smd.destination
+          JOIN shipment_methods sm      ON sm.id = ship.method
+          WHERE spo.po_number = $1
+            AND upper(st.status) = 'ON THE WAY'
+            AND ship.method <> 2
+            AND sd.id = spo.destination
+          GROUP BY sd.code, ship.shipment_number, ship.departure_date, smd.est_transition_days, sm.method
+        )
+        SELECT * FROM ranked WHERE rn = 1
+      `, [po_number])),
+
+      // Per-(destination, size) ordered / received — drives the size breakdown
+      // table inside the PO drawer's "Shipment Details" section. Open quantity =
+      // ordered − received (clamped to 0).
+      safe(client.query(`
+        SELECT
+          sd.destination AS destination_name,
+          sd.code        AS dest_code,
+          sz.size        AS size_name,
+          SUM(COALESCE(spq.ordered_qty, 0))  AS ordered_qty,
+          SUM(COALESCE(spq.qty_received, 0)) AS qty_received
+        FROM sub_po_view spv
+        JOIN shipment_destination sd ON sd.id = spv.destination
+        LEFT JOIN sub_po_qty spq     ON spq.sub_po_number = spv.sub_po_number
+        LEFT JOIN sizes sz           ON sz.id = spq.size
+        WHERE spv.po_number = $1
+          AND sz.size IS NOT NULL
+        GROUP BY sd.destination, sd.code, sz.size
+      `, [po_number])),
     ]);
 
     const destBySubPo = {};
@@ -178,6 +233,38 @@ Deno.serve(async (req) => {
       return null;
     }
 
+    // Earliest open shipment per destination — used by the drawer's
+    // "Shipment Details" section.
+    const safeIso = (v) => {
+      if (!v) return null;
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    };
+    const shipmentByCode = {};
+    for (const r of shipmentsRes.rows) {
+      shipmentByCode[r.dest_code] = {
+        shipment_number: r.shipment_number,
+        departure_date: safeIso(r.departure_date),
+        est_arrival_date: safeIso(r.est_arrival_date),
+        shipping_method: r.shipping_method,
+        quantity: Number(r.quantity) || 0,
+      };
+    }
+
+    // Per-(destination, size) ordered/received → grouped by destination CODE.
+    // Each entry: { size, ordered, received }. UI merges with IND from sizes_by_size.
+    const sizeBreakdownByCode = {};
+    for (const r of sizeBreakdownRes.rows) {
+      const code = r.dest_code;
+      if (!code) continue;
+      if (!sizeBreakdownByCode[code]) sizeBreakdownByCode[code] = [];
+      sizeBreakdownByCode[code].push({
+        size: r.size_name,
+        ordered: Number(r.ordered_qty) || 0,
+        received: Number(r.qty_received) || 0,
+      });
+    }
+
     const destinations = Object.values(byDest).map(d => {
       const priority = isBestSeller ? 'BEST_SELLER' : (isUrgent || d.sub_urgent ? 'URGENT' : 'NORMAL');
       const code = codeForDest(d.destination);
@@ -189,6 +276,9 @@ Deno.serve(async (req) => {
         shipping_method_names: [...d.shipping_methods_set],
         inv_days: code != null ? (indByDest[code] ?? null) : null,
         priority,
+        // Shipment details for the PO drawer's "Shipment Details" section.
+        next_shipment: code != null ? (shipmentByCode[code] || null) : null,
+        size_breakdown: code != null ? (sizeBreakdownByCode[code] || []) : [],
       };
     });
 

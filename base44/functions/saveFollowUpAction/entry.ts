@@ -171,7 +171,8 @@ Deno.serve(async (req) => {
     }
 
     // ── FOLLOW_UP_NEXT_UPDATE (Main Office only) ─────────────────
-    // Sets po_overrides.next_update_date — no DDD decision involved.
+    // Sets po_overrides.follow_up_next_update_date — separate from the DD team's
+    // next_update_date so the UI can show both in their own columns.
     // Optional internal_note is appended to the latest DDD update if present.
     if (action_type === 'FOLLOW_UP_NEXT_UPDATE') {
       const { next_update_date, internal_note } = payload || {};
@@ -180,9 +181,9 @@ Deno.serve(async (req) => {
       }
       const existing = await base44.entities.po_overrides.filter({ po_number });
       if (existing.length > 0) {
-        await base44.entities.po_overrides.update(existing[0].id, { next_update_date });
+        await base44.entities.po_overrides.update(existing[0].id, { follow_up_next_update_date: next_update_date });
       } else {
-        await base44.entities.po_overrides.create({ po_number, next_update_date });
+        await base44.entities.po_overrides.create({ po_number, follow_up_next_update_date: next_update_date });
       }
       if (internal_note) {
         const ov = existing[0];

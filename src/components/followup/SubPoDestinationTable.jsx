@@ -10,7 +10,7 @@ const SUB_PO_SIZES = ['XS', 'S', 'M', 'XS/S'];
 // and hovering the expand chevron starts the request before the click.
 // CACHE_VERSION — bump when the getPoDetails response shape changes so
 // already-mounted clients drop their stale entries on next render.
-const CACHE_VERSION = 'v6-air-otw-all-types';
+const CACHE_VERSION = 'v7-shipment-details';
 const _cache = new Map();         // po_number -> { v, dests }
 const _inflight = new Map();      // po_number -> Promise
 
@@ -110,10 +110,6 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
   const [loading, setLoading] = useState(() => !readCache(poNumber));
   const [airOtwTarget, setAirOtwTarget] = useState(null); // { styleColor, destination }
 
-  // IND + Air OTW are only meaningful for Rep orders (they come from the
-  // repeats mart). Hide both columns entirely on New / SWIM orders.
-  const isRep = String(parentRow?.po_type || '').toLowerCase().includes('rep');
-
   useEffect(() => {
     let cancelled = false;
     const cached = readCache(poNumber);
@@ -159,8 +155,8 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
           <tr className="text-[10px] font-bold text-[#A3A3A3] uppercase tracking-[.06em] bg-[#FAFAFA]">
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Destination</th>
             <th className="text-left px-2 py-1.5 border-b border-[#E5E5E5]">Priority</th>
-            {isRep && <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Inventory days — from mart_repeats__sc_united_with_groups">IND</th>}
-            {isRep && SUB_PO_SIZES.map(s => (
+            <th className="text-center px-2 py-1.5 border-b border-[#E5E5E5]" title="Inventory days — from mart_repeats__sc_united_with_groups">IND</th>
+            {SUB_PO_SIZES.map(s => (
               <th key={s} className="text-center px-1.5 py-1.5 border-b border-[#E5E5E5] w-[44px]" title={`Inventory days for size ${s} at this destination (sku_sizes_invd)`}>{s}</th>
             ))}
             <th className="text-left px-3 py-1.5 border-b border-[#E5E5E5]">Shipping</th>
@@ -183,12 +179,10 @@ export default function SubPoDestinationTable({ poNumber, parentRow }) {
                 <td className={`px-2 py-2 ${border}`}>
                   <PriorityCell value={priorityForDest(d.destination, parentRow)} />
                 </td>
-                {isRep && (
-                  <td className={`px-2 py-2 text-center font-mono font-semibold ${border} ${indClass(d.inv_days)}`}>
-                    {indText(d.inv_days)}
-                  </td>
-                )}
-                {isRep && SUB_PO_SIZES.map(s => (
+                <td className={`px-2 py-2 text-center font-mono font-semibold ${border} ${indClass(d.inv_days)}`}>
+                  {indText(d.inv_days)}
+                </td>
+                {SUB_PO_SIZES.map(s => (
                   <td key={s} className={`px-1.5 py-2 text-center ${border}`}>
                     <SizeIndCell value={sizeMap[s] ?? null} />
                   </td>

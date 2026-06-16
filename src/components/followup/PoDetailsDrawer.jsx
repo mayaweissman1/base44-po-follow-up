@@ -7,6 +7,7 @@ import ReadinessBlock from './po-details/ReadinessBlock';
 import DelayBlock from './po-details/DelayBlock';
 import MetaBlock from './po-details/MetaBlock';
 import TimelineBlock from './po-details/TimelineBlock';
+import ShipmentDetailsBlock from './po-details/ShipmentDetailsBlock';
 import StyleThumbnail from './StyleThumbnail';
 
 export default function PoDetailsDrawer({ po, onClose }) {
@@ -73,6 +74,7 @@ export default function PoDetailsDrawer({ po, onClose }) {
             manualRw={manualRw}
           />
           <DelayBlock po={po} />
+          <ShipmentDetailsBlock destinations={details?.destinations || []} />
           <MetaBlock po={po} destStr={destStr} orderType={orderType} />
           <TimelineBlock log={po.dd_comment_log} />
           <ReadinessBlock po={po} />

@@ -45,6 +45,7 @@ const CHIP_FORMATTERS = {
   supplierRegion:    v => ({ US: 'Region: US', CHINA: 'Region: China', ALL: 'Region: All' }[v] || `Region: ${v}`),
   dropDateFrom:      v => `Drop ≥ ${v}`,
   dropDateTo:        v => `Drop ≤ ${v}`,
+  dropDates:         v => `Drop: ${v.length}`,
   finalDdFrom:       v => `Final DD ≥ ${v}`,
   finalDdTo:         v => `Final DD ≤ ${v}`,
   delayDaysMin:      v => `Delay ≥ ${v}d`,
@@ -96,6 +97,7 @@ export default function FilterToolbar({
   shippingMethodOptions = [],
   urgencyReasonOptions = [],
   pmTagsOptions = [],
+  dropDateOptions = [],
   mainOfficeViewMode,
   advancedOpen, onAdvancedToggle,
   showStatusFilter = true,
@@ -111,6 +113,7 @@ export default function FilterToolbar({
     delayResponse: '', deliveryStatus: [],
     supplierRegion: 'CHINA',
     dropDateFrom: '', dropDateTo: '',
+    dropDates: [],
     finalDdFrom: '', finalDdTo: '',
     delayDaysMin: '', delayDaysMax: '',
     shippedPctMin: '', shippedPctMax: '',
@@ -262,12 +265,17 @@ export default function FilterToolbar({
             <FilterField label="Collection">
               <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
             </FilterField>
-            <FilterField label="US Priority">
-              <MultiSelect value={filters.priorityUS || []} onChange={v => set('priorityUS', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
-            </FilterField>
-            <FilterField label="UK Priority">
-              <MultiSelect value={filters.priorityUK || []} onChange={v => set('priorityUK', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
-            </FilterField>
+            {/* US / UK Priority — Rep view only (New orders don't use them). */}
+            {isRepScope && (
+              <>
+                <FilterField label="US Priority">
+                  <MultiSelect value={filters.priorityUS || []} onChange={v => set('priorityUS', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
+                </FilterField>
+                <FilterField label="UK Priority">
+                  <MultiSelect value={filters.priorityUK || []} onChange={v => set('priorityUK', v)} options={PRIORITY_DEST_OPTIONS} placeholder="All" />
+                </FilterField>
+              </>
+            )}
             <FilterField label="Delay Response">
               <input className={inputCls} placeholder="Search…" value={filters.delayResponse} onChange={e => set('delayResponse', e.target.value)} />
             </FilterField>
@@ -314,10 +322,17 @@ export default function FilterToolbar({
               <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo}
                 onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
             </FilterField>
-            {isNewScope && (
+            {/* Drop Date — Rep view only, populated from selected collection. */}
+            {isRepScope && (
               <FilterField label="Drop Date">
-                <DateRangePicker fromVal={filters.dropDateFrom} toVal={filters.dropDateTo}
-                  onChange={({ from, to }) => onChange({ ...filters, dropDateFrom: from, dropDateTo: to })} />
+                <MultiSelect
+                  value={filters.dropDates || []}
+                  onChange={v => set('dropDates', v)}
+                  options={dropDateOptions}
+                  placeholder={Array.isArray(filters.collection) && filters.collection.length > 0
+                    ? 'All drop dates'
+                    : 'Select a collection first'}
+                />
               </FilterField>
             )}
             <FilterField label="Next Update">

@@ -416,6 +416,9 @@ Deno.serve(async (req) => {
       const effectiveDelayedDD = ov.delayed_due_date || po.delayed_due_date || null;
       const effectiveDdStatus = ov.dd_status || po.dd_status || null;
       const effectiveNextUpdate = ov.next_update_date || po.next_update || null;
+      // Set by Main Office's "Follow up next update" action — separate from the
+      // DD team's next_update_date so both can be shown in the table.
+      const followUpNextUpdate = ov.follow_up_next_update_date || null;
       const finalDD = effectiveDelayedDD || po.due_date;
 
       const latestDDD = dddByPo[po.po_number] || null;
@@ -527,6 +530,7 @@ Deno.serve(async (req) => {
         effective_delayed_due_date: safeIso(effectiveDelayedDD),
         effective_dd_status: effectiveDdStatus,
         effective_next_update: safeIso(effectiveNextUpdate),
+        follow_up_next_update_date: safeIso(followUpNextUpdate),
         final_dd: safeIso(finalDD),
         days_late_counting: daysLateCounting,
         countdown,
