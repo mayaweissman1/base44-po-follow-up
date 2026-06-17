@@ -145,9 +145,10 @@ function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = f
   const isReceived = po.late_future === 'RECEIVED';
   // Urgency reason tokens — split the raw value (comma/semicolon/pipe) and
   // strip US-/UK- destination prefixes so it matches the dropdown options.
-  const urgencyTokens = showUrgencyReason && po.urgency_reason_raw
+  const urgencySource = po.urgency_reason_raw || po.priority || '';
+  const urgencyTokens = showUrgencyReason && urgencySource
     ? Array.from(new Set(
-        String(po.urgency_reason_raw)
+        String(urgencySource)
           .split(/[,;|]+/)
           .map(t => t.trim().replace(/^(US|UK)\s*[-–:]\s*/i, '').trim())
           .filter(Boolean)
