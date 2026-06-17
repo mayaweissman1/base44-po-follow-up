@@ -973,7 +973,7 @@ export default function FollowUpTable({
                       </button>
                     </td>
                     {role !== 'main_office' && <td className={tdBase}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>}
-                    {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} showLateFutureBadges={role !== 'main_office'} showPriority={role === 'main_office'} /></td>}
+                    {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} showLateFutureBadges={role !== 'main_office'} showPriority={false} /></td>}
                     {colVisible('style_color') && <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
