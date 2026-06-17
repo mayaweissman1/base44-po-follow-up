@@ -244,6 +244,11 @@ function passesFilters(row, filters, role) {
   // Date ranges
   if (dropDateFrom && (!row.drop || row.drop.slice(0, 10) < dropDateFrom)) return false;
   if (dropDateTo   && (!row.drop || row.drop.slice(0, 10) > dropDateTo))   return false;
+  // Rep view — exact drop dates picked from the selected collection.
+  if (Array.isArray(filters.dropDates) && filters.dropDates.length > 0) {
+    if (!row.drop) return false;
+    if (!filters.dropDates.includes(row.drop.slice(0, 10))) return false;
+  }
   if (finalDdFrom  && (!row.final_dd || row.final_dd.slice(0, 10) < finalDdFrom)) return false;
   if (finalDdTo    && (!row.final_dd || row.final_dd.slice(0, 10) > finalDdTo))   return false;
 
@@ -544,16 +549,30 @@ export default function FollowUp() {
   );
   // Static option pools (suppliers, managers, collections, etc.) — derived
   // from the full row set; not affected by current filters.
+  // Collections: New view shows New-order collections; Rep view shows
+  // Rep-order collections from the last 3 months only.
+  const isRepView = activeRole === 'main_office' && mainOfficeViewMode === 'Rep';
   const { suppliers, ddManagers, collections, orderTypes, shippingMethodOptions, pmTagsOptions } = useMemo(() => {
     const sup = new Set(), mgr = new Set(), col = new Set(), types = new Set();
     const smSet = new Set();
     const pmTagsMap = new Map();
+    // For Rep view, only collections whose POs have a drop date in the last 3 months.
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
     for (const r of rows) {
       if (r.supplier) sup.add(r.supplier);
       if (r.dd_manager_name) mgr.add(r.dd_manager_name);
-      if (r.collection && (r.po_type || '').toLowerCase().includes('new')) col.add(r.collection);
       if (r.po_type) types.add(r.po_type);
-      const isRep = (r.po_type || '').toLowerCase().includes('rep');
+      const prefix = String(r.po_type_prefix || '').toUpperCase();
+      const isNew = prefix ? (prefix === 'O' || prefix === 'SWIM') : (r.po_type || '').toLowerCase().includes('new');
+      const isRep = prefix ? ['WR', 'R', 'SWIMR'].includes(prefix) : (r.po_type || '').toLowerCase().includes('rep');
+      if (r.collection) {
+        if (isRepView) {
+          if (isRep && r.drop && new Date(r.drop) >= threeMonthsAgo) col.add(r.collection);
+        } else if (isNew) {
+          col.add(r.collection);
+        }
+      }
       if (isRep) {
         for (const m of (r.shipping_method_names || [])) smSet.add(m);
       }
@@ -573,23 +592,34 @@ export default function FollowUp() {
         .sort((a, b) => b[1] - a[1])
         .map(([k, c]) => ({ value: k, label: `${k} (${c})` })),
     };
-  }, [rows]);
+  }, [rows, isRepView]);
 
-  // Urgent Priority counts react to the current Status (delay request) filter.
-  // When a Status is selected we count POs in that status; when 'ALL' (no
-  // status filter) we count open POs only — so the user sees how many open
-  // orders match each priority bucket.
-  const urgencyReasonOptions = useMemo(() => {
-    const urgMap = new Map();
-    const status = filters.status;
+  // Rep view — Drop Date options come from the POs in the currently selected
+  // collection(s). Empty until a collection is chosen.
+  const dropDateOptions = useMemo(() => {
+    if (!isRepView) return [];
+    const selectedCollections = Array.isArray(filters.collection) ? filters.collection : [];
+    if (selectedCollections.length === 0) return [];
+    const dateMap = new Map();
     for (const r of rows) {
-      // Status scope
-      if (status === 'HOLD' && r.current_status !== 'HOLD') continue;
-      else if (status === 'HANDLED' && !['APPROVED', 'REJECTED', 'ACKNOWLEDGED'].includes(r.current_status)) continue;
-      else if (status === 'ACK_APPROVED' && !['APPROVED', 'ACKNOWLEDGED'].includes(r.current_status)) continue;
-      else if (['APPROVED', 'REJECTED', 'ACKNOWLEDGED', 'AUTOMATICALLY'].includes(status) && r.current_status !== status) continue;
-      else if ((status === 'ALL' || !status) && r.done === true) continue; // open-only when no status filter
+      if (!r.drop || !r.collection) continue;
+      if (!selectedCollections.includes(r.collection)) continue;
+      const d = r.drop.slice(0, 10);
+      dateMap.set(d, (dateMap.get(d) || 0) + 1);
+    }
+    return [...dateMap.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
+  }, [rows, filters.collection, isRepView]);
 
+  // Urgent Priority counts are LIVE — each option shows how many rows would
+  // remain if you selected it on top of the currently-active filters. We
+  // compute over the rows that pass every OTHER filter (urgencyReason = []).
+  const urgencyReasonOptions = useMemo(() => {
+    const baseFilters = { ...filters, urgencyReason: [] };
+    const urgMap = new Map();
+    for (const r of augmentedRows) {
+      if (!passesFilters(r, baseFilters, activeRole)) continue;
       if (r.urgent_priority) {
         urgMap.set(r.urgent_priority, (urgMap.get(r.urgent_priority) || 0) + 1);
       } else {
@@ -604,7 +634,7 @@ export default function FollowUp() {
     return [...urgMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([k, c]) => ({ value: k, label: `${k} (${c})` }));
-  }, [rows, filters.status]);
+  }, [augmentedRows, filters, activeRole]);
 
   // Augment server KPIs with client-computed values
   const displayKpis = useMemo(() => {
@@ -778,6 +808,7 @@ export default function FollowUp() {
           shippingMethodOptions={shippingMethodOptions}
           urgencyReasonOptions={urgencyReasonOptions}
           pmTagsOptions={pmTagsOptions}
+          dropDateOptions={dropDateOptions}
           mainOfficeViewMode={mainOfficeViewMode}
           advancedOpen={advancedOpen}
           onAdvancedToggle={setAdvancedOpen}
