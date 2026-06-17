@@ -13,14 +13,21 @@ import StyleThumbnail from './StyleThumbnail';
 
 export default function PoDetailsDrawer({ po, onClose }) {
   const [details, setDetails] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
 
   useEffect(() => {
     if (!po?.po_number) return;
     let cancelled = false;
     setDetails(null);
+    setDetailsLoading(true);
     base44.functions.invoke('getPoDetails', { po_number: po.po_number }).then(res => {
       if (cancelled) return;
       setDetails(res?.data || null);
+      setDetailsLoading(false);
+    }).catch(() => {
+      if (cancelled) return;
+      setDetails(null);
+      setDetailsLoading(false);
     });
     return () => { cancelled = true; };
   }, [po?.po_number]);
@@ -81,7 +88,15 @@ export default function PoDetailsDrawer({ po, onClose }) {
             />
           </DrawerErrorBoundary>
           <DrawerErrorBoundary><DelayBlock po={po} /></DrawerErrorBoundary>
-          <DrawerErrorBoundary><ShipmentDetailsBlock destinations={details?.destinations || []} /></DrawerErrorBoundary>
+          <DrawerErrorBoundary>
+            {detailsLoading ? (
+              <div className="px-5 py-4 border-t border-[#E5E5E5] text-[12px] text-[#A3A3A3]">
+                Loading shipment details…
+              </div>
+            ) : (
+              <ShipmentDetailsBlock destinations={details?.destinations || []} />
+            )}
+          </DrawerErrorBoundary>
           <DrawerErrorBoundary><MetaBlock po={po} destStr={destStr} orderType={orderType} /></DrawerErrorBoundary>
           <DrawerErrorBoundary><TimelineBlock log={po.dd_comment_log} /></DrawerErrorBoundary>
           <DrawerErrorBoundary><ReadinessBlock po={po} /></DrawerErrorBoundary>
