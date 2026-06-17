@@ -262,9 +262,6 @@ export default function FilterToolbar({
             <FilterField label="Order Type">
               <MultiSelect value={filters.orderType} onChange={v => set('orderType', v)} options={orderTypeOptions} placeholder="All types" />
             </FilterField>
-            <FilterField label="Collection">
-              <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
-            </FilterField>
             {/* US / UK Priority — Rep view only (New orders don't use them). */}
             {isRepScope && (
               <>
@@ -322,20 +319,6 @@ export default function FilterToolbar({
               <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo}
                 onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
             </FilterField>
-            {/* Drop Date — populated from selected collection. Shown for both
-                New and Rep scopes since the urgent_priority "Drop …" values
-                come from New orders (O/SWIM) and Rep orders also have drop
-                dates worth filtering on. */}
-            <FilterField label="Drop Date">
-              <MultiSelect
-                value={filters.dropDates || []}
-                onChange={v => set('dropDates', v)}
-                options={dropDateOptions}
-                placeholder={Array.isArray(filters.collection) && filters.collection.length > 0
-                  ? 'All drop dates'
-                  : 'Select a collection first'}
-              />
-            </FilterField>
             <FilterField label="Next Update">
               <DateRangePicker fromVal={filters.nextUpdateFrom} toVal={filters.nextUpdateTo}
                 onChange={({ from, to }) => onChange({ ...filters, nextUpdateFrom: from, nextUpdateTo: to })} />
@@ -348,6 +331,23 @@ export default function FilterToolbar({
               <FilterField label="Shipped %">
                 <RangeSlider min={0} max={100} valueMin={filters.shippedPctMin} valueMax={filters.shippedPctMax}
                   onChange={r => setRange('shippedPctMin', 'shippedPctMax', r)} suffix="%" />
+              </FilterField>
+            )}
+            {/* Collection (last) + Drop Date (Rep view only) — kept together
+                so picking a collection immediately exposes its drop dates. */}
+            <FilterField label="Collection">
+              <MultiSelect value={filters.collection} onChange={v => set('collection', v)} options={collections} placeholder="All collections" />
+            </FilterField>
+            {isRepScope && (
+              <FilterField label="Drop Date">
+                <MultiSelect
+                  value={filters.dropDates || []}
+                  onChange={v => set('dropDates', v)}
+                  options={dropDateOptions}
+                  placeholder={Array.isArray(filters.collection) && filters.collection.length > 0
+                    ? 'All drop dates'
+                    : 'Select a collection first'}
+                />
               </FilterField>
             )}
           </div>

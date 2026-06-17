@@ -180,16 +180,22 @@ Deno.serve(async (req) => {
         return Response.json({ error: 'next_update_date is required' }, { status: 400 });
       }
       const existing = await base44.entities.po_overrides.filter({ po_number });
-      if (existing.length > 0) {
-        await base44.entities.po_overrides.update(existing[0].id, { follow_up_next_update_date: next_update_date });
+      const ov = existing[0];
+      if (ov) {
+        await base44.entities.po_overrides.update(ov.id, { follow_up_next_update_date: next_update_date });
       } else {
         await base44.entities.po_overrides.create({ po_number, follow_up_next_update_date: next_update_date });
       }
+      // Internal note → attach to the latest DDD update (so it shows in the
+      // "Last Comment (internal)" column). Re-fetch the override after the
+      // upsert above so a freshly-created one is included.
       if (internal_note) {
-        const ov = existing[0];
-        if (ov?.last_ddd_update_id) {
-          await base44.entities.dd_updates.update(ov.last_ddd_update_id, { internal_note });
+        const fresh = ov || (await base44.entities.po_overrides.filter({ po_number }))[0];
+        if (fresh?.last_ddd_update_id) {
+          await base44.entities.dd_updates.update(fresh.last_ddd_update_id, { internal_note });
         }
+        // If no DDD update exists yet, the note has nowhere to live in the
+        // current schema — silently skip; user will see Next Update was set.
       }
       return Response.json({ success: true });
     }

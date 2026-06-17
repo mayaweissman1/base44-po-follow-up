@@ -121,15 +121,13 @@ function normalizeUrgencyReasons(raw) {
   return out;
 }
 
-// Helper: does row match an "Urgent Priority" token? Matches against the
-// computed `urgent_priority` field (BEST SELLER NEW/OLD, SOLD OUT,
-// MISSING SIZES, MANUAL, URGENT, sc_pm_tags value, "Drop ...", "Risk in
-// Fabric/PPS"). The special token "Drop" matches any value starting with
-// "Drop" since drop dates vary per PO and are bucketed in the dropdown.
+// Helper: does row match an Urgent Priority token? Matches against the
+// normalized urgency_reason_raw categories (US-/UK- prefixes stripped,
+// comma-separated values split). Same logic the filter used originally.
 function matchUrgencyReason(row, p) {
-  if (!row.urgent_priority) return false;
-  if (p === 'Drop') return row.urgent_priority.startsWith('Drop');
-  return row.urgent_priority === p;
+  const raw = row.urgency_reason_raw || row.priority || '';
+  const cats = normalizeUrgencyReasons(raw);
+  return cats.has(p);
 }
 
 // Helper: does row match a collection token (CURRENT, CURRENT_AT_RISK, PREVIOUS, or literal)?
@@ -618,35 +616,17 @@ export default function FollowUp() {
       .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
   }, [rows, filters.collection, activeRole]);
 
-  // "Urgent Priority" options — distinct values of the computed
-  // `urgent_priority` field per the SQL CASE expression: BEST SELLER NEW/OLD,
-  // SOLD OUT, MISSING SIZES, MANUAL, sc_pm_tags values (e.g. "urgent-worldcup"),
-  // URGENT, "Drop ..." (bucketed under one "Drop" label), "Risk in Fabric/PPS".
-  // Counts are LIVE — each option shows how many rows would remain if you
-  // selected it on top of the currently-active non-free-text filters (delay
-  // request status, supplier region, dd manager, supplier, production stage,
-  // collection, etc.). Free-text inputs (PO, style, delay response, last
-  // urgent comment) are excluded so typing doesn't recompute the dropdown.
+  // Urgent Priority options — distinct normalized urgency reasons from
+  // `urgency_reason_raw` across all rows. Static (not affected by other
+  // filter state) for performance.
   const urgencyReasonOptions = useMemo(() => {
-    const baseFilters = {
-      ...filters,
-      urgencyReason: [],
-      po: '',
-      style: '',
-      delayResponse: '',
-      lastUrgentComment: '',
-    };
-    const urgMap = new Map();
-    for (const r of augmentedRows) {
-      if (!passesFilters(r, baseFilters, activeRole)) continue;
-      if (!r.urgent_priority) continue;
-      const key = r.urgent_priority.startsWith('Drop') ? 'Drop' : r.urgent_priority;
-      urgMap.set(key, (urgMap.get(key) || 0) + 1);
+    const urgSet = new Set();
+    for (const r of rows) {
+      const raw = r.urgency_reason_raw || r.priority || '';
+      for (const cat of normalizeUrgencyReasons(raw)) urgSet.add(cat);
     }
-    return [...urgMap.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([k, c]) => ({ value: k, label: `${k} (${c})` }));
-  }, [augmentedRows, filters, activeRole]);
+    return [...urgSet].sort().map(v => ({ value: v, label: v }));
+  }, [rows]);
 
   // Augment server KPIs with client-computed values
   const displayKpis = useMemo(() => {

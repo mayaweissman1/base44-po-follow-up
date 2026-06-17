@@ -8,6 +8,7 @@ import DelayBlock from './po-details/DelayBlock';
 import MetaBlock from './po-details/MetaBlock';
 import TimelineBlock from './po-details/TimelineBlock';
 import ShipmentDetailsBlock from './po-details/ShipmentDetailsBlock';
+import DrawerErrorBoundary from './po-details/DrawerErrorBoundary';
 import StyleThumbnail from './StyleThumbnail';
 
 export default function PoDetailsDrawer({ po, onClose }) {
@@ -61,23 +62,26 @@ export default function PoDetailsDrawer({ po, onClose }) {
           </button>
         </div>
 
-        {/* Scrollable body */}
+        {/* Scrollable body — each block in its own boundary so a render
+            error in one section doesn't blank the whole drawer. */}
         <div className="flex-1 overflow-y-auto">
-          <HeroBlock po={po} />
-          <ProgressBlock
-            ordered={totalOrdered}
-            received={totalReceived}
-            sentOut={po.qty_sent_out}
-            gfs={totalGfs}
-            airOtw={airOtw}
-            autoRw={autoRw}
-            manualRw={manualRw}
-          />
-          <DelayBlock po={po} />
-          <ShipmentDetailsBlock destinations={details?.destinations || []} />
-          <MetaBlock po={po} destStr={destStr} orderType={orderType} />
-          <TimelineBlock log={po.dd_comment_log} />
-          <ReadinessBlock po={po} />
+          <DrawerErrorBoundary><HeroBlock po={po} /></DrawerErrorBoundary>
+          <DrawerErrorBoundary>
+            <ProgressBlock
+              ordered={totalOrdered}
+              received={totalReceived}
+              sentOut={po.qty_sent_out}
+              gfs={totalGfs}
+              airOtw={airOtw}
+              autoRw={autoRw}
+              manualRw={manualRw}
+            />
+          </DrawerErrorBoundary>
+          <DrawerErrorBoundary><DelayBlock po={po} /></DrawerErrorBoundary>
+          <DrawerErrorBoundary><ShipmentDetailsBlock destinations={details?.destinations || []} /></DrawerErrorBoundary>
+          <DrawerErrorBoundary><MetaBlock po={po} destStr={destStr} orderType={orderType} /></DrawerErrorBoundary>
+          <DrawerErrorBoundary><TimelineBlock log={po.dd_comment_log} /></DrawerErrorBoundary>
+          <DrawerErrorBoundary><ReadinessBlock po={po} /></DrawerErrorBoundary>
         </div>
       </div>
     </div>

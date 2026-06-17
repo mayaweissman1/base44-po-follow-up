@@ -167,9 +167,7 @@ function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = f
       </div>
       {((showPriority && po.urgent_priority) || po.marked_urgent || (showLateFutureBadges && (isReceived || isLate || isFuture))) && (
         <div className="flex gap-1 mt-1 flex-wrap items-center">
-          {showPriority && po.urgent_priority && (
-            <PriorityBadge priority={po.urgent_priority.startsWith('Drop') ? 'Drop' : po.urgent_priority} />
-          )}
+          {showPriority && po.urgent_priority && <PriorityBadge priority={po.urgent_priority} />}
           {po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
           {showLateFutureBadges && isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
           {showLateFutureBadges && isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
@@ -926,7 +924,6 @@ export default function FollowUpTable({
               {role !== 'main_office' && <th className={thCls} style={{ width: 56 }}></th>}
               {colVisible('po_number') && <Th {...thProps} col="po_number" width={colWidths['po_number'] || 140}>PO Number</Th>}
               {colVisible('style_color') && <Th {...thProps} col="style_color" width={colWidths['style_color'] || 110}>Style Color</Th>}
-              {colVisible('po_rank') && role !== 'main_office' && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
               {role !== 'main_office' && colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW/OLD · SOLD OUT · MISSING SIZES · MANUAL · URGENT · Drop … · Risk in Fabric/PPS">Priority</Th>}
@@ -978,7 +975,6 @@ export default function FollowUpTable({
                     {role !== 'main_office' && <td className={tdBase}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>}
                     {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} showLateFutureBadges={role !== 'main_office'} showPriority={role === 'main_office'} /></td>}
                     {colVisible('style_color') && <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>}
-                    {colVisible('po_rank') && role !== 'main_office' && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
                     {role !== 'main_office' && colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority} /></td>}
