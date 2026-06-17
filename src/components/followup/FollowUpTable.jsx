@@ -849,11 +849,11 @@ export default function FollowUpTable({
     : [];
 
   // colSpan for the expand row.
-  // Main Office: 2 fixed (checkbox+expand) + urgency_reason + pu_tags + 17 standard + hold_age + internal_note + actions = 24
+  // Main Office: 2 fixed (checkbox+expand) + urgency_reason + pu_tags + 17 standard + follow_up + hold_age + internal_note + actions = 25
   // (Priority column was moved under the PO number for main office.)
   const expandColSpan = role === 'dd_team_manager'
     ? 4 + DDM_ALL_COLS.filter(c => !!ddmOptCols[c.key]).length
-    : (24 + (isRepScopeTable ? 1 : 0));
+    : (25 + (isRepScopeTable ? 1 : 0));
 
   function renderAdditionalTds(po, bg) {
     return additionalCols.map(col => {
@@ -924,7 +924,7 @@ export default function FollowUpTable({
               {role !== 'main_office' && <th className={thCls} style={{ width: 56 }}></th>}
               {colVisible('po_number') && <Th {...thProps} col="po_number" width={colWidths['po_number'] || 140}>PO Number</Th>}
               {colVisible('style_color') && <Th {...thProps} col="style_color" width={colWidths['style_color'] || 110}>Style Color</Th>}
-              {colVisible('po_rank') && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
+              {colVisible('po_rank') && role !== 'main_office' && <Th {...thProps} col="po_rank" width={colWidths['po_rank'] || 60} tooltip={TIPS.po_rank}>Rank</Th>}
               {colVisible('effective_dd_status') && <Th {...thProps} col="effective_dd_status" width={colWidths['effective_dd_status'] || 110} tooltip={TIPS.effective_dd_status}>Production Stage</Th>}
               {colVisible('current_status') && <Th {...thProps} col="current_status" width={colWidths['current_status'] || 95} tooltip={TIPS.current_status}>DDD Status</Th>}
               {role !== 'main_office' && colVisible('priority') && <Th {...thProps} col="urgent_priority" width={colWidths['urgent_priority'] || 130} tooltip="Computed priority label: BEST SELLER NEW/OLD · SOLD OUT · MISSING SIZES · MANUAL · URGENT · Drop … · Risk in Fabric/PPS">Priority</Th>}
@@ -937,6 +937,7 @@ export default function FollowUpTable({
               {colVisible('effective_delayed_due_date') && <Th {...thProps} col="effective_delayed_due_date" width={colWidths['effective_delayed_due_date'] || 85}>Delayed DD</Th>}
               {colVisible('final_dd') && <Th {...thProps} col="final_dd" width={colWidths['final_dd'] || 80}>Final DD</Th>}
               {colVisible('effective_next_update') && <Th {...thProps} col="effective_next_update" width={colWidths['effective_next_update'] || 95}>Next Update</Th>}
+              {role === 'main_office' && <Th {...thProps} col="follow_up_next_update_date" width={colWidths['follow_up_next_update_date'] || 110} tooltip="Follow-up date set by Main Office (separate from DD team's next update)">Follow up next update</Th>}
               {colVisible('days_late_counting') && <Th {...thProps} col="days_late_counting" width={colWidths['days_late_counting'] || 75} tooltip={TIPS.days_late_counting}>Days Late</Th>}
               {colVisible('ddd_reason') && <Th {...thProps} col="ddd_reason" width={colWidths['ddd_reason'] || 120}>DD Reason</Th>}
               {colVisible('ddd_comment') && <Th {...thProps} col="ddd_comment" width={colWidths['ddd_comment'] || 160}>DDD Comment</Th>}
@@ -975,7 +976,7 @@ export default function FollowUpTable({
                     {role !== 'main_office' && <td className={tdBase}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>}
                     {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} showLateFutureBadges={role !== 'main_office'} showPriority={role === 'main_office'} /></td>}
                     {colVisible('style_color') && <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>}
-                    {colVisible('po_rank') && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
+                    {colVisible('po_rank') && role !== 'main_office' && <td className={tdBase}><span className="font-mono font-semibold">{po.po_rank ?? '—'}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
                     {role !== 'main_office' && colVisible('priority') && <td className={tdBase}><PriorityBadge priority={po.urgent_priority} /></td>}
@@ -1000,6 +1001,7 @@ export default function FollowUpTable({
                     {colVisible('effective_delayed_due_date') && <td className={tdBase}>{po.effective_delayed_due_date ? <span className="font-mono font-semibold">{fmtDate(po.effective_delayed_due_date)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>}
                     {colVisible('final_dd') && <td className={tdBase}><span className="font-mono font-semibold">{fmtDate(po.final_dd)}</span></td>}
                     {colVisible('effective_next_update') && <td className={tdBase}>{po.effective_next_update ? <span className="font-mono text-xs">{fmtDate(po.effective_next_update)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>}
+                    {role === 'main_office' && <td className={tdBase}>{po.follow_up_next_update_date ? <span className="font-mono text-xs text-[#E31B7F] font-semibold">{fmtDate(po.follow_up_next_update_date)}</span> : <span className="text-[#A3A3A3]">—</span>}</td>}
                     {colVisible('days_late_counting') && <td className={tdBase}><DaysCell value={po.days_late_counting} /></td>}
                     {colVisible('ddd_reason') && <td className={tdBase}><ReasonTag reasons={po.ddd_reasons} reason={po.ddd_reason} /></td>}
                     {colVisible('ddd_comment') && <td className={tdBase}><span className="text-[#A3A3A3] text-xs max-w-[180px] truncate inline-block" title={po.ddd_comment}>{po.ddd_comment || '—'}</span></td>}
