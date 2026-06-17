@@ -121,14 +121,15 @@ function normalizeUrgencyReasons(raw) {
   return out;
 }
 
-// Helper: does row match urgency-reason token? Matches against the computed
-// urgent_priority (per spec §3.3.2) when available, else falls back to the
-// legacy normalized urgency_reason_raw categories.
+// Helper: does row match an "Urgent Priority" token? Matches against the
+// computed `urgent_priority` field (BEST SELLER NEW/OLD, SOLD OUT,
+// MISSING SIZES, MANUAL, URGENT, sc_pm_tags value, "Drop ...", "Risk in
+// Fabric/PPS"). The special token "Drop" matches any value starting with
+// "Drop" since drop dates vary per PO and are bucketed in the dropdown.
 function matchUrgencyReason(row, p) {
-  if (row.urgent_priority && row.urgent_priority === p) return true;
-  const raw = row.urgency_reason_raw || row.priority || '';
-  const cats = normalizeUrgencyReasons(raw);
-  return cats.has(p);
+  if (!row.urgent_priority) return false;
+  if (p === 'Drop') return row.urgent_priority.startsWith('Drop');
+  return row.urgent_priority === p;
 }
 
 // Helper: does row match a collection token (CURRENT, CURRENT_AT_RISK, PREVIOUS, or literal)?
@@ -359,7 +360,11 @@ export default function FollowUp() {
   const [rows, setRows] = useState([]);
   const [kpis, setKpis] = useState({});
   const [loading, setLoading] = useState(true);
-  const [filters, setFilters] = useState(DEFAULT_FILTERS(activeRole));
+  const [filters, setFilters] = useState(() => {
+    const base = DEFAULT_FILTERS(activeRole);
+    if (activeRole === 'main_office') base.orderType = ['New'];
+    return base;
+  });
   const [activeKpiFilter, setActiveKpiFilter] = useState(null);
   const [activeOpKpi, setActiveOpKpi] = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -612,14 +617,15 @@ export default function FollowUp() {
       .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
   }, [rows, filters.collection, isRepView]);
 
-  // Urgent Priority options — distinct normalized urgency reasons from
-  // `urgency_reason_raw` (the same source the filter has always used). Counts
-  // are LIVE: each option shows how many rows would remain if you selected
-  // it on top of the currently-active non-free-text filters (delay request
-  // status, supplier region, dd manager, supplier, production stage,
+  // "Urgent Priority" options — distinct values of the computed
+  // `urgent_priority` field per the SQL CASE expression: BEST SELLER NEW/OLD,
+  // SOLD OUT, MISSING SIZES, MANUAL, sc_pm_tags values (e.g. "urgent-worldcup"),
+  // URGENT, "Drop ..." (bucketed under one "Drop" label), "Risk in Fabric/PPS".
+  // Counts are LIVE — each option shows how many rows would remain if you
+  // selected it on top of the currently-active non-free-text filters (delay
+  // request status, supplier region, dd manager, supplier, production stage,
   // collection, etc.). Free-text inputs (PO, style, delay response, last
-  // urgent comment) are excluded from the count base so typing doesn't
-  // recompute the dropdown on every keystroke (cache-friendly).
+  // urgent comment) are excluded so typing doesn't recompute the dropdown.
   const urgencyReasonOptions = useMemo(() => {
     const baseFilters = {
       ...filters,
@@ -632,10 +638,9 @@ export default function FollowUp() {
     const urgMap = new Map();
     for (const r of augmentedRows) {
       if (!passesFilters(r, baseFilters, activeRole)) continue;
-      const raw = r.urgency_reason_raw || r.priority || '';
-      for (const cat of normalizeUrgencyReasons(raw)) {
-        urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
-      }
+      if (!r.urgent_priority) continue;
+      const key = r.urgent_priority.startsWith('Drop') ? 'Drop' : r.urgent_priority;
+      urgMap.set(key, (urgMap.get(key) || 0) + 1);
     }
     return [...urgMap.entries()]
       .sort((a, b) => b[1] - a[1])
