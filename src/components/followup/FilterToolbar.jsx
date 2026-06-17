@@ -322,19 +322,20 @@ export default function FilterToolbar({
               <DateRangePicker fromVal={filters.finalDdFrom} toVal={filters.finalDdTo}
                 onChange={({ from, to }) => onChange({ ...filters, finalDdFrom: from, finalDdTo: to })} />
             </FilterField>
-            {/* Drop Date — Rep view only, populated from selected collection. */}
-            {isRepScope && (
-              <FilterField label="Drop Date">
-                <MultiSelect
-                  value={filters.dropDates || []}
-                  onChange={v => set('dropDates', v)}
-                  options={dropDateOptions}
-                  placeholder={Array.isArray(filters.collection) && filters.collection.length > 0
-                    ? 'All drop dates'
-                    : 'Select a collection first'}
-                />
-              </FilterField>
-            )}
+            {/* Drop Date — populated from selected collection. Shown for both
+                New and Rep scopes since the urgent_priority "Drop …" values
+                come from New orders (O/SWIM) and Rep orders also have drop
+                dates worth filtering on. */}
+            <FilterField label="Drop Date">
+              <MultiSelect
+                value={filters.dropDates || []}
+                onChange={v => set('dropDates', v)}
+                options={dropDateOptions}
+                placeholder={Array.isArray(filters.collection) && filters.collection.length > 0
+                  ? 'All drop dates'
+                  : 'Select a collection first'}
+              />
+            </FilterField>
             <FilterField label="Next Update">
               <DateRangePicker fromVal={filters.nextUpdateFrom} toVal={filters.nextUpdateTo}
                 onChange={({ from, to }) => onChange({ ...filters, nextUpdateFrom: from, nextUpdateTo: to })} />

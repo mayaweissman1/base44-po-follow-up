@@ -167,7 +167,9 @@ function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = f
       </div>
       {((showPriority && po.urgent_priority) || po.marked_urgent || (showLateFutureBadges && (isReceived || isLate || isFuture))) && (
         <div className="flex gap-1 mt-1 flex-wrap items-center">
-          {showPriority && po.urgent_priority && <PriorityBadge priority={po.urgent_priority} />}
+          {showPriority && po.urgent_priority && (
+            <PriorityBadge priority={po.urgent_priority.startsWith('Drop') ? 'Drop' : po.urgent_priority} />
+          )}
           {po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
           {showLateFutureBadges && isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
           {showLateFutureBadges && isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}

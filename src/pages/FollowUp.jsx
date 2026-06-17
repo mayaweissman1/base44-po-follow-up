@@ -599,10 +599,11 @@ export default function FollowUp() {
     };
   }, [rows, isRepView]);
 
-  // Rep view — Drop Date options come from the POs in the currently selected
-  // collection(s). Empty until a collection is chosen.
+  // Drop Date options — come from the POs in the currently selected
+  // collection(s). Empty until a collection is chosen. Available for both
+  // New and Rep scopes (main_office only).
   const dropDateOptions = useMemo(() => {
-    if (!isRepView) return [];
+    if (activeRole !== 'main_office') return [];
     const selectedCollections = Array.isArray(filters.collection) ? filters.collection : [];
     if (selectedCollections.length === 0) return [];
     const dateMap = new Map();
@@ -615,7 +616,7 @@ export default function FollowUp() {
     return [...dateMap.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
       .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
-  }, [rows, filters.collection, isRepView]);
+  }, [rows, filters.collection, activeRole]);
 
   // "Urgent Priority" options — distinct values of the computed
   // `urgent_priority` field per the SQL CASE expression: BEST SELLER NEW/OLD,
