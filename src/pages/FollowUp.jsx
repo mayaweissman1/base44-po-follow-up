@@ -121,14 +121,13 @@ function normalizeUrgencyReasons(raw) {
   return out;
 }
 
-// Helper: does row match urgency-reason token? Matches against the computed
-// urgent_priority (per spec §3.3.2) when available, else falls back to the
-// legacy normalized urgency_reason_raw categories.
+// Helper: does row match an "Urgent Priority" token? Matches against the
+// computed urgent_priority field. Special token "Drop" matches any
+// "Drop ..." value (since drop dates vary, we bucket them under one label).
 function matchUrgencyReason(row, p) {
-  if (row.urgent_priority && row.urgent_priority === p) return true;
-  const raw = row.urgency_reason_raw || row.priority || '';
-  const cats = normalizeUrgencyReasons(raw);
-  return cats.has(p);
+  if (!row.urgent_priority) return false;
+  if (p === 'Drop') return row.urgent_priority.startsWith('Drop');
+  return row.urgent_priority === p;
 }
 
 // Helper: does row match a collection token (CURRENT, CURRENT_AT_RISK, PREVIOUS, or literal)?
@@ -612,13 +611,16 @@ export default function FollowUp() {
       .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
   }, [rows, filters.collection, isRepView]);
 
-  // Urgent Priority options — uses the raw `urgency_reason` from po_urgent_status
-  // (same source as the table's "Urgency Reason" column). Counts are LIVE and
-  // reflect every active non-free-text filter (status, supplier region, dd
-  // manager, supplier, production stage, collection, etc.) so users see how
-  // many rows each option would yield on top of the current filter state.
-  // Free-text inputs (PO, style, delay response, last urgent comment) are
-  // excluded from the count base so typing doesn't recompute the dropdown.
+  // "Urgent Priority" options — the distinct values of the computed
+  // `urgent_priority` field (BEST SELLER NEW/OLD, SOLD OUT, MISSING SIZES,
+  // MANUAL, URGENT, "Risk in Fabric/PPS", etc.). All "Drop ..." values are
+  // bucketed under a single "Drop" entry since the actual date varies per PO.
+  // Counts are LIVE — they reflect every active non-free-text filter (delay
+  // request status, supplier region, dd manager, supplier, production stage,
+  // collection, etc.) so the user sees how many rows each option would yield
+  // on top of the current filter state. Free-text inputs (PO, style, delay
+  // response, last urgent comment) are excluded from the count base so
+  // typing doesn't recompute the dropdown on every keystroke (cache-friendly).
   const urgencyReasonOptions = useMemo(() => {
     const baseFilters = {
       ...filters,
@@ -631,11 +633,10 @@ export default function FollowUp() {
     const urgMap = new Map();
     for (const r of augmentedRows) {
       if (!passesFilters(r, baseFilters, activeRole)) continue;
-      const urgRaw = r.urgency_reason_raw || r.priority;
-      if (!urgRaw) continue;
-      for (const cat of normalizeUrgencyReasons(urgRaw)) {
-        urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
-      }
+      if (!r.urgent_priority) continue;
+      // Bucket all "Drop ..." variants under one "Drop" label
+      const key = r.urgent_priority.startsWith('Drop') ? 'Drop' : r.urgent_priority;
+      urgMap.set(key, (urgMap.get(key) || 0) + 1);
     }
     return [...urgMap.entries()]
       .sort((a, b) => b[1] - a[1])
