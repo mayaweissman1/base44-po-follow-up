@@ -612,29 +612,81 @@ export default function FollowUp() {
       .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
   }, [rows, filters.collection, isRepView]);
 
-  // Urgent Priority counts are LIVE — each option shows how many rows would
-  // remain if you selected it on top of the currently-active filters. We
-  // compute over the rows that pass every OTHER filter (urgencyReason = []).
+  // Urgent Priority options — uses the normalized raw `urgency_reason` values
+  // (US-/UK- destination prefixes stripped, split on , ; |). Counts are LIVE
+  // and reflect every other ACTIVE non-free-text filter (delay request
+  // status, supplier region, dd manager, supplier, production stage, etc.)
+  // — but NOT free-text inputs (PO, style, delay response, last urgent
+  // comment) so typing doesn't recompute the dropdown on every keystroke.
+  // The non-free-text filter slice is memoized as a stable key, so the
+  // expensive count loop only re-runs when one of those filters actually
+  // changes (the cache).
+  const urgencyFilterKey = useMemo(() => JSON.stringify({
+    status: filters.status,
+    orderState: filters.orderState,
+    orderType: filters.orderType,
+    supplierRegion: filters.supplierRegion,
+    supplier: filters.supplier,
+    ddManager: filters.ddManager,
+    ddStatus: filters.ddStatus,
+    collection: filters.collection,
+    deliveryStatus: filters.deliveryStatus,
+    priorityUS: filters.priorityUS,
+    priorityUK: filters.priorityUK,
+    missingSizes: filters.missingSizes,
+    shippingMethod: filters.shippingMethod,
+    pmTags: filters.pmTags,
+    dropDates: filters.dropDates,
+    dropDateFrom: filters.dropDateFrom,
+    dropDateTo: filters.dropDateTo,
+    finalDdFrom: filters.finalDdFrom,
+    finalDdTo: filters.finalDdTo,
+    nextUpdateFrom: filters.nextUpdateFrom,
+    nextUpdateTo: filters.nextUpdateTo,
+    delayDaysMin: filters.delayDaysMin,
+    delayDaysMax: filters.delayDaysMax,
+    shippedPctMin: filters.shippedPctMin,
+    shippedPctMax: filters.shippedPctMax,
+    indMin: filters.indMin,
+    indMax: filters.indMax,
+    archive: filters.archive,
+    staleStatus: filters.staleStatus,
+    late7Plus: filters.late7Plus,
+    bestSeller: filters.bestSeller,
+    highBno: filters.highBno,
+    dropRisk: filters.dropRisk,
+    urgentOnly: filters.urgentOnly,
+    mayBeUrgentOnly: filters.mayBeUrgentOnly,
+    lateFuture: filters.lateFuture,
+    bnoHighLowOtw: filters.bnoHighLowOtw,
+    sameStatusOver5d: filters.sameStatusOver5d,
+  }), [filters]);
+
   const urgencyReasonOptions = useMemo(() => {
-    const baseFilters = { ...filters, urgencyReason: [] };
+    // Build a filters object that excludes urgencyReason itself AND all
+    // free-text inputs (so the counts stay stable while typing).
+    const baseFilters = {
+      ...filters,
+      urgencyReason: [],
+      po: '',
+      style: '',
+      delayResponse: '',
+      lastUrgentComment: '',
+    };
     const urgMap = new Map();
     for (const r of augmentedRows) {
       if (!passesFilters(r, baseFilters, activeRole)) continue;
-      if (r.urgent_priority) {
-        urgMap.set(r.urgent_priority, (urgMap.get(r.urgent_priority) || 0) + 1);
-      } else {
-        const urgRaw = r.urgency_reason_raw || r.priority;
-        if (urgRaw) {
-          for (const cat of normalizeUrgencyReasons(urgRaw)) {
-            urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
-          }
-        }
+      const urgRaw = r.urgency_reason_raw || r.priority;
+      if (!urgRaw) continue;
+      for (const cat of normalizeUrgencyReasons(urgRaw)) {
+        urgMap.set(cat, (urgMap.get(cat) || 0) + 1);
       }
     }
     return [...urgMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([k, c]) => ({ value: k, label: `${k} (${c})` }));
-  }, [augmentedRows, filters, activeRole]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [augmentedRows, activeRole, urgencyFilterKey]);
 
   // Augment server KPIs with client-computed values
   const displayKpis = useMemo(() => {
