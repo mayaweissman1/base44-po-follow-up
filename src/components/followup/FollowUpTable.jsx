@@ -139,10 +139,20 @@ function DdCommentLog({ log }) {
   );
 }
 
-function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = false }) {
+function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = false, showUrgencyReason = false }) {
   const isLate = po.late_future === 'LATE';
   const isFuture = po.late_future === 'FUTURE';
   const isReceived = po.late_future === 'RECEIVED';
+  // Urgency reason tokens — split the raw value (comma/semicolon/pipe) and
+  // strip US-/UK- destination prefixes so it matches the dropdown options.
+  const urgencyTokens = showUrgencyReason && po.urgency_reason_raw
+    ? Array.from(new Set(
+        String(po.urgency_reason_raw)
+          .split(/[,;|]+/)
+          .map(t => t.trim().replace(/^(US|UK)\s*[-–:]\s*/i, '').trim())
+          .filter(Boolean)
+      ))
+    : [];
   // "May be urgent" — small orange flame icon with tooltip when the PO matches
   // any of the user-configurable rules (see lib/mayBeUrgentRules.js). The
   // matched rule labels show in the tooltip. Falls back to the legacy server
@@ -165,9 +175,12 @@ function PoCell({ po, onLogsClick, showLateFutureBadges = true, showPriority = f
         )}
         <button onClick={(e) => { e.stopPropagation(); onLogsClick(po); }} className="font-mono font-semibold text-[#E31B7F] hover:underline text-[13px]">{po.po_number}</button>
       </div>
-      {((showPriority && po.urgent_priority) || po.marked_urgent || (showLateFutureBadges && (isReceived || isLate || isFuture))) && (
+      {((showPriority && po.urgent_priority) || urgencyTokens.length > 0 || po.marked_urgent || (showLateFutureBadges && (isReceived || isLate || isFuture))) && (
         <div className="flex gap-1 mt-1 flex-wrap items-center">
           {showPriority && po.urgent_priority && <PriorityBadge priority={po.urgent_priority} />}
+          {urgencyTokens.map(t => (
+            <span key={t} className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-orange-50 text-orange-600 border border-orange-200" title={t}>{t}</span>
+          ))}
           {po.marked_urgent && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-amber-50 text-amber-600 border border-amber-200">URGENT</span>}
           {showLateFutureBadges && isReceived && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-green-50 text-green-600 border border-green-200">RECEIVED</span>}
           {showLateFutureBadges && isLate && <span className="inline-flex items-center px-1.5 py-0.5 rounded-[0.65rem] text-[9px] font-bold uppercase bg-red-50 text-red-500 border border-red-200">LATE</span>}
@@ -973,7 +986,7 @@ export default function FollowUpTable({
                       </button>
                     </td>
                     {role !== 'main_office' && <td className={tdBase}><StyleThumbnail key={po.po_number} styleColor={po.style_color} imageUrl={po.product_image} size={40} /></td>}
-                    {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} showLateFutureBadges={role !== 'main_office'} showPriority={role === 'main_office'} /></td>}
+                    {colVisible('po_number') && <td className={tdBase}><PoCell po={po} onLogsClick={onViewLogs} showLateFutureBadges={role !== 'main_office'} showPriority={false} showUrgencyReason={role === 'main_office'} /></td>}
                     {colVisible('style_color') && <td className={tdBase}><span className="font-mono text-[12px]">{po.style_color}</span></td>}
                     {colVisible('effective_dd_status') && <td className={tdBase}><DdStatusBadge status={po.effective_dd_status} /></td>}
                     {colVisible('current_status') && <td className={tdBase}><StatusBadge status={po.current_status} /></td>}
