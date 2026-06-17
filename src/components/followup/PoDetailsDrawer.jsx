@@ -36,8 +36,11 @@ export default function PoDetailsDrawer({ po, onClose }) {
   const totalReceived = Number(po.qty_received) || null;
 
   // GFS aggregated from getPoDetails size breakdown
-  const totalGfs = details?.destinations?.length
-    ? details.destinations.reduce((t, d) => t + d.sizes.reduce((s, sz) => s + (sz.good_for_sale || 0), 0), 0)
+  const totalGfs = Array.isArray(details?.destinations)
+    ? details.destinations.reduce((total, destination) => {
+        const sizes = Array.isArray(destination?.size_breakdown) ? destination.size_breakdown : [];
+        return total + sizes.reduce((sum, size) => sum + (Number(size.good_for_sale) || 0), 0);
+      }, 0)
     : null;
 
   const airOtw = po.air_otw ?? po.otw ?? details?.air_otw ?? null;
