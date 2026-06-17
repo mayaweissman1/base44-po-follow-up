@@ -612,59 +612,14 @@ export default function FollowUp() {
       .map(([d, c]) => ({ value: d, label: `${d} (${c})` }));
   }, [rows, filters.collection, isRepView]);
 
-  // Urgent Priority options — uses the normalized raw `urgency_reason` values
-  // (US-/UK- destination prefixes stripped, split on , ; |). Counts are LIVE
-  // and reflect every other ACTIVE non-free-text filter (delay request
-  // status, supplier region, dd manager, supplier, production stage, etc.)
-  // — but NOT free-text inputs (PO, style, delay response, last urgent
-  // comment) so typing doesn't recompute the dropdown on every keystroke.
-  // The non-free-text filter slice is memoized as a stable key, so the
-  // expensive count loop only re-runs when one of those filters actually
-  // changes (the cache).
-  const urgencyFilterKey = useMemo(() => JSON.stringify({
-    status: filters.status,
-    orderState: filters.orderState,
-    orderType: filters.orderType,
-    supplierRegion: filters.supplierRegion,
-    supplier: filters.supplier,
-    ddManager: filters.ddManager,
-    ddStatus: filters.ddStatus,
-    collection: filters.collection,
-    deliveryStatus: filters.deliveryStatus,
-    priorityUS: filters.priorityUS,
-    priorityUK: filters.priorityUK,
-    missingSizes: filters.missingSizes,
-    shippingMethod: filters.shippingMethod,
-    pmTags: filters.pmTags,
-    dropDates: filters.dropDates,
-    dropDateFrom: filters.dropDateFrom,
-    dropDateTo: filters.dropDateTo,
-    finalDdFrom: filters.finalDdFrom,
-    finalDdTo: filters.finalDdTo,
-    nextUpdateFrom: filters.nextUpdateFrom,
-    nextUpdateTo: filters.nextUpdateTo,
-    delayDaysMin: filters.delayDaysMin,
-    delayDaysMax: filters.delayDaysMax,
-    shippedPctMin: filters.shippedPctMin,
-    shippedPctMax: filters.shippedPctMax,
-    indMin: filters.indMin,
-    indMax: filters.indMax,
-    archive: filters.archive,
-    staleStatus: filters.staleStatus,
-    late7Plus: filters.late7Plus,
-    bestSeller: filters.bestSeller,
-    highBno: filters.highBno,
-    dropRisk: filters.dropRisk,
-    urgentOnly: filters.urgentOnly,
-    mayBeUrgentOnly: filters.mayBeUrgentOnly,
-    lateFuture: filters.lateFuture,
-    bnoHighLowOtw: filters.bnoHighLowOtw,
-    sameStatusOver5d: filters.sameStatusOver5d,
-  }), [filters]);
-
+  // Urgent Priority options — uses the raw `urgency_reason` from po_urgent_status
+  // (same source as the table's "Urgency Reason" column). Counts are LIVE and
+  // reflect every active non-free-text filter (status, supplier region, dd
+  // manager, supplier, production stage, collection, etc.) so users see how
+  // many rows each option would yield on top of the current filter state.
+  // Free-text inputs (PO, style, delay response, last urgent comment) are
+  // excluded from the count base so typing doesn't recompute the dropdown.
   const urgencyReasonOptions = useMemo(() => {
-    // Build a filters object that excludes urgencyReason itself AND all
-    // free-text inputs (so the counts stay stable while typing).
     const baseFilters = {
       ...filters,
       urgencyReason: [],
@@ -685,8 +640,7 @@ export default function FollowUp() {
     return [...urgMap.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([k, c]) => ({ value: k, label: `${k} (${c})` }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [augmentedRows, activeRole, urgencyFilterKey]);
+  }, [augmentedRows, filters, activeRole]);
 
   // Augment server KPIs with client-computed values
   const displayKpis = useMemo(() => {
