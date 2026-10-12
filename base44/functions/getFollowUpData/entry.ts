@@ -1,16 +1,6 @@
 import { createClientFromRequest } from 'npm:@base44/sdk@0.8.25';
 
-const DB_URL = Deno.env.get('EDIKTED_DB_URL');
-
-let _pgClient = null;
-async function getPgClient() {
-  if (_pgClient) return _pgClient;
-  const pg = await import('npm:pg@8.11.3');
-  const Client = pg.default?.Client || pg.Client;
-  _pgClient = new Client({ connectionString: DB_URL, ssl: false });
-  await _pgClient.connect();
-  return _pgClient;
-}
+import { getPgClient } from '../../shared/db.ts';
 
 async function query(sql, params = []) {
   const client = await getPgClient();
